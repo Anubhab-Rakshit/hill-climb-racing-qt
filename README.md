@@ -23,6 +23,8 @@ To read the complete blueprints for each domain, explore the dedicated documenta
 | **[04. Software Architecture & OOP](./docs/04_SOFTWARE_ARCHITECTURE_AND_CLASS_DESIGN.md)** | C++ Design Patterns | UML class diagrams, State pattern, fixed-timestep game loop, input buffering, and Qt event integration. |
 | **[05. Gameplay Mechanics & Levels](./docs/05_GAMEPLAY_SYSTEMS_AND_LEVEL_GENERATION.md)** | Game Design & Procedural Math | Perlin/sinusoidal terrain generation, fuel drain balance, coin distribution, upgrade curves, and stunt detectors. |
 | **[06. Team Roadmap & QA Protocols](./docs/06_TEAM_DIVISION_ROADMAP_AND_TESTING.md)** | Project Management & Testing | 4-week sprint plan, individual role assignments (2 to 5 members), QTest unit testing suite, and grading defense checklist. |
+| **[07. GitHub Benchmark & Innovation](./docs/07_GITHUB_BENCHMARK_AND_INNOVATION.md)** | Open-Source Comparative Analysis | Audit of existing Box2D implementations, b2WheelJoint soft constraints, continuous circle-segment collision, and raster optimizations. |
+| **[08. Brick-by-Brick Execution Plan](./docs/08_BRICK_BY_BRICK_EXECUTION_PLAN.md)** | Step-by-Step Construction Guide | The sequential 8-brick incremental construction roadmap with interfaces, math formulas, and acceptance criteria. |
 
 ---
 
