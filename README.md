@@ -25,6 +25,7 @@ To read the complete blueprints for each domain, explore the dedicated documenta
 | **[06. Team Roadmap & QA Protocols](./docs/06_TEAM_DIVISION_ROADMAP_AND_TESTING.md)** | Project Management & Testing | 4-week sprint plan, individual role assignments (2 to 5 members), QTest unit testing suite, and grading defense checklist. |
 | **[07. GitHub Benchmark & Innovation](./docs/07_GITHUB_BENCHMARK_AND_INNOVATION.md)** | Open-Source Comparative Analysis | Audit of existing Box2D implementations, b2WheelJoint soft constraints, continuous circle-segment collision, and raster optimizations. |
 | **[08. Brick-by-Brick Execution Plan](./docs/08_BRICK_BY_BRICK_EXECUTION_PLAN.md)** | Step-by-Step Construction Guide | The sequential 8-brick incremental construction roadmap with interfaces, math formulas, and acceptance criteria. |
+| **[Teammate Onboarding & Physics Guide](./docs/DEVELOPER_SETUP_AND_FRIENDS_GUIDE.md)** | Developer Guide for Friends | Step-by-step instructions for teammates to build in Qt Creator and tune the physics/math engine. |
 
 ---
 
