@@ -41,6 +41,9 @@ public:
     void setGasVirtualPressed(bool pressed);
 
     void setOnPauseClicked(std::function<void()> cb) { m_pauseButton.setOnClick(cb); }
+    void setButtonSound(std::function<void()> cb) { m_pauseButton.setOnSound(cb); }
+
+    void addFloatingText(const std::string& text, float x, float y, uint32_t color = 0xFFFFB300);
 
     void update(float dt);
     void render(Graphics::Framebuffer& fb);
@@ -61,6 +64,16 @@ private:
     float m_distance;
     float m_recordDistance;
     int m_coins;
+
+    struct FloatingText {
+        std::string text;
+        float x;
+        float y;
+        float life;
+        float maxLife;
+        uint32_t color;
+    };
+    std::vector<FloatingText> m_floatingTexts;
 };
 
 } // namespace UI

@@ -123,6 +123,21 @@ void ProfileManager::unlockStage(const std::string& stageId) {
     save();
 }
 
+int ProfileManager::getStageUnlockCost(const std::string& stageId) const {
+    if (stageId == "moon") return 1000;
+    if (stageId == "mountain") return 2500;
+    return 0;
+}
+
+bool ProfileManager::unlockStageWithCoins(const std::string& stageId) {
+    int cost = getStageUnlockCost(stageId);
+    if (!isStageUnlocked(stageId) && spendCoins(cost)) {
+        unlockStage(stageId);
+        return true;
+    }
+    return false;
+}
+
 void ProfileManager::load() {
     QSettings settings("HillClimbQtTeam", "HillClimbRacingQt");
     if (settings.contains("coins")) {
@@ -132,13 +147,18 @@ void ProfileManager::load() {
         m_upgradeLevels[UPGRADE_TIRES] = settings.value("up_tires", 1).toInt();
         m_upgradeLevels[UPGRADE_4WD] = settings.value("up_4wd", 1).toInt();
 
-        m_stageRecords["countryside"] = settings.value("rec_countryside", 450.0f).toFloat();
-        m_stageRecords["desert"] = settings.value("rec_desert", 320.0f).toFloat();
-        m_stageRecords["moon"] = settings.value("rec_moon", 0.0f).toFloat();
-        m_stageRecords["mountain"] = settings.value("rec_mountain", 0.0f).toFloat();
-
-        m_stageUnlocked["moon"] = settings.value("unlocked_moon", false).toBool();
-        m_stageUnlocked["mountain"] = settings.value("unlocked_mountain", false).toBool();
+        for (auto& pair : m_stageRecords) {
+            QString key = QString::fromStdString("rec_" + pair.first);
+            if (settings.contains(key)) {
+                pair.second = settings.value(key, pair.second).toFloat();
+            }
+        }
+        for (auto& pair : m_stageUnlocked) {
+            QString key = QString::fromStdString("unlocked_" + pair.first);
+            if (settings.contains(key)) {
+                pair.second = settings.value(key, pair.second).toBool();
+            }
+        }
     }
 }
 
@@ -150,13 +170,12 @@ void ProfileManager::save() const {
     settings.setValue("up_tires", m_upgradeLevels[UPGRADE_TIRES]);
     settings.setValue("up_4wd", m_upgradeLevels[UPGRADE_4WD]);
 
-    settings.setValue("rec_countryside", m_stageRecords.at("countryside"));
-    settings.setValue("rec_desert", m_stageRecords.at("desert"));
-    settings.setValue("rec_moon", m_stageRecords.at("moon"));
-    settings.setValue("rec_mountain", m_stageRecords.at("mountain"));
-
-    settings.setValue("unlocked_moon", m_stageUnlocked.at("moon"));
-    settings.setValue("unlocked_mountain", m_stageUnlocked.at("mountain"));
+    for (const auto& pair : m_stageRecords) {
+        settings.setValue(QString::fromStdString("rec_" + pair.first), pair.second);
+    }
+    for (const auto& pair : m_stageUnlocked) {
+        settings.setValue(QString::fromStdString("unlocked_" + pair.first), pair.second);
+    }
 }
 
 } // namespace Core

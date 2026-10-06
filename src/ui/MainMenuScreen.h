@@ -20,6 +20,12 @@ public:
     void setOnGarage(std::function<void()> cb) { m_btnGarage.setOnClick(cb); }
     void setOnStages(std::function<void()> cb) { m_btnStages.setOnClick(cb); }
     void setOnQuit(std::function<void()> cb) { m_btnQuit.setOnClick(cb); }
+    void setButtonSound(std::function<void()> cb) {
+        m_btnStart.setOnSound(cb);
+        m_btnGarage.setOnSound(cb);
+        m_btnStages.setOnSound(cb);
+        m_btnQuit.setOnSound(cb);
+    }
 
     void onMouseMove(int px, int py);
     bool onMouseDown(int px, int py);

@@ -19,6 +19,7 @@ public:
 private:
     void renderParallaxSky(Framebuffer& fb, const Camera& cam, const std::string& biomeId);
     void renderItems(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime);
+    void renderMilestones(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain);
 };
 
 } // namespace Graphics

@@ -15,9 +15,9 @@ GameOverScreen::GameOverScreen()
     , m_flips(0)
     , m_airTime(0.0f)
     , m_isNewRecord(false)
-    , m_btnRetry(0, 0, 180, 46, "RETRY", Theme::GREEN_GAS)
-    , m_btnGarage(0, 0, 180, 46, "GARAGE", Theme::GOLD)
-    , m_btnMenu(0, 0, 180, 46, "MENU", 0xFF37474F)
+    , m_btnRetry(0, 0, 175, 46, "RETRY [R]", Theme::GREEN_GAS)
+    , m_btnGarage(0, 0, 175, 46, "GARAGE", Theme::GOLD)
+    , m_btnMenu(0, 0, 175, 46, "MENU", 0xFF37474F)
 {
     setDimensions(m_width, m_height);
 }
@@ -26,9 +26,9 @@ void GameOverScreen::setDimensions(int width, int height) {
     m_width = width;
     m_height = height;
 
-    int btnW = 180;
+    int btnW = 175;
     int btnH = 46;
-    int gap = 20;
+    int gap = 18;
     int totalW = 3 * btnW + 2 * gap;
     int startX = (width - totalW) / 2;
     int btnY = height / 2 + 130;
@@ -71,35 +71,61 @@ void GameOverScreen::onMouseUp(int px, int py) {
 }
 
 void GameOverScreen::render(Graphics::Framebuffer& fb) {
-    // 1. Darkened overlay
-    fb.fillRect(0, 0, m_width, m_height, 0xC8080C14);
+    // 1. Darkened scanline raster overlay
+    fb.fillRect(0, 0, m_width, m_height, 0xD0080C14);
 
     // 2. Centered Summary Modal Card
-    int boxW = 600;
-    int boxH = 400;
+    int boxW = 620;
+    int boxH = 410;
     int boxX = (m_width - boxW) / 2;
     int boxY = (m_height - boxH) / 2;
 
     fb.fillRect(boxX, boxY, boxW, boxH, Theme::CARD_BG);
     fb.drawRect(boxX, boxY, boxW, boxH, Theme::RED_BRAKE);
-    fb.drawRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4, 0xFF000000);
+    fb.drawRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4, 0xFF05080E);
 
     // Header Title (e.g. "DRIVER DOWN!" or "OUT OF FUEL!")
     uint32_t headerCol = (m_reason == "OUT OF FUEL!") ? Theme::GOLD : Theme::RED_BRAKE;
+    Graphics::RasterFont::drawStringCentered(fb, m_width / 2 + 2, boxY + 24, m_reason, 0xFF05080E, 3);
     Graphics::RasterFont::drawStringCentered(fb, m_width / 2, boxY + 22, m_reason, headerCol, 3);
 
+    // Performance Medal (Bronze, Silver, Gold, Platinum)
+    std::string medalTitle = "ROOKIE";
+    uint32_t medalCol = 0xFF78909C;
+    if (m_distance >= 1200.0f) {
+        medalTitle = "PLATINUM CHAMPION";
+        medalCol = 0xFF00E5FF;
+    } else if (m_distance >= 600.0f) {
+        medalTitle = "GOLD MEDAL";
+        medalCol = Theme::GOLD;
+    } else if (m_distance >= 300.0f) {
+        medalTitle = "SILVER MEDAL";
+        medalCol = 0xFFCFD8DC;
+    } else if (m_distance >= 100.0f) {
+        medalTitle = "BRONZE MEDAL";
+        medalCol = 0xFFCD7F32;
+    }
+
     if (m_isNewRecord) {
-        int badgeW = 200;
+        int badgeW = 230;
         int badgeH = 22;
         int bx = m_width / 2 - badgeW / 2;
         int by = boxY + 60;
-        fb.fillRect(bx, by, badgeW, badgeH, 0xFFE65100);
+        fb.fillRect(bx, by, badgeW, badgeH, 0xFFD84315);
         fb.drawRect(bx, by, badgeW, badgeH, Theme::GOLD);
-        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, by + 4, "* NEW RECORD DISTANCE! *", Theme::TEXT_WHITE, 1);
+        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, by + 5, "* NEW RECORD DISTANCE! *", Theme::TEXT_WHITE, 1);
+    } else {
+        int badgeW = 200;
+        int badgeH = 20;
+        int bx = m_width / 2 - badgeW / 2;
+        int by = boxY + 62;
+        fb.fillRect(bx, by, badgeW, badgeH, 0xEE111A26);
+        fb.drawRect(bx, by, badgeW, badgeH, medalCol);
+        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, by + 4, medalTitle, medalCol, 1);
     }
 
     // Stats Table Grid
-    int tableY = boxY + 100;
+    int tableY = boxY + 98;
     int colLeft = boxX + 60;
     int colRight = boxX + boxW - 60;
 

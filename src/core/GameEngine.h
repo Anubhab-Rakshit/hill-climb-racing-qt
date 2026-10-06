@@ -23,6 +23,11 @@ public:
 
     void start();
 
+    GameStateManager& stateManager() { return m_stateManager; }
+    InputController& input() { return m_input; }
+    Graphics::Framebuffer& framebuffer() { return m_framebuffer; }
+    const Graphics::Framebuffer& framebuffer() const { return m_framebuffer; }
+
 private slots:
     void onTick();
 

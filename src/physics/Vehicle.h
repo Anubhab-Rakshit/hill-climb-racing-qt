@@ -46,7 +46,8 @@ public:
     // States & Stunts
     bool isRearOnGround() const { return m_rearContact; }
     bool isFrontOnGround() const { return m_frontContact; }
-    bool isAirborne() const { return !m_rearContact && !m_frontContact; }
+    bool isChassisContact() const { return m_chassisContact; }
+    bool isAirborne() const { return !m_rearContact && !m_frontContact && !m_chassisContact; }
     bool isDriverDown() const { return m_driverDown; }
     bool isOutOfFuel() const { return m_fuel <= 0.0f; }
 
@@ -79,12 +80,17 @@ private:
 
     // Suspension
     float m_suspRestLength;
+    float m_suspMinLength;
+    float m_suspMaxLength;
     float m_rearSuspensionLength;
     float m_frontSuspensionLength;
+    float m_rearSuspVel;
+    float m_frontSuspVel;
 
     // Driver Head Pendulum
     float m_driverHeadAngle;
     float m_driverHeadAngularVel;
+    float m_spawnGraceTimer;
 
     // Fuel & Controls
     float m_fuel;
@@ -93,6 +99,7 @@ private:
 
     bool m_rearContact;
     bool m_frontContact;
+    bool m_chassisContact;
     bool m_driverDown;
 };
 

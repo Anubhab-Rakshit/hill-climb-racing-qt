@@ -3,6 +3,7 @@
 #include "UITheme.h"
 #include <iomanip>
 #include <sstream>
+#include <algorithm>
 
 namespace UI {
 
@@ -19,6 +20,7 @@ HUD::HUD()
     , m_recordDistance(500.0f)
     , m_coins(0)
 {
+    setDimensions(m_width, m_height);
 }
 
 void HUD::setDimensions(int width, int height) {
@@ -35,19 +37,22 @@ void HUD::setDimensions(int width, int height) {
 }
 
 void HUD::setBrakeVirtualPressed(bool pressed) {
-    if (pressed) {
-        m_brakePedal.onMouseDown(m_brakePedal.isHovered() ? 0 : 36, m_height - 100);
-    } else {
-        m_brakePedal.onMouseUp(0, 0);
-    }
+    m_brakePedal.setPressed(pressed);
 }
 
 void HUD::setGasVirtualPressed(bool pressed) {
-    if (pressed) {
-        m_gasPedal.onMouseDown(m_gasPedal.isHovered() ? 0 : m_width - 150, m_height - 100);
-    } else {
-        m_gasPedal.onMouseUp(0, 0);
-    }
+    m_gasPedal.setPressed(pressed);
+}
+
+void HUD::addFloatingText(const std::string& text, float x, float y, uint32_t color) {
+    FloatingText ft;
+    ft.text = text;
+    ft.x = x;
+    ft.y = y;
+    ft.life = 0.0f;
+    ft.maxLife = 1.0f;
+    ft.color = color;
+    m_floatingTexts.push_back(ft);
 }
 
 void HUD::onMouseMove(int px, int py) {
@@ -74,19 +79,31 @@ void HUD::update(float dt) {
     m_speedometer.update(dt);
     m_tachometer.update(dt);
     m_stuntBanner.update(dt);
+
+    // Update floating score texts
+    for (size_t i = 0; i < m_floatingTexts.size(); ) {
+        m_floatingTexts[i].life += dt;
+        m_floatingTexts[i].y -= 35.0f * dt;
+        if (m_floatingTexts[i].life >= m_floatingTexts[i].maxLife) {
+            m_floatingTexts[i] = m_floatingTexts.back();
+            m_floatingTexts.pop_back();
+        } else {
+            ++i;
+        }
+    }
 }
 
 void HUD::render(Graphics::Framebuffer& fb) {
     // 1. Top Left: Fuel Bar
     m_fuelBar.render(fb);
 
-    // 2. Top Center: Distance Odometer Card
-    int distCardW = 210;
-    int distCardH = 34;
+    // 2. Top Center: Distance Odometer Card & Progress Track
+    int distCardW = 220;
+    int distCardH = 42;
     int distCardX = (m_width - distCardW) / 2;
-    int distCardY = 16;
+    int distCardY = 14;
 
-    fb.fillRect(distCardX, distCardY, distCardW, distCardH, 0xDD0C1320);
+    fb.fillRect(distCardX, distCardY, distCardW, distCardH, 0xEE0A121E);
     fb.drawRect(distCardX, distCardY, distCardW, distCardH, Theme::CARD_BORDER);
 
     int distInt = static_cast<int>(m_distance);
@@ -94,25 +111,39 @@ void HUD::render(Graphics::Framebuffer& fb) {
     std::snprintf(distBuf, sizeof(distBuf), "%05dm", distInt);
 
     Graphics::RasterFont::drawString(fb, distCardX + 10, distCardY + 6, "DIST", Theme::TEXT_MUTED, 1);
-    Graphics::RasterFont::drawString(fb, distCardX + 50, distCardY + 6, distBuf, Theme::TEXT_WHITE, 2);
+    Graphics::RasterFont::drawString(fb, distCardX + 48, distCardY + 5, distBuf, Theme::TEXT_WHITE, 2);
 
     int recInt = static_cast<int>(m_recordDistance);
     char recBuf[32];
     std::snprintf(recBuf, sizeof(recBuf), "REC %04dm", recInt);
-    Graphics::RasterFont::drawString(fb, distCardX + 138, distCardY + 22, recBuf, Theme::GOLD, 1);
+    Graphics::RasterFont::drawString(fb, distCardX + 144, distCardY + 8, recBuf, Theme::GOLD, 1);
+
+    // Mini Stage Progress Track Line
+    int trackX = distCardX + 10;
+    int trackY = distCardY + 30;
+    int trackW = distCardW - 20;
+    fb.fillRect(trackX, trackY, trackW, 4, 0xFF192534);
+
+    float trackProg = std::clamp(m_distance / 1000.0f, 0.0f, 1.0f);
+    int fillW = static_cast<int>(trackProg * trackW);
+    if (fillW > 0) {
+        fb.fillRect(trackX, trackY, fillW, 4, Theme::CYAN_UPGRADE);
+    }
+    // Indicator pip for car position
+    fb.fillRect(trackX + fillW - 2, trackY - 2, 5, 8, Theme::GOLD);
 
     // 3. Top Right: Coin Balance Box
     int coinBoxW = 120;
-    int coinBoxH = 30;
+    int coinBoxH = 32;
     int coinBoxX = m_width - coinBoxW - 80;
-    int coinBoxY = 18;
+    int coinBoxY = 16;
 
-    fb.fillRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, 0xEE111926);
+    fb.fillRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, 0xEE0B121C);
     fb.drawRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, Theme::CARD_BORDER);
 
     // Pixel gold coin icon
-    int iconX = coinBoxX + 12;
-    int iconY = coinBoxY + 15;
+    int iconX = coinBoxX + 14;
+    int iconY = coinBoxY + 16;
     fb.fillCircle(iconX, iconY, 7, Theme::GOLD);
     fb.drawCircle(iconX, iconY, 7, 0xFFFFA000);
     Graphics::RasterFont::drawStringCentered(fb, iconX, iconY - 3, "$", 0xFF6D4C41, 1);
@@ -124,15 +155,23 @@ void HUD::render(Graphics::Framebuffer& fb) {
     // 4. Pause Button
     m_pauseButton.render(fb, 2);
 
-    // 5. Bottom Center: Gauges
+    // 5. Floating Text FX (Popups for collected coins and fuel)
+    for (const auto& ft : m_floatingTexts) {
+        int fx = static_cast<int>(ft.x);
+        int fy = static_cast<int>(ft.y);
+        Graphics::RasterFont::drawStringCentered(fb, fx + 1, fy + 1, ft.text, 0xFF05080E, 2);
+        Graphics::RasterFont::drawStringCentered(fb, fx, fy, ft.text, ft.color, 2);
+    }
+
+    // 6. Bottom Center: Gauges
     m_speedometer.render(fb);
     m_tachometer.render(fb);
 
-    // 6. Bottom Corners: Interactive Arcade Pedals
+    // 7. Bottom Corners: Interactive Arcade Pedals
     m_brakePedal.render(fb, 2);
     m_gasPedal.render(fb, 2);
 
-    // 7. Stunt Notifications Banner (Top-Center floating)
+    // 8. Stunt Notifications Banner (Top-Center floating)
     m_stuntBanner.render(fb);
 }
 

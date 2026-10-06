@@ -9,7 +9,7 @@ Camera::Camera(int screenWidth, int screenHeight)
     , m_screenH(screenHeight)
     , m_pos({0.0f, 0.0f})
     , m_shakeOffset({0.0f, 0.0f})
-    , m_zoom(22.0f) // 22 pixels per meter base scale
+    , m_zoom(44.0f) // 44 pixels per meter base scale for authentic Hill Climb framing
     , m_trauma(0.0f)
 {
 }
@@ -20,8 +20,8 @@ void Camera::addTrauma(float amount) {
 
 void Camera::update(float dt, const Physics::Vec2& targetPos, float targetSpeedX) {
     // 1. Dynamic Look-ahead based on forward speed
-    float lookAheadX = std::clamp(targetSpeedX * 0.35f, 0.0f, 8.0f);
-    Physics::Vec2 desiredPos = {targetPos.x + lookAheadX, targetPos.y + 1.2f};
+    float lookAheadX = std::clamp(targetSpeedX * 0.35f, 0.0f, 7.0f);
+    Physics::Vec2 desiredPos = {targetPos.x + lookAheadX, targetPos.y + 0.9f};
 
     // Smooth position lerp
     float lerpSpeed = 7.0f;
@@ -29,15 +29,15 @@ void Camera::update(float dt, const Physics::Vec2& targetPos, float targetSpeedX
     m_pos.y += (desiredPos.y - m_pos.y) * (1.0f - std::exp(-lerpSpeed * dt));
 
     // 2. Speed-dependent Zoom Out
-    float targetZoom = 24.0f - std::clamp(std::abs(targetSpeedX) * 0.35f, 0.0f, 8.0f);
+    float targetZoom = 46.0f - std::clamp(std::abs(targetSpeedX) * 0.40f, 0.0f, 12.0f);
     m_zoom += (targetZoom - m_zoom) * (1.0f - std::exp(-4.0f * dt));
 
     // 3. Traumatic Shake
     if (m_trauma > 0.001f) {
         float shake = m_trauma * m_trauma; // Non-linear shake curve
         float maxOffset = 0.6f; // meters
-        float r1 = (static_cast<float>(std::rand()) / RAND_MAX) * 2.0f - 1.0f;
-        float r2 = (static_cast<float>(std::rand()) / RAND_MAX) * 2.0f - 1.0f;
+        float r1 = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 2.0f - 1.0f;
+        float r2 = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 2.0f - 1.0f;
         m_shakeOffset = {r1 * maxOffset * shake, r2 * maxOffset * shake};
         m_trauma = std::max(0.0f, m_trauma - 1.5f * dt);
     } else {

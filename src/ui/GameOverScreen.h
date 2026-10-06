@@ -22,6 +22,11 @@ public:
     void setOnRetry(std::function<void()> cb) { m_btnRetry.setOnClick(cb); }
     void setOnGarage(std::function<void()> cb) { m_btnGarage.setOnClick(cb); }
     void setOnMenu(std::function<void()> cb) { m_btnMenu.setOnClick(cb); }
+    void setButtonSound(std::function<void()> cb) {
+        m_btnRetry.setOnSound(cb);
+        m_btnGarage.setOnSound(cb);
+        m_btnMenu.setOnSound(cb);
+    }
 
     void onMouseMove(int px, int py);
     bool onMouseDown(int px, int py);

@@ -36,6 +36,7 @@ public:
 
     void changeState(StateType newState);
     StateType currentState() const { return m_currentState; }
+    void startRace(const std::string& biomeId);
 
     void handleInput(const InputController::State& input);
     void fixedUpdate(float dt);
@@ -68,7 +69,6 @@ private:
     UI::GameOverScreen m_gameOverScreen;
 
     void setupUiCallbacks();
-    void startRace(const std::string& biomeId);
 };
 
 } // namespace Core

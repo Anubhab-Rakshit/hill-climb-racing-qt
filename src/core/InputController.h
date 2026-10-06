@@ -19,6 +19,9 @@ public:
         int mouseX = 0;
         int mouseY = 0;
         bool mouseDown = false;
+        bool mouseJustPressed = false;
+        bool mouseJustReleased = false;
+        bool mouseMoved = false;
     };
 
     InputController();

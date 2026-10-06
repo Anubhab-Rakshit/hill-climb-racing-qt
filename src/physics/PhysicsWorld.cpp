@@ -18,7 +18,9 @@ PhysicsWorld::PhysicsWorld()
 
 void PhysicsWorld::reset(const std::string& biomeId) {
     m_terrain.setBiome(biomeId);
-    m_vehicle.reset(5.0f, 3.0f);
+    float startX = 5.0f;
+    float groundY = m_terrain.getHeight(startX);
+    m_vehicle.reset(startX, groundY + 1.20f);
 
     m_distance = 0.0f;
     m_coinsCollected = 0;
@@ -52,7 +54,7 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
     if (m_vehicle.isDriverDown()) {
         m_gameOver = true;
         m_gameOverReason = "DRIVER DOWN!";
-    } else if (m_vehicle.isOutOfFuel() && m_vehicle.getSpeedKmh() < 1.0f) {
+    } else if (m_vehicle.isOutOfFuel() && m_vehicle.getSpeedKmh() < 0.5f) {
         m_gameOver = true;
         m_gameOverReason = "OUT OF FUEL!";
     }

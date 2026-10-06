@@ -31,6 +31,18 @@ void GameStateManager::setDimensions(int width, int height) {
 }
 
 void GameStateManager::setupUiCallbacks() {
+    auto playClick = [this]() {
+        m_audio.playButtonClick();
+    };
+
+    // Button audio feedback
+    m_mainMenu.setButtonSound(playClick);
+    m_garage.setButtonSound(playClick);
+    m_stageSelect.setButtonSound(playClick);
+    m_hud.setButtonSound(playClick);
+    m_pauseOverlay.setButtonSound(playClick);
+    m_gameOverScreen.setButtonSound(playClick);
+
     // 1. Main Menu
     m_mainMenu.setOnStart([this]() {
         changeState(StateType::STAGE_SELECT);
@@ -101,12 +113,15 @@ void GameStateManager::setupUiCallbacks() {
     });
 
     m_physics.setOnItemCollected([this](Physics::ItemType type, int val) {
+        Physics::Vec2 carPos = m_physics.vehicle().chassisPos();
+        Physics::Vec2 scr = m_camera.worldToScreen(carPos);
         if (type == Physics::ItemType::FUEL_CANISTER) {
             m_audio.playFuelPickup();
             m_hud.triggerStunt("+100 FUEL!", 0, UI::Theme::GREEN_GAS);
+            m_hud.addFloatingText("+100 FUEL!", scr.x, scr.y - 25.0f, UI::Theme::GREEN_GAS);
         } else {
             m_audio.playCoinPickup();
-            m_hud.triggerStunt("+$" + std::to_string(val), 0, UI::Theme::GOLD);
+            m_hud.addFloatingText("+$" + std::to_string(val), scr.x, scr.y - 25.0f, UI::Theme::GOLD);
         }
     });
 }
@@ -128,47 +143,55 @@ void GameStateManager::handleInput(const InputController::State& input) {
     int my = input.mouseY;
 
     if (m_currentState == StateType::MAIN_MENU) {
-        m_mainMenu.onMouseMove(mx, my);
-        if (input.mouseDown) m_mainMenu.onMouseDown(mx, my);
-        else m_mainMenu.onMouseUp(mx, my);
+        if (input.mouseMoved) m_mainMenu.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_mainMenu.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_mainMenu.onMouseUp(mx, my);
     } else if (m_currentState == StateType::GARAGE) {
-        m_garage.onMouseMove(mx, my);
-        if (input.mouseDown) m_garage.onMouseDown(mx, my, m_profile);
-        else m_garage.onMouseUp(mx, my);
+        if (input.mouseMoved) m_garage.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_garage.onMouseDown(mx, my, m_profile);
+        if (input.mouseJustReleased) m_garage.onMouseUp(mx, my, m_profile);
     } else if (m_currentState == StateType::STAGE_SELECT) {
-        m_stageSelect.onMouseMove(mx, my);
-        if (input.mouseDown) m_stageSelect.onMouseDown(mx, my);
-        else m_stageSelect.onMouseUp(mx, my);
+        if (input.mouseMoved) m_stageSelect.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_stageSelect.onMouseDown(mx, my, m_profile);
+        if (input.mouseJustReleased) m_stageSelect.onMouseUp(mx, my);
     } else if (m_currentState == StateType::GAMEPLAY) {
         if (input.pause) {
             changeState(StateType::PAUSED);
             return;
         }
+        if (input.restart) {
+            startRace(m_selectedBiome);
+            return;
+        }
 
-        m_hud.onMouseMove(mx, my);
-        if (input.mouseDown) m_hud.onMouseDown(mx, my);
-        else m_hud.onMouseUp(mx, my);
+        if (input.mouseMoved) m_hud.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_hud.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_hud.onMouseUp(mx, my);
 
-        // Map inputs: either keyboard or touch pedal
-        float gas = (input.gas || m_hud.isGasPressed()) ? 1.0f : 0.0f;
-        float brake = (input.brake || m_hud.isBrakePressed()) ? 1.0f : 0.0f;
+        // Map inputs: either keyboard or touch/mouse pedal hold
+        bool gasActive = input.gas || (input.mouseDown && m_hud.isGasPressed());
+        bool brakeActive = input.brake || (input.mouseDown && m_hud.isBrakePressed());
 
-        m_hud.setGasVirtualPressed(input.gas);
-        m_hud.setBrakeVirtualPressed(input.brake);
+        m_hud.setGasVirtualPressed(gasActive);
+        m_hud.setBrakeVirtualPressed(brakeActive);
 
-        m_physics.vehicle().applyInput(gas, brake);
+        m_physics.vehicle().applyInput(gasActive ? 1.0f : 0.0f, brakeActive ? 1.0f : 0.0f);
     } else if (m_currentState == StateType::PAUSED) {
         if (input.pause) {
             changeState(StateType::GAMEPLAY);
             return;
         }
-        m_pauseOverlay.onMouseMove(mx, my);
-        if (input.mouseDown) m_pauseOverlay.onMouseDown(mx, my);
-        else m_pauseOverlay.onMouseUp(mx, my);
+        if (input.mouseMoved) m_pauseOverlay.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_pauseOverlay.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_pauseOverlay.onMouseUp(mx, my);
     } else if (m_currentState == StateType::GAME_OVER) {
-        m_gameOverScreen.onMouseMove(mx, my);
-        if (input.mouseDown) m_gameOverScreen.onMouseDown(mx, my);
-        else m_gameOverScreen.onMouseUp(mx, my);
+        if (input.restart) {
+            startRace(m_selectedBiome);
+            return;
+        }
+        if (input.mouseMoved) m_gameOverScreen.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_gameOverScreen.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_gameOverScreen.onMouseUp(mx, my);
     }
 }
 
@@ -177,6 +200,8 @@ void GameStateManager::fixedUpdate(float dt) {
         m_mainMenu.update(dt);
     } else if (m_currentState == StateType::GARAGE) {
         m_garage.update(dt);
+    } else if (m_currentState == StateType::STAGE_SELECT) {
+        m_stageSelect.update(dt);
     } else if (m_currentState == StateType::GAMEPLAY) {
         m_gameTime += dt;
 
@@ -193,6 +218,9 @@ void GameStateManager::fixedUpdate(float dt) {
         }
         if (car.isRearOnGround() && std::abs(car.chassisVel().x) > 2.0f) {
             m_particleSystem.emitDirt(car.rearWheelPos(), {-1.0f, 0.4f});
+        }
+        if (car.isChassisContact()) {
+            m_particleSystem.emitSparkles(car.chassisPos() + Physics::Vec2(0.0f, -0.2f));
         }
         m_particleSystem.update(dt);
 
@@ -238,7 +266,7 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float /*alpha*/) {
         // 1. Render World (Terrain + Parallax)
         m_terrainRasterizer.render(fb, m_camera, m_physics.terrain(), m_gameTime);
 
-        // 2. Render Particles (Smoke & Dirt)
+        // 2. Render Particles (Smoke & Dirt & Sparks)
         m_particleSystem.render(fb, m_camera);
 
         // 3. Render Vehicle (Chassis, Rotated Wheels, Driver)

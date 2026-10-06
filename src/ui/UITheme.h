@@ -40,12 +40,12 @@ struct Theme {
     static constexpr uint32_t GAUGE_REDLINE  = 0xFFFF1744;
 
     // World & Terrain Palette
-    static constexpr uint32_t SKY_TOP        = 0xFF162B4D;
-    static constexpr uint32_t SKY_HORIZON    = 0xFF3F6B99;
-    static constexpr uint32_t GRASS_LUSH     = 0xFF43A047;
-    static constexpr uint32_t GRASS_DARK     = 0xFF1B5E20;
-    static constexpr uint32_t DIRT_RICH      = 0xFF6D4C41;
-    static constexpr uint32_t DIRT_DEEP      = 0xFF3E2723;
+    static constexpr uint32_t SKY_TOP        = 0xFF1E88E5; // Vibrant Sky Azure
+    static constexpr uint32_t SKY_HORIZON    = 0xFF81D4FA; // Soft Sunny Horizon
+    static constexpr uint32_t GRASS_LUSH     = 0xFF4CAF50; // Vibrant Lush Emerald
+    static constexpr uint32_t GRASS_DARK     = 0xFF2E7D32; // Deep Grass Sublayer
+    static constexpr uint32_t DIRT_RICH      = 0xFF795548; // Warm Chocolate Loam
+    static constexpr uint32_t DIRT_DEEP      = 0xFF4E342E; // Deep Terracotta Bedrock
 };
 
 } // namespace UI

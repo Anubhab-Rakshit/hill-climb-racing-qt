@@ -1,7 +1,9 @@
 #include "GarageScreen.h"
 #include "RasterFont.h"
 #include "UITheme.h"
+#include "Sprite.h"
 #include <algorithm>
+#include <cmath>
 
 namespace UI {
 
@@ -11,11 +13,11 @@ GarageScreen::GarageScreen()
     , m_carBounceY(0.0f)
     , m_carBounceVel(0.0f)
     , m_btnBack(20, 16, 110, 36, "< MENU", 0xFF37474F)
-    , m_btnDrive(790, 16, 150, 38, "DRIVE >", Theme::GREEN_GAS)
-    , m_btnUpgradeEngine(0, 0, 190, 34, "UPGRADE", Theme::GOLD)
-    , m_btnUpgradeSuspension(0, 0, 190, 34, "UPGRADE", Theme::GOLD)
-    , m_btnUpgradeTires(0, 0, 190, 34, "UPGRADE", Theme::GOLD)
-    , m_btnUpgrade4WD(0, 0, 190, 34, "UPGRADE", Theme::GOLD)
+    , m_btnDrive(780, 16, 160, 38, "DRIVE >", Theme::GREEN_GAS)
+    , m_btnUpgradeEngine(0, 0, 186, 42, "UPGRADE", Theme::GOLD)
+    , m_btnUpgradeSuspension(0, 0, 186, 42, "UPGRADE", Theme::GOLD)
+    , m_btnUpgradeTires(0, 0, 186, 42, "UPGRADE", Theme::GOLD)
+    , m_btnUpgrade4WD(0, 0, 186, 42, "UPGRADE", Theme::GOLD)
 {
     setDimensions(m_width, m_height);
 }
@@ -25,7 +27,7 @@ void GarageScreen::setDimensions(int width, int height) {
     m_height = height;
 
     m_btnBack.setPosition(20, 16);
-    m_btnDrive.setPosition(m_width - 170, 16);
+    m_btnDrive.setPosition(m_width - 180, 16);
 
     int cardW = 210;
     int cardGap = 16;
@@ -33,10 +35,21 @@ void GarageScreen::setDimensions(int width, int height) {
     int startX = (m_width - totalCardsW) / 2;
     int cardY = 320;
 
-    m_btnUpgradeEngine.setPosition(startX + 10, cardY + 120);
-    m_btnUpgradeSuspension.setPosition(startX + (cardW + cardGap) * 1 + 10, cardY + 120);
-    m_btnUpgradeTires.setPosition(startX + (cardW + cardGap) * 2 + 10, cardY + 120);
-    m_btnUpgrade4WD.setPosition(startX + (cardW + cardGap) * 3 + 10, cardY + 120);
+    int btnY = cardY + 114;
+    int btnW = cardW - 24;
+    int btnH = 40;
+
+    m_btnUpgradeEngine.setPosition(startX + 12, btnY);
+    m_btnUpgradeEngine.setSize(btnW, btnH);
+
+    m_btnUpgradeSuspension.setPosition(startX + (cardW + cardGap) * 1 + 12, btnY);
+    m_btnUpgradeSuspension.setSize(btnW, btnH);
+
+    m_btnUpgradeTires.setPosition(startX + (cardW + cardGap) * 2 + 12, btnY);
+    m_btnUpgradeTires.setSize(btnW, btnH);
+
+    m_btnUpgrade4WD.setPosition(startX + (cardW + cardGap) * 3 + 12, btnY);
+    m_btnUpgrade4WD.setSize(btnW, btnH);
 }
 
 void GarageScreen::onMouseMove(int px, int py) {
@@ -48,125 +61,82 @@ void GarageScreen::onMouseMove(int px, int py) {
     m_btnUpgrade4WD.onMouseMove(px, py);
 }
 
-bool GarageScreen::onMouseDown(int px, int py, Core::ProfileManager& profile) {
+bool GarageScreen::onMouseDown(int px, int py, Core::ProfileManager& /*profile*/) {
     if (m_btnBack.onMouseDown(px, py)) return true;
     if (m_btnDrive.onMouseDown(px, py)) return true;
 
     // Check click on vehicle preview to trigger playful suspension bounce
     int cx = m_width / 2;
-    int cy = 180;
-    if (px >= cx - 120 && px <= cx + 120 && py >= cy - 60 && py <= cy + 60) {
-        m_carBounceVel = -150.0f;
+    int cy = 175;
+    if (px >= cx - 130 && px <= cx + 130 && py >= cy - 60 && py <= cy + 60) {
+        m_carBounceVel = -180.0f;
         return true;
     }
 
-    if (m_btnUpgradeEngine.onMouseDown(px, py)) {
-        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_ENGINE)) {
-            m_carBounceVel = -120.0f;
-        }
-        return true;
-    }
-    if (m_btnUpgradeSuspension.onMouseDown(px, py)) {
-        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_SUSPENSION)) {
-            m_carBounceVel = -160.0f;
-        }
-        return true;
-    }
-    if (m_btnUpgradeTires.onMouseDown(px, py)) {
-        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_TIRES)) {
-            m_carBounceVel = -100.0f;
-        }
-        return true;
-    }
-    if (m_btnUpgrade4WD.onMouseDown(px, py)) {
-        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_4WD)) {
-            m_carBounceVel = -140.0f;
-        }
-        return true;
-    }
+    if (m_btnUpgradeEngine.onMouseDown(px, py)) return true;
+    if (m_btnUpgradeSuspension.onMouseDown(px, py)) return true;
+    if (m_btnUpgradeTires.onMouseDown(px, py)) return true;
+    if (m_btnUpgrade4WD.onMouseDown(px, py)) return true;
 
     return false;
 }
 
-void GarageScreen::onMouseUp(int px, int py) {
+void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
     m_btnBack.onMouseUp(px, py);
     m_btnDrive.onMouseUp(px, py);
+
+    // Single purchase on mouse release prevents unintended multi-click spending
+    if (m_btnUpgradeEngine.isPressed() && m_btnUpgradeEngine.contains(px, py)) {
+        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_ENGINE)) {
+            m_carBounceVel = -140.0f;
+        }
+    }
     m_btnUpgradeEngine.onMouseUp(px, py);
+
+    if (m_btnUpgradeSuspension.isPressed() && m_btnUpgradeSuspension.contains(px, py)) {
+        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_SUSPENSION)) {
+            m_carBounceVel = -180.0f;
+        }
+    }
     m_btnUpgradeSuspension.onMouseUp(px, py);
+
+    if (m_btnUpgradeTires.isPressed() && m_btnUpgradeTires.contains(px, py)) {
+        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_TIRES)) {
+            m_carBounceVel = -120.0f;
+        }
+    }
     m_btnUpgradeTires.onMouseUp(px, py);
+
+    if (m_btnUpgrade4WD.isPressed() && m_btnUpgrade4WD.contains(px, py)) {
+        if (profile.purchaseUpgrade(Core::ProfileManager::UPGRADE_4WD)) {
+            m_carBounceVel = -150.0f;
+        }
+    }
     m_btnUpgrade4WD.onMouseUp(px, py);
 }
 
 void GarageScreen::update(float dt) {
     // Damped harmonic spring bounce for vehicle preview
-    float k = 180.0f;
-    float c = 12.0f;
+    float k = 160.0f;
+    float c = 11.0f;
     float force = -k * m_carBounceY - c * m_carBounceVel;
     m_carBounceVel += force * dt;
     m_carBounceY += m_carBounceVel * dt;
 }
 
 void GarageScreen::drawVehiclePreview(Graphics::Framebuffer& fb, int cx, int cy, const Core::ProfileManager& profile) {
-    // Garage floor platform
-    fb.fillRect(cx - 160, cy + 38, 320, 10, 0xFF1E2838);
-    fb.drawRect(cx - 160, cy + 38, 320, 10, Theme::CARD_BORDER);
+    Graphics::SpriteRenderer::renderGarageVehicle(fb, cx, cy, m_carBounceY, profile);
 
-    // Bounce offset
-    int by = static_cast<int>(m_carBounceY);
-    int carY = cy + by;
-
-    // 1. Suspension struts
-    int rearWheelX = cx - 55;
-    int frontWheelX = cx + 55;
-    int wheelY = cy + 28;
-
-    fb.drawLine(rearWheelX, wheelY, rearWheelX + 10, carY + 8, 0xFF90A4AE);
-    fb.drawLine(frontWheelX, wheelY, frontWheelX - 10, carY + 8, 0xFF90A4AE);
-
-    // 2. Chassis Body (Red Retro Jeep)
-    int bodyX = cx - 75;
-    int bodyY = carY - 20;
-    fb.fillRect(bodyX, bodyY, 150, 28, 0xFFD32F2F); // Crimson red chassis
-    fb.drawRect(bodyX, bodyY, 150, 28, 0xFF8E0000);
-    // White racing stripe
-    fb.fillRect(bodyX, bodyY + 10, 150, 6, Theme::TEXT_WHITE);
-
-    // Windshield & Roll cage
-    fb.drawLine(cx - 20, bodyY, cx - 10, bodyY - 24, 0xFF37474F);
-    fb.drawLine(cx - 10, bodyY - 24, cx + 40, bodyY - 24, 0xFF37474F);
-    fb.drawLine(cx + 40, bodyY - 24, cx + 45, bodyY, 0xFF37474F);
-
-    // Driver (Head & Torso)
-    fb.fillRect(cx - 5, bodyY - 14, 18, 14, 0xFF1976D2); // Blue shirt
-    fb.fillCircle(cx + 4, bodyY - 22, 9, 0xFFFFCA28);     // Yellow helmet
-    fb.fillRect(cx + 4, bodyY - 23, 7, 5, 0xFF212121);    // Goggles
-
-    // 3. Wheels (Tire Upgrade reflects wheel size/tread!)
-    int tireLvl = profile.getUpgradeLevel(Core::ProfileManager::UPGRADE_TIRES);
-    int wheelRadius = 18 + std::min(4, tireLvl / 4);
-
-    auto drawTire = [&](int wx, int wy) {
-        fb.fillCircle(wx, wy, wheelRadius, 0xFF212121);
-        fb.drawCircle(wx, wy, wheelRadius, 0xFF101010);
-        // Hubcap
-        fb.fillCircle(wx, wy, wheelRadius / 2, 0xFFB0BEC5);
-        fb.drawCircle(wx, wy, wheelRadius / 2, 0xFF455A64);
-        fb.fillCircle(wx, wy, 2, Theme::GOLD);
-    };
-
-    drawTire(rearWheelX, wheelY);
-    drawTire(frontWheelX, wheelY);
-
-    // Vehicle Spec Readout Banner below car
-    std::string powerStr = "TORQUE: " + std::to_string(static_cast<int>(profile.getEngineTorqueMultiplier() * 100)) + "%  |  GRIP: " +
-                           std::to_string(static_cast<int>(profile.getTireGripMultiplier() * 100)) + "%  |  AWD SPLIT: " +
-                           std::to_string(static_cast<int>(profile.get4wdTorqueSplit() * 100 * 2)) + "%";
-    Graphics::RasterFont::drawStringCentered(fb, cx, cy + 62, powerStr, Theme::CYAN_UPGRADE, 1);
+    // Vehicle Spec Readout Banner below lift
+    std::string powerStr = "TORQUE: " + std::to_string(static_cast<int>(profile.getEngineTorqueMultiplier() * 100)) + "%   |   GRIP: " +
+                           std::to_string(static_cast<int>(profile.getTireGripMultiplier() * 100)) + "%   |   AWD: " +
+                           std::to_string(static_cast<int>(profile.get4wdTorqueSplit() * 200)) + "%";
+    Graphics::RasterFont::drawStringCentered(fb, cx, cy + 92, powerStr, Theme::CYAN_UPGRADE, 1);
 }
 
 void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profile) {
     // 1. Dark Gradient Background
-    fb.fillVerticalGradient(0, 0, m_width, m_height, 0xFF0E1724, 0xFF172336);
+    fb.fillVerticalGradient(0, 0, m_width, m_height, 0xFF0B1422, 0xFF142134);
 
     // 2. Header
     m_btnBack.render(fb, 2);
@@ -177,9 +147,9 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     // Coin Balance
     int coinBoxW = 140;
     int coinBoxH = 34;
-    int coinBoxX = m_width / 2 + 190;
+    int coinBoxX = m_width / 2 + 180;
     int coinBoxY = 18;
-    fb.fillRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, 0xEE111926);
+    fb.fillRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, 0xEE0B121C);
     fb.drawRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, Theme::CARD_BORDER);
     fb.fillCircle(coinBoxX + 16, coinBoxY + 17, 8, Theme::GOLD);
     Graphics::RasterFont::drawStringCentered(fb, coinBoxX + 16, coinBoxY + 14, "$", 0xFF5D4037, 1);
@@ -206,9 +176,9 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     };
 
     CardData cards[4] = {
-        {Core::ProfileManager::UPGRADE_ENGINE, "ENGINE", "+Peak Hill Climb Torque", &m_btnUpgradeEngine},
-        {Core::ProfileManager::UPGRADE_SUSPENSION, "SUSPENSION", "Absorbs Rough Landings", &m_btnUpgradeSuspension},
-        {Core::ProfileManager::UPGRADE_TIRES, "TIRES", "Maximum Slope Traction", &m_btnUpgradeTires},
+        {Core::ProfileManager::UPGRADE_ENGINE, "ENGINE", "+Peak Climbing Torque", &m_btnUpgradeEngine},
+        {Core::ProfileManager::UPGRADE_SUSPENSION, "SUSPENSION", "Absorbs Rough Jumps", &m_btnUpgradeSuspension},
+        {Core::ProfileManager::UPGRADE_TIRES, "TIRES", "Maximum Slope Grip", &m_btnUpgradeTires},
         {Core::ProfileManager::UPGRADE_4WD, "4WD SYSTEM", "Power To Front Axle", &m_btnUpgrade4WD}
     };
 
@@ -216,7 +186,6 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
         int x = startX + i * (cardW + cardGap);
         int y = cardY;
 
-        // Card container
         fb.fillRect(x, y, cardW, cardH, Theme::CARD_BG);
         fb.drawRect(x, y, cardW, cardH, Theme::CARD_BORDER);
         fb.fillRect(x, y, cardW, 4, Theme::CYAN_UPGRADE);
@@ -229,8 +198,8 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
         std::string lvlStr = "LEVEL " + std::to_string(lvl) + " / 20";
         Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 36, lvlStr, Theme::GOLD, 1);
 
-        // Segmented Progress Pips Bar (20 segments)
-        int pipStartX = x + 15;
+        // Segmented Illuminated LED Bar (20 segments)
+        int pipStartX = x + 14;
         int pipY = y + 54;
         int pipW = 7;
         int pipH = 12;
@@ -240,26 +209,32 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
             int px = pipStartX + p * (pipW + pipGap);
             if (p < lvl) {
                 fb.fillRect(px, pipY, pipW, pipH, Theme::GREEN_GAS);
+                fb.fillRect(px, pipY, pipW, 2, 0x88FFFFFF); // Illuminated LED highlight
             } else {
-                fb.fillRect(px, pipY, pipW, pipH, 0xFF1C2738);
+                fb.fillRect(px, pipY, pipW, pipH, 0xFF192534);
             }
         }
 
         // Description
         Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 78, cards[i].desc, Theme::TEXT_MUTED, 1);
 
-        // Upgrade Button
-        cards[i].btn->setPosition(x + 15, y + 104);
-        cards[i].btn->setSize(cardW - 30, 44);
+        // Button state
+        int btnW = cardW - 24;
+        int btnH = 40;
+        int btnY = cardY + 114;
+        cards[i].btn->setPosition(x + 12, btnY);
+        cards[i].btn->setSize(btnW, btnH);
 
         if (lvl >= 20) {
-            cards[i].btn->setText("MAXED OUT");
+            cards[i].btn->setText("MAX LEVEL");
             cards[i].btn->setBaseColor(0xFF37474F);
+            cards[i].btn->setEnabled(false);
         } else {
             int cost = profile.getUpgradeCost(cards[i].type);
             cards[i].btn->setText("BUY $" + std::to_string(cost));
             bool canAfford = profile.canAffordUpgrade(cards[i].type);
             cards[i].btn->setBaseColor(canAfford ? Theme::GOLD : 0xFF455A64);
+            cards[i].btn->setEnabled(canAfford);
         }
 
         cards[i].btn->render(fb, 2);

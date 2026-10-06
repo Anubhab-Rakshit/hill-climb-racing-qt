@@ -43,6 +43,8 @@ public:
     void recordDistance(const std::string& stageId, float distance);
     bool isStageUnlocked(const std::string& stageId) const;
     void unlockStage(const std::string& stageId);
+    int getStageUnlockCost(const std::string& stageId) const;
+    bool unlockStageWithCoins(const std::string& stageId);
 
     // Serialization
     void load();

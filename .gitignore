@@ -4,6 +4,7 @@ build-*/
 *.user
 *.user.*
 .DS_Store
+scratch/
 
 # CMake temporary files
 CMakeCache.txt

@@ -29,9 +29,11 @@ RetroButton::RetroButton(int x, int y, int w, int h, const std::string& text, ui
     , m_text(text)
     , m_baseColor(baseColor)
     , m_textColor(Theme::TEXT_WHITE)
+    , m_enabled(true)
     , m_hovered(false)
     , m_pressed(false)
     , m_onClick(nullptr)
+    , m_onSound(nullptr)
 {
 }
 
@@ -41,12 +43,10 @@ bool RetroButton::contains(int px, int py) const {
 
 void RetroButton::onMouseMove(int px, int py) {
     m_hovered = contains(px, py);
-    if (!m_hovered) {
-        m_pressed = false;
-    }
 }
 
 bool RetroButton::onMouseDown(int px, int py) {
+    if (!m_enabled) return false;
     if (contains(px, py)) {
         m_pressed = true;
         return true;
@@ -55,8 +55,15 @@ bool RetroButton::onMouseDown(int px, int py) {
 }
 
 void RetroButton::onMouseUp(int px, int py) {
+    if (!m_enabled) {
+        m_pressed = false;
+        return;
+    }
     if (m_pressed && contains(px, py)) {
         m_pressed = false;
+        if (m_onSound) {
+            m_onSound();
+        }
         if (m_onClick) {
             m_onClick();
         }
@@ -65,16 +72,35 @@ void RetroButton::onMouseUp(int px, int py) {
 }
 
 void RetroButton::render(Graphics::Framebuffer& fb, int fontScale) {
-    uint32_t fillCol = m_baseColor;
-    if (m_hovered && !m_pressed) {
-        fillCol = lightenColor(m_baseColor, 35);
-    } else if (m_pressed) {
-        fillCol = darkenColor(m_baseColor, 30);
+    if (!m_enabled) {
+        // Disabled / Locked appearance
+        uint32_t disBg = 0xFF212B36;
+        uint32_t disBorder = 0xFF37474F;
+        fb.fillRect(m_x, m_y, m_w, m_h, disBg);
+        fb.drawRect(m_x, m_y, m_w, m_h, disBorder);
+
+        int textYOffset = (m_h - Graphics::RasterFont::getTextHeight(fontScale)) / 2;
+        int cx = m_x + m_w / 2;
+        int cy = m_y + textYOffset;
+        Graphics::RasterFont::drawStringCentered(fb, cx, cy, m_text, 0xFF546E7A, fontScale);
+        return;
     }
 
-    uint32_t lightBevel = lightenColor(fillCol, 60);
-    uint32_t darkBevel = darkenColor(fillCol, 70);
-    uint32_t blackBorder = 0xFF000000;
+    uint32_t fillCol = m_baseColor;
+    if (m_hovered && !m_pressed) {
+        fillCol = lightenColor(m_baseColor, 40);
+    } else if (m_pressed) {
+        fillCol = darkenColor(m_baseColor, 35);
+    }
+
+    uint32_t lightBevel = lightenColor(fillCol, 70);
+    uint32_t darkBevel = darkenColor(fillCol, 80);
+    uint32_t blackBorder = 0xFF080C14;
+
+    // Hover glow border (1px neon border if hovered)
+    if (m_hovered && !m_pressed) {
+        fb.drawRect(m_x - 1, m_y - 1, m_w + 2, m_h + 2, lightenColor(m_baseColor, 90));
+    }
 
     // Outer 1px black border
     fb.drawRect(m_x, m_y, m_w, m_h, blackBorder);
@@ -100,6 +126,11 @@ void RetroButton::render(Graphics::Framebuffer& fb, int fontScale) {
     fb.setPixelFast(m_x + 1, m_y + m_h - 2, blackBorder);
     fb.setPixelFast(m_x + m_w - 2, m_y + m_h - 2, blackBorder);
 
+    // Top highlight specular line (subtle arcade gloss)
+    if (!m_pressed) {
+        fb.fillRect(m_x + 6, m_y + 4, m_w - 12, 1, 0x44FFFFFF);
+    }
+
     // Text rendering with drop shadow and press offset
     int textYOffset = (m_h - Graphics::RasterFont::getTextHeight(fontScale)) / 2;
     int pressOffset = m_pressed ? 2 : 0;
@@ -107,9 +138,10 @@ void RetroButton::render(Graphics::Framebuffer& fb, int fontScale) {
     int cy = m_y + textYOffset + pressOffset;
 
     // Text drop shadow
-    Graphics::RasterFont::drawStringCentered(fb, cx + 1, cy + 1, m_text, 0xFF0A0F1A, fontScale);
+    Graphics::RasterFont::drawStringCentered(fb, cx + 1, cy + 1, m_text, 0xFF05080E, fontScale);
     // Main text
-    Graphics::RasterFont::drawStringCentered(fb, cx, cy, m_text, m_textColor, fontScale);
+    uint32_t textCol = (m_hovered && !m_pressed) ? 0xFFFFFFFF : m_textColor;
+    Graphics::RasterFont::drawStringCentered(fb, cx, cy, m_text, textCol, fontScale);
 }
 
 } // namespace UI

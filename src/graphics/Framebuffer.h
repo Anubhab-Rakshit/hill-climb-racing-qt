@@ -34,7 +34,7 @@ public:
     // Direct pixel operations with inline bounds checking
     inline void setPixelFast(int x, int y, uint32_t color) {
         if (x >= 0 && x < m_width && y >= 0 && y < m_height) {
-            reinterpret_cast<uint32_t*>(m_image.scanLine(y))[x] = color;
+            reinterpret_cast<uint32_t*>(m_image.scanLine(y))[x] = 0xFF000000 | (color & 0x00FFFFFF);
         }
     }
 
@@ -45,21 +45,21 @@ public:
         return 0;
     }
 
-    // Fast alpha blending (Premultiplied ARGB32)
+    // Standard alpha blending onto opaque 32-bit pixel grid
     inline void blendPixelFast(int x, int y, uint32_t srcColor) {
         if (x < 0 || x >= m_width || y < 0 || y >= m_height) return;
 
-        uint32_t* pixel = &reinterpret_cast<uint32_t*>(m_image.scanLine(y))[x];
-        uint32_t dst = *pixel;
-
-        uint8_t sa = (srcColor >> 24) & 0xFF;
-        if (sa == 255) {
-            *pixel = srcColor;
+        uint32_t sa = (srcColor >> 24) & 0xFF;
+        if (sa >= 255) {
+            reinterpret_cast<uint32_t*>(m_image.scanLine(y))[x] = 0xFF000000 | (srcColor & 0x00FFFFFF);
             return;
         }
         if (sa == 0) return;
 
-        uint8_t invA = 255 - sa;
+        uint32_t* pixel = &reinterpret_cast<uint32_t*>(m_image.scanLine(y))[x];
+        uint32_t dst = *pixel;
+
+        uint32_t invA = 255 - sa;
 
         uint32_t sr = (srcColor >> 16) & 0xFF;
         uint32_t sg = (srcColor >> 8) & 0xFF;
@@ -68,17 +68,12 @@ public:
         uint32_t dr = (dst >> 16) & 0xFF;
         uint32_t dg = (dst >> 8) & 0xFF;
         uint32_t db = dst & 0xFF;
-        uint32_t da = (dst >> 24) & 0xFF;
 
-        uint32_t outR = sr + ((dr * invA) >> 8);
-        uint32_t outG = sg + ((dg * invA) >> 8);
-        uint32_t outB = sb + ((db * invA) >> 8);
-        uint32_t outA = sa + ((da * invA) >> 8);
+        uint32_t outR = (sr * sa + dr * invA) / 255;
+        uint32_t outG = (sg * sa + dg * invA) / 255;
+        uint32_t outB = (sb * sa + db * invA) / 255;
 
-        *pixel = (std::min<uint32_t>(255, outA) << 24) |
-                 (std::min<uint32_t>(255, outR) << 16) |
-                 (std::min<uint32_t>(255, outG) << 8)  |
-                  std::min<uint32_t>(255, outB);
+        *pixel = 0xFF000000 | (outR << 16) | (outG << 8) | outB;
     }
 
     // High performance raster primitives
@@ -88,6 +83,7 @@ public:
     void drawLine(int x0, int y0, int x1, int y1, uint32_t color);
     void drawCircle(int xc, int yc, int r, uint32_t color);
     void fillCircle(int xc, int yc, int r, uint32_t color);
+    void fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color);
     void fillVerticalGradient(int x, int y, int w, int h, uint32_t topColor, uint32_t bottomColor);
 
 private:

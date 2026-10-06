@@ -20,6 +20,11 @@ struct WorldItem {
     bool collected = false;
 };
 
+struct MilestoneSign {
+    Vec2 position;
+    int distanceMeters = 0;
+};
+
 /**
  * @brief Continuous Procedural Terrain and Item Spawner.
  * Provides height, slope, normal vectors, and manages collectible items.
@@ -41,6 +46,8 @@ public:
     const std::vector<WorldItem>& getItems() const { return m_items; }
     std::vector<WorldItem>& getItems() { return m_items; }
 
+    const std::vector<MilestoneSign>& getMilestones() const { return m_milestones; }
+
     void collectItem(size_t index);
     void reset();
 
@@ -49,6 +56,7 @@ private:
     float m_friction;
     float m_gravity;
     std::vector<WorldItem> m_items;
+    std::vector<MilestoneSign> m_milestones;
 
     void spawnItems();
 };

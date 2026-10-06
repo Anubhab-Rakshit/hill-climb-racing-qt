@@ -19,10 +19,18 @@ public:
 
     void setOnBack(std::function<void()> cb) { m_btnBack.setOnClick(cb); }
     void setOnDrive(std::function<void()> cb) { m_btnDrive.setOnClick(cb); }
+    void setButtonSound(std::function<void()> cb) {
+        m_btnBack.setOnSound(cb);
+        m_btnDrive.setOnSound(cb);
+        m_btnUpgradeEngine.setOnSound(cb);
+        m_btnUpgradeSuspension.setOnSound(cb);
+        m_btnUpgradeTires.setOnSound(cb);
+        m_btnUpgrade4WD.setOnSound(cb);
+    }
 
     void onMouseMove(int px, int py);
     bool onMouseDown(int px, int py, Core::ProfileManager& profile);
-    void onMouseUp(int px, int py);
+    void onMouseUp(int px, int py, Core::ProfileManager& profile);
 
     void update(float dt);
     void render(Graphics::Framebuffer& fb, Core::ProfileManager& profile);

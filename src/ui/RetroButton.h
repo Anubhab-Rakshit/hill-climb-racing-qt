@@ -23,6 +23,10 @@ public:
     void setTextColor(uint32_t color) { m_textColor = color; }
     void setOnClick(std::function<void()> cb) { m_onClick = cb; }
 
+    void setEnabled(bool enabled) { m_enabled = enabled; }
+    bool isEnabled() const { return m_enabled; }
+    void setOnSound(std::function<void()> cb) { m_onSound = cb; }
+
     bool contains(int px, int py) const;
     void onMouseMove(int px, int py);
     bool onMouseDown(int px, int py);
@@ -32,6 +36,7 @@ public:
 
     bool isHovered() const { return m_hovered; }
     bool isPressed() const { return m_pressed; }
+    void setPressed(bool p) { m_pressed = p; }
 
 private:
     int m_x;
@@ -41,9 +46,11 @@ private:
     std::string m_text;
     uint32_t m_baseColor;
     uint32_t m_textColor;
-    bool m_hovered;
-    bool m_pressed;
+    bool m_enabled = true;
+    bool m_hovered = false;
+    bool m_pressed = false;
     std::function<void()> m_onClick;
+    std::function<void()> m_onSound;
 };
 
 } // namespace UI

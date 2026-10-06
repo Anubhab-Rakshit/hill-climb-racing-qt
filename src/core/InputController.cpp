@@ -9,6 +9,9 @@ InputController::InputController() {
 void InputController::resetTransientActions() {
     m_state.pause = false;
     m_state.restart = false;
+    m_state.mouseJustPressed = false;
+    m_state.mouseJustReleased = false;
+    m_state.mouseMoved = false;
 }
 
 void InputController::onKeyPress(QKeyEvent* event) {
@@ -47,6 +50,7 @@ static void mapMouseCoords(int rawX, int rawY, int virtW, int virtH, int widW, i
     float scaleX = static_cast<float>(widW) / virtW;
     float scaleY = static_cast<float>(widH) / virtH;
     float scale = std::min(scaleX, scaleY);
+    if (scale <= 0.0001f) scale = 1.0f;
 
     int viewportW = static_cast<int>(virtW * scale);
     int viewportH = static_cast<int>(virtH * scale);
@@ -58,12 +62,14 @@ static void mapMouseCoords(int rawX, int rawY, int virtW, int virtH, int widW, i
 }
 
 void InputController::onMouseMove(QMouseEvent* event, int virtualW, int virtualH, int widgetW, int widgetH) {
+    m_state.mouseMoved = true;
     mapMouseCoords(event->pos().x(), event->pos().y(), virtualW, virtualH, widgetW, widgetH, m_state.mouseX, m_state.mouseY);
 }
 
 void InputController::onMousePress(QMouseEvent* event, int virtualW, int virtualH, int widgetW, int widgetH) {
     if (event->button() == Qt::LeftButton) {
         m_state.mouseDown = true;
+        m_state.mouseJustPressed = true;
         mapMouseCoords(event->pos().x(), event->pos().y(), virtualW, virtualH, widgetW, widgetH, m_state.mouseX, m_state.mouseY);
     }
 }
@@ -71,6 +77,7 @@ void InputController::onMousePress(QMouseEvent* event, int virtualW, int virtual
 void InputController::onMouseRelease(QMouseEvent* event, int virtualW, int virtualH, int widgetW, int widgetH) {
     if (event->button() == Qt::LeftButton) {
         m_state.mouseDown = false;
+        m_state.mouseJustReleased = true;
         mapMouseCoords(event->pos().x(), event->pos().y(), virtualW, virtualH, widgetW, widgetH, m_state.mouseX, m_state.mouseY);
     }
 }
