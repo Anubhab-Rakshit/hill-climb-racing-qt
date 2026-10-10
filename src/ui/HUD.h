@@ -25,6 +25,8 @@ public:
     void setDistance(float meters) { m_distance = meters; }
     void setRecord(float meters) { m_recordDistance = meters; }
     void setCoins(int coins) { m_coins = coins; }
+    void setCheckpointProgress(int cleared, int total) { m_clearedCheckpoints = cleared; m_totalCheckpoints = total; }
+    void setNextCheckpoint(const std::string& name, float dist) { m_nextCheckpointName = name; m_nextCheckpointDist = dist; }
 
     void triggerStunt(const std::string& title, int bonusCoins, uint32_t color = 0xFFFFB300) {
         m_stuntBanner.trigger(title, bonusCoins, color);
@@ -51,6 +53,7 @@ public:
 private:
     int m_width;
     int m_height;
+    float m_animTime;
 
     FuelBar m_fuelBar;
     AnalogGauge m_speedometer;
@@ -64,6 +67,10 @@ private:
     float m_distance;
     float m_recordDistance;
     int m_coins;
+    int m_clearedCheckpoints;
+    int m_totalCheckpoints;
+    std::string m_nextCheckpointName;
+    float m_nextCheckpointDist;
 
     struct FloatingText {
         std::string text;

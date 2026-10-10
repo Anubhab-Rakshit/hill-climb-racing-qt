@@ -12,21 +12,12 @@ ScanlineRasterizer::ScanlineRasterizer() {
 void ScanlineRasterizer::renderParallaxSky(Framebuffer& fb, const Camera& cam, const std::string& biomeId) {
     int W = fb.width();
     int H = fb.height();
+    if (W <= 0 || H <= 0) return;
     float camX = cam.x();
 
-    uint32_t skyTop = UI::Theme::SKY_TOP;
-    uint32_t skyBot = UI::Theme::SKY_HORIZON;
-
-    if (biomeId == "desert") {
-        skyTop = 0xFFC95B24;
-        skyBot = 0xFFFFB74D;
-    } else if (biomeId == "moon") {
-        skyTop = 0xFF050811;
-        skyBot = 0xFF141C2B;
-    } else if (biomeId == "mountain") {
-        skyTop = 0xFF192532;
-        skyBot = 0xFF455A64;
-    }
+    const auto& spec = Physics::BiomeRegistry::getBiome(biomeId);
+    uint32_t skyTop = spec.skyTopColor;
+    uint32_t skyBot = spec.skyBottomColor;
 
     fb.fillVerticalGradient(0, 0, W, H, skyTop, skyBot);
 
@@ -78,6 +69,23 @@ void ScanlineRasterizer::renderParallaxSky(Framebuffer& fb, const Camera& cam, c
         int c2X = static_cast<int>(W + 400 - std::fmod(camX * 0.025f + 250, W + 500));
         drawCloud(c1X, 60, 22);
         drawCloud(c2X, 110, 28);
+    } else if (biomeId == "arctic") {
+        // Falling snowflakes in arctic blizzard
+        for (int i = 0; i < 35; ++i) {
+            int sx = static_cast<int>((i * 59 + 23) - camX * 0.05f) % W;
+            if (sx < 0) sx += W;
+            int sy = (i * 37 + 11) % (H * 2 / 3);
+            fb.fillRect(sx, sy, 2, 2, 0xFFFFFFFF);
+        }
+    } else if (biomeId == "volcano") {
+        // Fiery embers drifting in ash sky
+        for (int i = 0; i < 30; ++i) {
+            int sx = static_cast<int>((i * 61 + 19) - camX * 0.04f) % W;
+            if (sx < 0) sx += W;
+            int sy = (i * 41 + 13) % (H * 2 / 3);
+            uint32_t col = (i % 2 == 0) ? 0xFFFF5722 : 0xFFFFD54F;
+            fb.setPixelFast(sx, sy, col);
+        }
     }
 
     // Parallax Distant Mountain Range (Scroll factor 0.06)
@@ -87,17 +95,15 @@ void ScanlineRasterizer::renderParallaxSky(Framebuffer& fb, const Camera& cam, c
         int sy = static_cast<int>(h);
         sy = std::clamp(sy, 0, H);
 
-        uint32_t mtnCol = (biomeId == "desert") ? 0xFFBF6E34 :
-                          (biomeId == "moon") ? 0xFF192230 :
-                          (biomeId == "mountain") ? 0xFF37474F : 0xFF3E5062;
+        uint32_t mtnCol = spec.mountainColor;
 
         for (int y = sy; y < H; ++y) {
             fb.setPixelFast(x, y, mtnCol);
         }
 
-        // Snow-capped peaks on mountain biome
-        if (biomeId == "mountain" && sy < H * 0.44f) {
-            fb.fillRect(x, sy, 1, 4, 0xFFCFD8DC);
+        // Snow-capped peaks on mountain & arctic biomes
+        if ((biomeId == "mountain" || biomeId == "arctic") && sy < H * 0.44f) {
+            fb.fillRect(x, sy, 1, 4, 0xFFECEFF1);
         }
     }
 }
@@ -157,6 +163,7 @@ void ScanlineRasterizer::renderItems(Framebuffer& fb, const Camera& cam, const P
 }
 
 void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime) {
+    if (fb.width() <= 0 || fb.height() <= 0) return;
     const std::string& biomeId = terrain.getBiome();
 
     // 1. Parallax Sky & Distant Landscapes
@@ -170,31 +177,12 @@ void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physic
     float zoom = cam.zoom();
     float invZoom = 1.0f / zoom;
 
-    uint32_t crestCol    = 0xFF81C784;
-    uint32_t grassTopCol = UI::Theme::GRASS_LUSH;
-    uint32_t grassBodyCol = UI::Theme::GRASS_DARK;
-    uint32_t dirtBodyCol = UI::Theme::DIRT_RICH;
-    uint32_t bedrockCol  = UI::Theme::DIRT_DEEP;
-
-    if (biomeId == "desert") {
-        crestCol     = 0xFFFFF59D;
-        grassTopCol  = 0xFFFFD54F;
-        grassBodyCol = 0xFFFFA000;
-        dirtBodyCol  = 0xFFFF8F00;
-        bedrockCol   = 0xFFD84315;
-    } else if (biomeId == "moon") {
-        crestCol     = 0xFFFFFFFF;
-        grassTopCol  = 0xFFECEFF1;
-        grassBodyCol = 0xFFCFD8DC;
-        dirtBodyCol  = 0xFF90A4AE;
-        bedrockCol   = 0xFF455A64;
-    } else if (biomeId == "mountain") {
-        crestCol     = 0xFFECEFF1;
-        grassTopCol  = 0xFF78909C;
-        grassBodyCol = 0xFF546E7A;
-        dirtBodyCol  = 0xFF37474F;
-        bedrockCol   = 0xFF212121;
-    }
+    const auto& spec = terrain.getBiomeSpec();
+    uint32_t crestCol    = spec.crestColor;
+    uint32_t grassTopCol = spec.topColor;
+    uint32_t grassBodyCol = spec.bodyColor;
+    uint32_t dirtBodyCol = spec.soilColor;
+    uint32_t bedrockCol  = spec.bedrockColor;
 
     for (int x = 0; x < W; ++x) {
         float worldX = camX + (x - W * 0.5f) * invZoom;
@@ -203,16 +191,75 @@ void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physic
 
         int startY = std::max(0, surfaceScreenY);
 
+        Physics::TerrainDeformation deform = terrain.getDeformation(worldX);
+
+        // Biome base colors and layer thicknesses
+        uint32_t colCrest = crestCol;
+        uint32_t colTop = grassTopCol;
+        uint32_t colBody = grassBodyCol;
+        int topThickness = 5;
+        int bodyThickness = 14;
+
+        if (biomeId == "countryside") {
+            if (deform.grassFlattening > 0.10f || deform.grassTear > 0.10f) {
+                // Grass trampled & bent by rolling tires: crest consistently remains lush green
+                colCrest = 0xFF43A047; // Darker compressed green crest
+                colTop   = 0xFF388E3C; // Compressed green sub-layer
+                topThickness = 3;      // Compressed layer thickness
+                bodyThickness = 10;
+
+                // Subtle, localized tyre interaction: small discrete patches of exposed brown soil
+                // occurring only where aggressive slip/tear notches breach the turf
+                int worldCol = static_cast<int>(std::floor(std::abs(worldX) * 12.0f));
+                bool isSoilBreach = (deform.grassTear > 0.35f) && (((worldCol % 7) == 0) || (((worldCol + 3) % 13) == 0));
+                if (isSoilBreach) {
+                    colCrest = 0xFF4E342E; // Small patch of exposed dark fertile soil
+                    colTop   = 0xFF3E2723;
+                    topThickness = 2;
+                }
+            }
+        } else if (biomeId == "desert") {
+            if (deform.compression > 0.008f) {
+                // Deep shadowed sand tire ruts / tracks
+                colCrest = 0xFFC29B38; // Shadowed furrow
+                colTop   = 0xFFB28728;
+            }
+        } else if (biomeId == "arctic") {
+            if (deform.compression > 0.005f) {
+                // Hard-packed icy blue frosted ruts
+                colCrest = 0xFFB0BEC5;
+                colTop   = 0xFF90A4AE;
+            }
+        } else if (biomeId == "mountain") {
+            if (deform.compression > 0.008f) {
+                // Displaced scree and gravel scuffs
+                colCrest = 0xFF37474F;
+                colTop   = 0xFF263238;
+            }
+        } else if (biomeId == "volcano") {
+            if (deform.compression > 0.008f) {
+                // Disturbed ash reveals basalt bedrock & warm cinders
+                colCrest = 0xFF212121;
+                colTop   = ((x & 7) == 0) ? 0xFFD84315 : 0xFF303030;
+            }
+        } else if (biomeId == "moon") {
+            if (deform.compression > 0.008f) {
+                // Dark compacted lunar regolith tracks
+                colCrest = 0xFF424242;
+                colTop   = 0xFF303030;
+            }
+        }
+
         for (int y = startY; y < H; ++y) {
             int depth = y - surfaceScreenY;
             uint32_t pixelCol;
 
             if (depth == 0) {
-                pixelCol = crestCol;
-            } else if (depth < 5) {
-                pixelCol = grassTopCol;
-            } else if (depth < 14) {
-                pixelCol = grassBodyCol;
+                pixelCol = colCrest;
+            } else if (depth < topThickness) {
+                pixelCol = colTop;
+            } else if (depth < bodyThickness) {
+                pixelCol = colBody;
             } else if (depth < 24) {
                 pixelCol = 0xFF4E342E; // Dark rich loam layer
             } else if (depth < 85) {
@@ -231,15 +278,31 @@ void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physic
 
         // Grass blade tufts & wildflowers on countryside ridge
         if (biomeId == "countryside" && surfaceScreenY > 3 && surfaceScreenY < H) {
-            if (x % 6 == 0) {
-                fb.setPixelFast(x, surfaceScreenY - 1, 0xFF66BB6A);
-                fb.setPixelFast(x + 1, surfaceScreenY - 2, 0xFF81C784);
-            }
-            // Scattered wildflowers: yellow dandelions & white clovers
-            if (x % 17 == 0) {
-                fb.setPixelFast(x, surfaceScreenY - 1, 0xFFFFEE58);
-            } else if (x % 31 == 0) {
-                fb.setPixelFast(x, surfaceScreenY - 1, 0xFFFFFFFF);
+            if (deform.grassFlattening < 0.15f && deform.grassTear < 0.15f) {
+                // Pristine grass: upright tufts & wildflowers
+                if (x % 6 == 0) {
+                    fb.setPixelFast(x, surfaceScreenY - 1, 0xFF66BB6A);
+                    fb.setPixelFast(x + 1, surfaceScreenY - 2, 0xFF81C784);
+                }
+                // Scattered wildflowers: yellow dandelions & white clovers
+                if (x % 17 == 0) {
+                    fb.setPixelFast(x, surfaceScreenY - 1, 0xFFFFEE58);
+                } else if (x % 31 == 0) {
+                    fb.setPixelFast(x, surfaceScreenY - 1, 0xFFFFFFFF);
+                }
+            } else {
+                // Bent grass: flattened green blades along the ground
+                if (x % 4 == 0) {
+                    fb.setPixelFast(x, surfaceScreenY - 1, 0xFF388E3C);
+                }
+                // Subtle localized tyre interaction: tiny dislodged grass flecks & small soil crumbs
+                if (deform.grassTear > 0.35f) {
+                    if (x % 11 == 0) {
+                        fb.setPixelFast(x, surfaceScreenY - 1, 0xFF558B2F); // Dislodged grass fleck
+                    } else if (x % 7 == 0) {
+                        fb.setPixelFast(x, surfaceScreenY - 1, 0xFF4E342E); // Small soil speck
+                    }
+                }
             }
         }
     }
@@ -261,7 +324,75 @@ void ScanlineRasterizer::renderMilestones(Framebuffer& fb, const Camera& cam, co
         int sx = static_cast<int>(scr.x);
         int sy = static_cast<int>(scr.y);
 
-        if (sx < -60 || sx > W + 60 || sy < -100 || sy > H + 100) continue;
+        if (sx < -80 || sx > W + 80 || sy < -120 || sy > H + 120) continue;
+
+        if (ms.isCheckpoint) {
+            // Grand Overhead Checkpoint Archway
+            int archH = 68;
+            int archW = 100;
+            int p1x = sx - archW / 2;
+            int p2x = sx + archW / 2 - 6;
+            int topY = sy - archH;
+
+            // Two Steel Lattice Gantry Towers
+            auto drawTower = [&](int tx) {
+                fb.fillRect(tx, topY, 6, archH, 0xFF37474F);
+                fb.drawRect(tx, topY, 6, archH, 0xFF263238);
+                // Cross braces
+                for (int b = topY + 4; b < sy - 8; b += 12) {
+                    fb.drawLine(tx, b, tx + 5, b + 8, 0xFF78909C);
+                    fb.drawLine(tx + 5, b, tx, b + 8, 0xFF78909C);
+                }
+            };
+            drawTower(p1x);
+            drawTower(p2x);
+
+            // Overhead Banner Box
+            int bannerW = archW + 16;
+            int bannerH = 26;
+            int bx = sx - bannerW / 2;
+            int by = topY - 14;
+
+            uint32_t bannerBg = ms.isFinishLine ? 0xFFC62828 : 0xFF1565C0;
+            uint32_t borderCol = ms.isFinishLine ? UI::Theme::GOLD : 0xFF00E5FF;
+            fb.fillRect(bx, by, bannerW, bannerH, bannerBg);
+            fb.drawRect(bx, by, bannerW, bannerH, borderCol);
+
+            // Checkered border strip on banner
+            for (int cx = bx + 2; cx < bx + bannerW - 2; cx += 6) {
+                fb.fillRect(cx, by + 1, 3, 3, 0xFFFFFFFF);
+                fb.fillRect(cx + 3, by + 1, 3, 3, 0xFF212121);
+                fb.fillRect(cx, by + bannerH - 4, 3, 3, 0xFF212121);
+                fb.fillRect(cx + 3, by + bannerH - 4, 3, 3, 0xFFFFFFFF);
+            }
+
+            if (ms.isFinishLine) {
+                Graphics::RasterFont::drawStringCentered(fb, sx + 1, by + 7, "FINISH LINE", 0xFF05080E, 2);
+                Graphics::RasterFont::drawStringCentered(fb, sx, by + 6, "FINISH LINE", UI::Theme::GOLD, 2);
+            } else {
+                std::string title = "CHECKPOINT " + std::to_string(ms.checkpointIndex);
+                Graphics::RasterFont::drawStringCentered(fb, sx + 1, by + 7, title, 0xFF05080E, 2);
+                Graphics::RasterFont::drawStringCentered(fb, sx, by + 6, title, 0xFFFFFFFF, 2);
+            }
+
+            // Subtitle banner under overhead beam
+            std::string subStr = ms.checkpointName + " - " + std::to_string(ms.distanceMeters) + "m";
+            Graphics::RasterFont::drawStringCentered(fb, sx, by + bannerH + 3, subStr, UI::Theme::GOLD, 1);
+
+            // Dual Checkered Racing Flags atop towers
+            auto drawFlag = [&](int fx, int fy) {
+                fb.drawLine(fx, fy + 12, fx, fy, 0xFFCFD8DC);
+                for (int x = 0; x < 9; ++x) {
+                    for (int y = 0; y < 7; ++y) {
+                        bool white = ((x / 3 + y / 3) % 2 == 0);
+                        fb.setPixelFast(fx + 1 + x, fy + y, white ? 0xFFFFFFFF : 0xFF1A1A1A);
+                    }
+                }
+            };
+            drawFlag(p1x - 2, topY - 26);
+            drawFlag(p2x + 2, topY - 26);
+            continue;
+        }
 
         // 1. Two Wooden Support Stakes Planted in the Ground
         int postW = 3;

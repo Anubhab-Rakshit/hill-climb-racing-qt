@@ -44,12 +44,19 @@ public:
 
     ProfileManager& profile() { return m_profile; }
     Physics::PhysicsWorld& physics() { return m_physics; }
+    UI::GarageScreen& garageScreen() { return m_garage; }
+    const UI::GarageScreen& garageScreen() const { return m_garage; }
+    UI::StageSelectScreen& stageSelectScreen() { return m_stageSelect; }
+    const UI::StageSelectScreen& stageSelectScreen() const { return m_stageSelect; }
+    Graphics::Camera& camera() { return m_camera; }
+    const Graphics::Camera& camera() const { return m_camera; }
 
 private:
     StateType m_currentState;
     int m_width;
     int m_height;
     float m_gameTime;
+    float m_transitionTimer;
     std::string m_selectedBiome;
 
     // Subsystems

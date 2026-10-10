@@ -2,6 +2,7 @@
 
 #include "Framebuffer.h"
 #include "RetroButton.h"
+#include "ProfileManager.h"
 #include <functional>
 
 namespace UI {
@@ -32,6 +33,7 @@ public:
     void onMouseUp(int px, int py);
 
     void update(float dt);
+    void render(Graphics::Framebuffer& fb, const Core::ProfileManager& profile);
     void render(Graphics::Framebuffer& fb, int totalCoins);
 
 private:

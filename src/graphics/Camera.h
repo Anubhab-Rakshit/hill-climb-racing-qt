@@ -13,6 +13,7 @@ public:
     Camera(int screenWidth = 960, int screenHeight = 540);
 
     void setScreenSize(int w, int h) { m_screenW = w; m_screenH = h; }
+    void reset(const Physics::Vec2& pos) { m_pos = pos; m_shakeOffset = {0.0f, 0.0f}; m_trauma = 0.0f; }
 
     void update(float dt, const Physics::Vec2& targetPos, float targetSpeedX);
     void addTrauma(float amount);

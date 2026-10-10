@@ -1,6 +1,7 @@
 #include "GameOverScreen.h"
 #include "RasterFont.h"
 #include "UITheme.h"
+#include "UIComponents.h"
 #include <iomanip>
 #include <sstream>
 
@@ -9,16 +10,19 @@ namespace UI {
 GameOverScreen::GameOverScreen()
     : m_width(Theme::VIRTUAL_WIDTH)
     , m_height(Theme::VIRTUAL_HEIGHT)
+    , m_animTime(0.0f)
     , m_reason("DRIVER DOWN!")
     , m_distance(0.0f)
     , m_coins(0)
     , m_flips(0)
     , m_airTime(0.0f)
     , m_isNewRecord(false)
-    , m_btnRetry(0, 0, 175, 46, "RETRY [R]", Theme::GREEN_GAS)
-    , m_btnGarage(0, 0, 175, 46, "GARAGE", Theme::GOLD)
-    , m_btnMenu(0, 0, 175, 46, "MENU", 0xFF37474F)
+    , m_btnRetry(0, 0, 180, 46, "RETRY", Theme::GREEN_GAS)
+    , m_btnGarage(0, 0, 180, 46, "GARAGE", Theme::GOLD)
+    , m_btnMenu(0, 0, 180, 46, "MENU", 0xFF37474F)
 {
+    m_btnRetry.setKeyHint("R");
+    m_btnMenu.setKeyHint("ESC");
     setDimensions(m_width, m_height);
 }
 
@@ -26,7 +30,7 @@ void GameOverScreen::setDimensions(int width, int height) {
     m_width = width;
     m_height = height;
 
-    int btnW = 175;
+    int btnW = 180;
     int btnH = 46;
     int gap = 18;
     int totalW = 3 * btnW + 2 * gap;
@@ -41,6 +45,10 @@ void GameOverScreen::setDimensions(int width, int height) {
 
     m_btnMenu.setPosition(startX + (btnW + gap) * 2, btnY);
     m_btnMenu.setSize(btnW, btnH);
+}
+
+void GameOverScreen::update(float dt) {
+    m_animTime += dt;
 }
 
 void GameOverScreen::setStats(float distance, int coins, int flips, float airTime, bool isNewRecord) {
@@ -73,6 +81,9 @@ void GameOverScreen::onMouseUp(int px, int py) {
 void GameOverScreen::render(Graphics::Framebuffer& fb) {
     // 1. Darkened scanline raster overlay
     fb.fillRect(0, 0, m_width, m_height, 0xD0080C14);
+    for (int sy = 0; sy < m_height; sy += 3) {
+        fb.fillRect(0, sy, m_width, 1, 0x18000000);
+    }
 
     // 2. Centered Summary Modal Card
     int boxW = 620;
@@ -80,69 +91,92 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
     int boxX = (m_width - boxW) / 2;
     int boxY = (m_height - boxH) / 2;
 
-    fb.fillRect(boxX, boxY, boxW, boxH, Theme::CARD_BG);
-    fb.drawRect(boxX, boxY, boxW, boxH, Theme::RED_BRAKE);
-    fb.drawRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4, 0xFF05080E);
+    uint32_t stripeCol = (m_reason == "OUT OF FUEL!") ? Theme::GOLD : Theme::RED_BRAKE;
+    UIComponents::drawArcadePanel(fb, boxX, boxY, boxW, boxH, Theme::CARD_BG, stripeCol, stripeCol, 4, true, true);
+
+    // Corner Rivets
+    fb.fillCircle(boxX + 8, boxY + 8, 2, Theme::CHROME_MID);
+    fb.fillCircle(boxX + boxW - 9, boxY + 8, 2, Theme::CHROME_MID);
+    fb.fillCircle(boxX + 8, boxY + boxH - 9, 2, Theme::CHROME_MID);
+    fb.fillCircle(boxX + boxW - 9, boxY + boxH - 9, 2, Theme::CHROME_MID);
+
+    int cx = m_width / 2;
 
     // Header Title (e.g. "DRIVER DOWN!" or "OUT OF FUEL!")
-    uint32_t headerCol = (m_reason == "OUT OF FUEL!") ? Theme::GOLD : Theme::RED_BRAKE;
-    Graphics::RasterFont::drawStringCentered(fb, m_width / 2 + 2, boxY + 24, m_reason, 0xFF05080E, 3);
-    Graphics::RasterFont::drawStringCentered(fb, m_width / 2, boxY + 22, m_reason, headerCol, 3);
+    Graphics::RasterFont::drawStringCentered(fb, cx + 2, boxY + 20, m_reason, 0xFF05080E, 3);
+    Graphics::RasterFont::drawStringCentered(fb, cx, boxY + 18, m_reason, stripeCol, 3);
 
-    // Performance Medal (Bronze, Silver, Gold, Platinum)
+    // Performance Medal Tier Calculation
     std::string medalTitle = "ROOKIE";
-    uint32_t medalCol = 0xFF78909C;
+    uint32_t medalCol = Theme::MEDAL_ROOKIE;
+    int tier = 0;
+
     if (m_distance >= 1200.0f) {
         medalTitle = "PLATINUM CHAMPION";
-        medalCol = 0xFF00E5FF;
+        medalCol = Theme::MEDAL_PLATINUM;
+        tier = 4;
     } else if (m_distance >= 600.0f) {
         medalTitle = "GOLD MEDAL";
-        medalCol = Theme::GOLD;
+        medalCol = Theme::MEDAL_GOLD;
+        tier = 3;
     } else if (m_distance >= 300.0f) {
         medalTitle = "SILVER MEDAL";
-        medalCol = 0xFFCFD8DC;
+        medalCol = Theme::MEDAL_SILVER;
+        tier = 2;
     } else if (m_distance >= 100.0f) {
         medalTitle = "BRONZE MEDAL";
-        medalCol = 0xFFCD7F32;
+        medalCol = Theme::MEDAL_BRONZE;
+        tier = 1;
     }
 
+    // Draw True Pixel-Art Medal Badge
+    int medalCenterY = boxY + 68;
+    UIComponents::drawMedalBadge(fb, cx - 120, medalCenterY, tier, m_animTime);
+
+    // Medal Tier Banner next to badge
+    int tierW = 210;
+    int tierH = 22;
+    int tierX = cx - 95;
+    int tierY = medalCenterY - 11;
+    UIComponents::drawArcadePanel(fb, tierX, tierY, tierW, tierH, 0xEE111A26, medalCol, 0, 0, false, true);
+    Graphics::RasterFont::drawStringCentered(fb, tierX + tierW / 2, tierY + 5, medalTitle, medalCol, 1);
+
+    // New Record Banner if beaten
     if (m_isNewRecord) {
-        int badgeW = 230;
-        int badgeH = 22;
-        int bx = m_width / 2 - badgeW / 2;
-        int by = boxY + 60;
-        fb.fillRect(bx, by, badgeW, badgeH, 0xFFD84315);
-        fb.drawRect(bx, by, badgeW, badgeH, Theme::GOLD);
-        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, by + 5, "* NEW RECORD DISTANCE! *", Theme::TEXT_WHITE, 1);
-    } else {
-        int badgeW = 200;
-        int badgeH = 20;
-        int bx = m_width / 2 - badgeW / 2;
-        int by = boxY + 62;
-        fb.fillRect(bx, by, badgeW, badgeH, 0xEE111A26);
-        fb.drawRect(bx, by, badgeW, badgeH, medalCol);
-        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, by + 4, medalTitle, medalCol, 1);
+        int recW = 240;
+        int recH = 20;
+        int recX = cx - recW / 2;
+        int recY = boxY + 88;
+        UIComponents::drawArcadePanel(fb, recX, recY, recW, recH, 0xFFD84315, Theme::GOLD, 0, 0, false, true);
+        Graphics::RasterFont::drawStringCentered(fb, cx, recY + 4, "* NEW RECORD DISTANCE! *", Theme::TEXT_WHITE, 1);
     }
 
     // Stats Table Grid
-    int tableY = boxY + 98;
+    int tableY = boxY + (m_isNewRecord ? 116 : 106);
     int colLeft = boxX + 60;
     int colRight = boxX + boxW - 60;
+    int rowW = colRight - colLeft;
 
-    auto drawRow = [&](int y, const std::string& label, const std::string& value, uint32_t valCol) {
-        Graphics::RasterFont::drawString(fb, colLeft, y, label, Theme::TEXT_MUTED, 2);
+    auto drawRow = [&](int y, const std::string& label, const std::string& value, uint32_t valCol, bool altBg) {
+        if (altBg) {
+            fb.fillRect(colLeft - 8, y - 2, rowW + 16, 26, 0x221E2C3D);
+        }
+        // Label
+        Graphics::RasterFont::drawString(fb, colLeft, y + 2, label, Theme::TEXT_MUTED, 2);
+        // Formatted Value
         int valW = Graphics::RasterFont::getTextWidth(value, 2);
-        Graphics::RasterFont::drawString(fb, colRight - valW, y, value, valCol, 2);
-        fb.drawLine(colLeft, y + 26, colRight, y + 26, 0xFF1C2738);
+        Graphics::RasterFont::drawString(fb, colRight - valW, y + 2, value, valCol, 2);
+        // Divider line
+        fb.drawLine(colLeft - 8, y + 26, colRight + 8, y + 26, 0xFF1C2738);
     };
 
-    drawRow(tableY, "DISTANCE REACHED", std::to_string(static_cast<int>(m_distance)) + " m", Theme::TEXT_WHITE);
-    drawRow(tableY + 36, "COINS COLLECTED", "+$" + std::to_string(m_coins), Theme::GOLD);
-    drawRow(tableY + 72, "AERIAL FLIPS", std::to_string(m_flips) + " FLIPS", Theme::CYAN_UPGRADE);
+    drawRow(tableY, "DISTANCE REACHED", UIComponents::formatNumber(static_cast<int64_t>(m_distance)) + " m", Theme::TEXT_WHITE, false);
+    drawRow(tableY + 32, "COINS COLLECTED", "+$" + UIComponents::formatNumber(m_coins), Theme::GOLD, true);
+    drawRow(tableY + 64, "AERIAL FLIPS", UIComponents::formatNumber(m_flips) + " FLIPS", Theme::CYAN_UPGRADE, false);
 
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1) << m_airTime << " s";
-    drawRow(tableY + 108, "TOTAL AIR TIME", ss.str(), Theme::GREEN_GAS);
+    drawRow(tableY + 96, "TOTAL AIR TIME", ss.str(), Theme::GREEN_GAS, true);
 
     // Action Buttons
     m_btnRetry.render(fb, 2);

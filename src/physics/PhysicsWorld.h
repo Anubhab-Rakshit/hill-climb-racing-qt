@@ -15,7 +15,9 @@ class PhysicsWorld {
 public:
     PhysicsWorld();
 
-    void reset(const std::string& biomeId = "countryside");
+    void reset(const std::string& biomeId = "countryside",
+               VehicleType vehicleType = VehicleType::OFFROADER,
+               DriverType driverType = DriverType::BILL);
     void step(float dt, const Core::ProfileManager& profile);
 
     Vehicle& vehicle() { return m_vehicle; }
@@ -33,9 +35,12 @@ public:
     bool isGameOver() const { return m_gameOver; }
     const std::string& gameOverReason() const { return m_gameOverReason; }
 
+    int currentCheckpoint() const { return m_lastClearedCheckpoint; }
+
     // Event callbacks for UI
     void setOnStunt(std::function<void(const std::string& title, int coins)> cb) { m_onStunt = cb; }
     void setOnItemCollected(std::function<void(ItemType type, int value)> cb) { m_onItem = cb; }
+    void setOnCheckpoint(std::function<void(const CheckpointInfo& cp)> cb) { m_onCheckpoint = cb; }
 
 private:
     Vehicle m_vehicle;
@@ -45,6 +50,7 @@ private:
     int m_coinsCollected;
     int m_flips;
     float m_totalAirTime;
+    int m_lastClearedCheckpoint;
 
     float m_airTimer;
     float m_cumulativeRotation;
@@ -54,8 +60,10 @@ private:
 
     std::function<void(const std::string&, int)> m_onStunt;
     std::function<void(ItemType, int)> m_onItem;
+    std::function<void(const CheckpointInfo&)> m_onCheckpoint;
 
     void checkItemCollisions();
+    void checkCheckpoints();
     void updateStunts(float dt);
 };
 

@@ -80,8 +80,12 @@ void Framebuffer::drawLine(int x0, int y0, int x1, int y1, uint32_t color) {
 }
 
 void Framebuffer::drawCircle(int xc, int yc, int r, uint32_t color) {
-    if (r <= 0) {
+    if (r < 0) return;
+    if (r == 0) {
         setPixelFast(xc, yc, color);
+        return;
+    }
+    if (xc + r < 0 || xc - r >= m_width || yc + r < 0 || yc - r >= m_height) {
         return;
     }
     // Midpoint circle algorithm
@@ -114,11 +118,15 @@ void Framebuffer::drawCircle(int xc, int yc, int r, uint32_t color) {
 }
 
 void Framebuffer::fillCircle(int xc, int yc, int r, uint32_t color) {
-    if (r <= 0) {
+    if (r < 0) return;
+    if (r == 0) {
         setPixelFast(xc, yc, color);
         return;
     }
-    int r2 = r * r;
+    if (xc + r < 0 || xc - r >= m_width || yc + r < 0 || yc - r >= m_height) {
+        return;
+    }
+    int64_t r2 = static_cast<int64_t>(r) * r;
     int y0 = std::max(0, yc - r);
     int y1 = std::min(m_height - 1, yc + r);
 
@@ -127,16 +135,20 @@ void Framebuffer::fillCircle(int xc, int yc, int r, uint32_t color) {
     uint32_t opCol = 0xFF000000 | (color & 0x00FFFFFF);
 
     for (int y = y0; y <= y1; ++y) {
-        int dy = y - yc;
-        int dx = static_cast<int>(std::sqrt(r2 - dy * dy));
+        int64_t dy = y - yc;
+        int64_t diff = r2 - dy * dy;
+        if (diff < 0) diff = 0;
+        int dx = static_cast<int>(std::sqrt(diff));
         int x0 = std::max(0, xc - dx);
         int x1 = std::min(m_width - 1, xc + dx);
-        if (isOpaque) {
-            uint32_t* line = scanLine(y);
-            std::fill(line + x0, line + x1 + 1, opCol);
-        } else {
-            for (int x = x0; x <= x1; ++x) {
-                blendPixelFast(x, y, color);
+        if (x0 <= x1) {
+            if (isOpaque) {
+                uint32_t* line = scanLine(y);
+                std::fill(line + x0, line + x1 + 1, opCol);
+            } else {
+                for (int x = x0; x <= x1; ++x) {
+                    blendPixelFast(x, y, color);
+                }
             }
         }
     }
@@ -165,10 +177,10 @@ void Framebuffer::fillVerticalGradient(int x, int y, int w, int h, uint32_t topC
 
     for (int cy = y0; cy < y1; ++cy) {
         float t = (cy - y) * invH;
-        uint32_t r = static_cast<uint32_t>(tr + (br - tr) * t);
-        uint32_t g = static_cast<uint32_t>(tg + (bg - tg) * t);
-        uint32_t b = static_cast<uint32_t>(tb + (bb - tb) * t);
-        uint32_t a = static_cast<uint32_t>(ta + (ba - ta) * t);
+        uint32_t r = static_cast<uint32_t>(std::clamp(tr + (br - tr) * t, 0.0f, 255.0f));
+        uint32_t g = static_cast<uint32_t>(std::clamp(tg + (bg - tg) * t, 0.0f, 255.0f));
+        uint32_t b = static_cast<uint32_t>(std::clamp(tb + (bb - tb) * t, 0.0f, 255.0f));
+        uint32_t a = static_cast<uint32_t>(std::clamp(ta + (ba - ta) * t, 0.0f, 255.0f));
 
         uint32_t color = (a << 24) | (r << 16) | (g << 8) | b;
         uint32_t* line = scanLine(cy);

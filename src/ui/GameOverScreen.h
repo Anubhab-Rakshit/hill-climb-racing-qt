@@ -32,11 +32,13 @@ public:
     bool onMouseDown(int px, int py);
     void onMouseUp(int px, int py);
 
+    void update(float dt);
     void render(Graphics::Framebuffer& fb);
 
 private:
     int m_width;
     int m_height;
+    float m_animTime;
     std::string m_reason;
     float m_distance;
     int m_coins;

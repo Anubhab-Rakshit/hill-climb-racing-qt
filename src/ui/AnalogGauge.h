@@ -34,6 +34,7 @@ private:
     std::string m_label;
     std::string m_unit;
     float m_redlineFrac;
+    float m_animTime;
 };
 
 } // namespace UI

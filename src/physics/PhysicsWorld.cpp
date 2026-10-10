@@ -16,16 +16,19 @@ PhysicsWorld::PhysicsWorld()
 {
 }
 
-void PhysicsWorld::reset(const std::string& biomeId) {
+void PhysicsWorld::reset(const std::string& biomeId, VehicleType vehicleType, DriverType driverType) {
     m_terrain.setBiome(biomeId);
     float startX = 5.0f;
     float groundY = m_terrain.getHeight(startX);
+    m_vehicle.setVehicleType(vehicleType);
+    m_vehicle.setDriverType(driverType);
     m_vehicle.reset(startX, groundY + 1.20f);
 
     m_distance = 0.0f;
     m_coinsCollected = 0;
     m_flips = 0;
     m_totalAirTime = 0.0f;
+    m_lastClearedCheckpoint = 0;
     m_airTimer = 0.0f;
     m_cumulativeRotation = 0.0f;
     m_gameOver = false;
@@ -38,6 +41,17 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
     // Step multi-body vehicle
     m_vehicle.step(dt, m_terrain, profile);
 
+    // Dynamic terrain deformation synchronized with wheel physics
+    if (m_vehicle.isRearOnGround()) {
+        m_terrain.applyWheelDeformation(m_vehicle.rearWheelPos().x, m_vehicle.rearWheelRadius(),
+                                        m_vehicle.rearNormalForce(), m_vehicle.rearSlipSpeed(), dt);
+    }
+    if (m_vehicle.isFrontOnGround()) {
+        m_terrain.applyWheelDeformation(m_vehicle.frontWheelPos().x, m_vehicle.frontWheelRadius(),
+                                        m_vehicle.frontNormalForce(), m_vehicle.frontSlipSpeed(), dt);
+    }
+    m_terrain.updateDeformation(dt, m_vehicle.chassisPos().x - 120.0f, m_vehicle.chassisPos().x + 120.0f);
+
     // Update forward distance reached
     float currentX = m_vehicle.chassisPos().x;
     if (currentX > m_distance) {
@@ -46,6 +60,9 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
 
     // Check item pickup collisions
     checkItemCollisions();
+
+    // Check checkpoint line crossings
+    checkCheckpoints();
 
     // Check stunt flips and airtime
     updateStunts(dt);
@@ -131,6 +148,20 @@ void PhysicsWorld::updateStunts(float dt) {
         }
         m_airTimer = 0.0f;
         m_cumulativeRotation = 0.0f;
+    }
+}
+
+void PhysicsWorld::checkCheckpoints() {
+    float x = m_vehicle.chassisPos().x;
+    const auto& checkpoints = m_terrain.getCheckpoints();
+    for (const auto& cp : checkpoints) {
+        if (cp.index > m_lastClearedCheckpoint && x >= cp.distance) {
+            m_lastClearedCheckpoint = cp.index;
+            m_coinsCollected += cp.coinReward;
+            if (m_onCheckpoint) {
+                m_onCheckpoint(cp);
+            }
+        }
     }
 }
 

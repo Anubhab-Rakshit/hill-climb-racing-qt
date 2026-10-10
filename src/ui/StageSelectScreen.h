@@ -3,15 +3,17 @@
 #include "Framebuffer.h"
 #include "RetroButton.h"
 #include "ProfileManager.h"
+#include "TerrainConfig.h"
 #include <string>
 #include <functional>
+#include <vector>
 
 namespace UI {
 
 /**
- * @brief Stage & Biome Selection Screen.
- * Allows choosing between Countryside, Desert, Moon, and Mountain Ridge tracks.
- * Features live animated biome previews and coin-based stage unlocking.
+ * @brief Stage & Biome Selection Screen with Checkpoint Progression.
+ * Supports browsing 6 unique biomes with animated previews, checkpoint completion badges,
+ * and dual unlock paths (via stage completion or coin economy).
  */
 class StageSelectScreen {
 public:
@@ -21,13 +23,7 @@ public:
 
     void setOnBack(std::function<void()> cb) { m_btnBack.setOnClick(cb); }
     void setOnSelectStage(std::function<void(const std::string& stageId)> cb) { m_onSelectStage = cb; }
-    void setButtonSound(std::function<void()> cb) {
-        m_btnBack.setOnSound(cb);
-        m_btnSelectCountryside.setOnSound(cb);
-        m_btnSelectDesert.setOnSound(cb);
-        m_btnSelectMoon.setOnSound(cb);
-        m_btnSelectMountain.setOnSound(cb);
-    }
+    void setButtonSound(std::function<void()> cb);
 
     void onMouseMove(int px, int py);
     bool onMouseDown(int px, int py, Core::ProfileManager& profile);
@@ -36,16 +32,21 @@ public:
     void update(float dt);
     void render(Graphics::Framebuffer& fb, const Core::ProfileManager& profile);
 
+    int currentPage() const { return m_page; }
+    void setPage(int p) { m_page = (p < 0) ? 0 : (p > 1) ? 1 : p; }
+
 private:
     int m_width;
     int m_height;
     float m_animTime;
+    int m_page; // 0 = stages 0..2, 1 = stages 3..5
 
     RetroButton m_btnBack;
-    RetroButton m_btnSelectCountryside;
-    RetroButton m_btnSelectDesert;
-    RetroButton m_btnSelectMoon;
-    RetroButton m_btnSelectMountain;
+    RetroButton m_btnPrevPage;
+    RetroButton m_btnNextPage;
+
+    // 6 Stage Select Buttons
+    RetroButton m_btnStageAction[6];
 
     std::function<void(const std::string& stageId)> m_onSelectStage;
 

@@ -26,6 +26,9 @@ public:
     void setEnabled(bool enabled) { m_enabled = enabled; }
     bool isEnabled() const { return m_enabled; }
     void setOnSound(std::function<void()> cb) { m_onSound = cb; }
+    void setKeyHint(const std::string& hint) { m_keyHint = hint; }
+    const std::string& keyHint() const { return m_keyHint; }
+    void setCornerNotches(bool notches) { m_cornerNotches = notches; }
 
     bool contains(int px, int py) const;
     void onMouseMove(int px, int py);
@@ -44,11 +47,13 @@ private:
     int m_w;
     int m_h;
     std::string m_text;
+    std::string m_keyHint;
     uint32_t m_baseColor;
     uint32_t m_textColor;
     bool m_enabled = true;
     bool m_hovered = false;
     bool m_pressed = false;
+    bool m_cornerNotches = true;
     std::function<void()> m_onClick;
     std::function<void()> m_onSound;
 };

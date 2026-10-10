@@ -1,5 +1,5 @@
 #include "Sprite.h"
-#include "CarSpritesData.h"
+#include "VehicleSprites.h"
 #include "UITheme.h"
 #include <cmath>
 #include <algorithm>
@@ -13,15 +13,7 @@ bool SpriteRenderer::s_loaded = false;
 
 void SpriteRenderer::ensureLoaded() {
     if (s_loaded) return;
-
-    s_chassisImg.loadFromData(Assets::s_chassisPng, Assets::s_chassisPng_len);
-    s_wheelImg.loadFromData(Assets::s_wheelPng, Assets::s_wheelPng_len);
-    s_driverHeadImg.loadFromData(Assets::s_driverHeadPng, Assets::s_driverHeadPng_len);
-
-    s_chassisImg = s_chassisImg.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    s_wheelImg = s_wheelImg.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    s_driverHeadImg = s_driverHeadImg.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-
+    VehicleSprites::init();
     s_loaded = true;
 }
 
@@ -77,6 +69,11 @@ void SpriteRenderer::blitRotated(Framebuffer& fb, const QImage& img, float targe
 void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle) {
     ensureLoaded();
 
+    const auto& config = vehicle.config();
+    const QImage& chassisImg = VehicleSprites::getChassisSprite(vehicle.vehicleType());
+    const QImage& wheelImg = VehicleSprites::getWheelSprite(vehicle.vehicleType());
+    const QImage& driverImg = VehicleSprites::getDriverSprite(vehicle.driverType());
+
     float zoom = cam.zoom();
     // 80.25 sprite pixels per physical meter
     float spriteScale = zoom / 80.25f;
@@ -85,33 +82,21 @@ void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Phy
     Physics::Vec2 chassisScr = cam.worldToScreen(vehicle.chassisPos());
     float angle = vehicle.chassisAngle();
     float screenChassisAngle = -angle; // Screen Y is inverted
-    float cosA = std::cos(screenChassisAngle);
-    float sinA = std::sin(screenChassisAngle);
 
     // Helper: local chassis world offset (lx, ly) to world coordinates
-    auto chassisPointToWorld = [&](float lx, float ly) -> Physics::Vec2 {
+    auto chassisPointToWorld = [&](const Physics::Vec2& local) -> Physics::Vec2 {
         float cosW = std::cos(angle);
         float sinW = std::sin(angle);
-        return {vehicle.chassisPos().x + (lx * cosW - ly * sinW),
-                vehicle.chassisPos().y + (lx * sinW + ly * cosW)};
+        return {vehicle.chassisPos().x + (local.x * cosW - local.y * sinW),
+                vehicle.chassisPos().y + (local.x * sinW + local.y * cosW)};
     };
 
-    // 2. Suspension Mount Points on Chassis (matching wheel well centers)
-    Physics::Vec2 rearMountScr = cam.worldToScreen(chassisPointToWorld(-0.78f, -0.06f));
-    Physics::Vec2 frontMountScr = cam.worldToScreen(chassisPointToWorld(+0.78f, -0.06f));
+    // 2. Suspension Mount Points & Wheel Positions
+    Physics::Vec2 rearMountScr = cam.worldToScreen(chassisPointToWorld(vehicle.rearMountOffset()));
+    Physics::Vec2 frontMountScr = cam.worldToScreen(chassisPointToWorld(vehicle.frontMountOffset()));
 
     Physics::Vec2 rearWheelScr = cam.worldToScreen(vehicle.rearWheelPos());
     Physics::Vec2 frontWheelScr = cam.worldToScreen(vehicle.frontWheelPos());
-
-    // Safety fallback: ensure wheels stay strictly anchored to their struts
-    float maxStrutPx = 0.60f * zoom;
-    float minStrutPx = 0.10f * zoom;
-    if (std::isnan(rearWheelScr.x) || (rearWheelScr - rearMountScr).length() > maxStrutPx || (rearWheelScr - rearMountScr).length() < minStrutPx) {
-        rearWheelScr = rearMountScr + Physics::Vec2(-sinA, cosA) * (0.28f * zoom);
-    }
-    if (std::isnan(frontWheelScr.x) || (frontWheelScr - frontMountScr).length() > maxStrutPx || (frontWheelScr - frontMountScr).length() < minStrutPx) {
-        frontWheelScr = frontMountScr + Physics::Vec2(-sinA, cosA) * (0.28f * zoom);
-    }
 
     // 3. Render Suspension Struts (Clean shock absorbers behind the wheels)
     auto drawStrut = [&](const Physics::Vec2& m, const Physics::Vec2& w) {
@@ -126,77 +111,101 @@ void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Phy
     drawStrut(rearMountScr, rearWheelScr);
     drawStrut(frontMountScr, frontWheelScr);
 
-    // 4. Render Authentic Wheels (Inside wheel wells, rotating with physical wheel angle)
-    // Wheel sprite is 74x72, anchor at center (37, 36)
-    float wheelScale = spriteScale * (44.0f / 74.0f);
-    blitRotated(fb, s_wheelImg, rearWheelScr.x, rearWheelScr.y, 37.0f, 36.0f, vehicle.rearWheelAngle(), wheelScale);
-    blitRotated(fb, s_wheelImg, frontWheelScr.x, frontWheelScr.y, 37.0f, 36.0f, vehicle.frontWheelAngle(), wheelScale);
+    // 4. Render Wheels (Rotating with physical wheel angle, strictly anchored to struts)
+    float wheelScale = (vehicle.rearWheelRadius() * zoom) / config.wheelSpriteRadius;
+    float wAnchorX = wheelImg.width() * 0.5f;
+    float wAnchorY = wheelImg.height() * 0.5f;
+    blitRotated(fb, wheelImg, rearWheelScr.x, rearWheelScr.y, wAnchorX, wAnchorY, vehicle.rearWheelAngle(), wheelScale);
+    blitRotated(fb, wheelImg, frontWheelScr.x, frontWheelScr.y, wAnchorX, wAnchorY, vehicle.frontWheelAngle(), wheelScale);
 
-    // 5. Render Driver (Bill Newton with his red backwards cap and scruffy chin)
-    // Driver position in cockpit: (-0.27m, +0.38m) relative to chassis center
-    Physics::Vec2 driverHeadScr = cam.worldToScreen(chassisPointToWorld(-0.27f, +0.38f));
-    // Bill's head sways with g-forces and terrain jumps
-    float driverHeadScreenAngle = screenChassisAngle + vehicle.driverHeadAngle();
-    float driverScale = spriteScale * (44.0f / 95.0f);
-    // Anchor at neck base of driver sprite: (45, 85)
-    blitRotated(fb, s_driverHeadImg, driverHeadScr.x, driverHeadScr.y, 45.0f, 85.0f, driverHeadScreenAngle, driverScale);
+    // 5. Render Driver with Physics Inertia (if not already integrated into bespoke vehicle asset)
+    if (!config.hasIntegratedDriver) {
+        Physics::Vec2 driverHeadScr = cam.worldToScreen(vehicle.driverHeadPos());
+        float driverHeadScreenAngle = screenChassisAngle + vehicle.driverHeadAngle();
+        float driverScale = spriteScale * 0.52f;
+        float dAnchorX = driverImg.width() * 0.5f;
+        float dAnchorY = driverImg.height() * 0.88f;
+        blitRotated(fb, driverImg, driverHeadScr.x, driverHeadScr.y, dAnchorX, dAnchorY, driverHeadScreenAngle, driverScale);
+    }
 
-    // 6. Render Authentic Red Jeep Chassis Body (Drawn on top so wheels sit inside wheel arches!)
-    // Anchor at chassis center: (126.4, 70.0)
-    blitRotated(fb, s_chassisImg, chassisScr.x, chassisScr.y, 126.4f, 70.0f, screenChassisAngle, spriteScale);
+    // 6. Render Pixel-Art Chassis Body (Drawn on top so wheels sit inside wheel arches)
+    blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale);
 }
 
 void SpriteRenderer::renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile) {
+    renderGarageVehicle(fb, cx, cy, bounceY, profile, profile.selectedVehicle(), profile.selectedDriver());
+}
+
+void SpriteRenderer::renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile,
+                                        Physics::VehicleType vType, Physics::DriverType dType, bool drawLift) {
     ensureLoaded();
 
-    float scale = 0.68f; // Prominent crisp garage scale
-    float liftY = cy + 45;
+    const auto& config = Physics::VehicleRegistry::getConfig(vType);
+    const QImage& chassisImg = VehicleSprites::getChassisSprite(vType);
+    const QImage& wheelImg = VehicleSprites::getWheelSprite(vType);
+    const QImage& driverImg = VehicleSprites::getDriverSprite(dType);
 
-    // 1. Hydraulic Garage Lift Platform
-    int liftW = 230;
-    int liftH = 14;
-    int liftX = cx - liftW / 2;
-    fb.fillRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF212B36);
-    fb.drawRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF455A64);
+    float garageScale = 0.72f;
+    float liftY = cy + 46.0f;
 
-    // Yellow Hazard Stripes
-    for (int s = liftX + 6; s < liftX + liftW - 12; s += 16) {
-        fb.fillRect(s, static_cast<int>(liftY + 2), 8, liftH - 4, UI::Theme::GOLD);
+    // 1. Wheelbase and Wheel Positions
+    float rearWheelX = cx + config.rearMountOffset.x * 80.25f * garageScale;
+    float frontWheelX = cx + config.frontMountOffset.x * 80.25f * garageScale;
+
+    // Hydraulic Lift Platform (Optional, only drawn in Garage)
+    if (drawLift) {
+        int liftW = static_cast<int>((frontWheelX - rearWheelX) + 110.0f);
+        int liftH = 14;
+        int liftX = cx - liftW / 2;
+        fb.fillRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF212B36);
+        fb.drawRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF455A64);
+
+        // Yellow Hazard Stripes
+        for (int s = liftX + 6; s < liftX + liftW - 12; s += 16) {
+            fb.fillRect(s, static_cast<int>(liftY + 2), 8, liftH - 4, UI::Theme::GOLD);
+        }
+        // Lift hydraulic posts
+        fb.fillRect(cx - 75, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
+        fb.fillRect(cx + 59, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
     }
-    fb.fillRect(cx - 75, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
-    fb.fillRect(cx + 59, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
 
     // 2. Wheels Resting on Lift
-    int tireLvl = profile.getUpgradeLevel(Core::ProfileManager::UPGRADE_TIRES);
-    float tireUpgrMult = 1.0f + std::min(0.18f, tireLvl * 0.015f);
-    float wheelScale = scale * (44.0f / 74.0f) * tireUpgrMult;
-    float wheelRadiusPx = 22.0f * tireUpgrMult * scale;
+    int tireLvl = profile.getUpgradeLevel(vType, Core::ProfileManager::UPGRADE_TIRES);
+    float tireUpgrMult = 1.0f + std::min(0.18f, (tireLvl - 1) * 0.012f);
+    float wheelScale = garageScale * tireUpgrMult;
+    float wheelRadiusPx = config.wheelSpriteRadius * wheelScale;
     float wheelCenterY = liftY - wheelRadiusPx;
 
-    float rearWheelX = cx - 62.6f * scale;
-    float frontWheelX = cx + 62.6f * scale;
-
-    // 3. Chassis on Suspension (bounces playfully when clicked!)
-    float chassisCenterY = wheelCenterY - (26.1f * scale) + bounceY;
+    // 3. Chassis on Suspension (bounces playfully when clicked or upgraded!)
+    float suspHeightPx = config.suspRestLength * 80.25f * garageScale;
+    float chassisCenterY = wheelCenterY - suspHeightPx + bounceY;
 
     // Shock struts
-    fb.drawLine(static_cast<int>(rearWheelX), static_cast<int>(chassisCenterY + 26.1f * scale),
+    float rearMountY = chassisCenterY - config.rearMountOffset.y * 80.25f * garageScale;
+    float frontMountY = chassisCenterY - config.frontMountOffset.y * 80.25f * garageScale;
+    fb.drawLine(static_cast<int>(rearWheelX), static_cast<int>(rearMountY),
                 static_cast<int>(rearWheelX), static_cast<int>(wheelCenterY), 0xFFCFD8DC);
-    fb.drawLine(static_cast<int>(frontWheelX), static_cast<int>(chassisCenterY + 26.1f * scale),
+    fb.drawLine(static_cast<int>(frontWheelX), static_cast<int>(frontMountY),
                 static_cast<int>(frontWheelX), static_cast<int>(wheelCenterY), 0xFFCFD8DC);
 
     // Wheels
-    blitRotated(fb, s_wheelImg, rearWheelX, wheelCenterY, 37.0f, 36.0f, 0.0f, wheelScale);
-    blitRotated(fb, s_wheelImg, frontWheelX, wheelCenterY, 37.0f, 36.0f, 0.0f, wheelScale);
+    float wAnchorX = wheelImg.width() * 0.5f;
+    float wAnchorY = wheelImg.height() * 0.5f;
+    blitRotated(fb, wheelImg, rearWheelX, wheelCenterY, wAnchorX, wAnchorY, 0.0f, wheelScale);
+    blitRotated(fb, wheelImg, frontWheelX, wheelCenterY, wAnchorX, wAnchorY, 0.0f, wheelScale);
 
-    // Driver Bill
-    float driverScale = scale * (44.0f / 95.0f);
-    float driverX = cx - 21.4f * scale;
-    float driverY = chassisCenterY - 32.0f * scale;
-    blitRotated(fb, s_driverHeadImg, driverX, driverY, 45.0f, 85.0f, bounceY * 0.04f, driverScale);
+    // Driver in Cockpit (if not already integrated into bespoke vehicle asset)
+    if (!config.hasIntegratedDriver) {
+        float driverX = cx + config.driverSeatOffset.x * 80.25f * garageScale;
+        float driverY = chassisCenterY - config.driverSeatOffset.y * 80.25f * garageScale;
+        float driverScale = garageScale * 0.52f;
+        float dAnchorX = driverImg.width() * 0.5f;
+        float dAnchorY = driverImg.height() * 0.88f;
+        blitRotated(fb, driverImg, driverX, driverY, dAnchorX, dAnchorY, bounceY * 0.035f, driverScale);
+    }
 
     // Chassis
-    blitRotated(fb, s_chassisImg, cx, chassisCenterY, 126.4f, 70.0f, 0.0f, scale);
+    blitRotated(fb, chassisImg, cx, chassisCenterY, config.spriteAnchor.x, config.spriteAnchor.y, 0.0f, garageScale);
 }
 
 } // namespace Graphics

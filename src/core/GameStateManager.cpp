@@ -10,6 +10,7 @@ GameStateManager::GameStateManager()
     , m_width(UI::Theme::VIRTUAL_WIDTH)
     , m_height(UI::Theme::VIRTUAL_HEIGHT)
     , m_gameTime(0.0f)
+    , m_transitionTimer(0.0f)
     , m_selectedBiome("countryside")
     , m_camera(m_width, m_height)
 {
@@ -48,6 +49,7 @@ void GameStateManager::setupUiCallbacks() {
         changeState(StateType::STAGE_SELECT);
     });
     m_mainMenu.setOnGarage([this]() {
+        m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_mainMenu.setOnStages([this]() {
@@ -88,6 +90,7 @@ void GameStateManager::setupUiCallbacks() {
         startRace(m_selectedBiome);
     });
     m_pauseOverlay.setOnGarage([this]() {
+        m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_pauseOverlay.setOnMenu([this]() {
@@ -99,6 +102,7 @@ void GameStateManager::setupUiCallbacks() {
         startRace(m_selectedBiome);
     });
     m_gameOverScreen.setOnGarage([this]() {
+        m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_gameOverScreen.setOnMenu([this]() {
@@ -124,15 +128,42 @@ void GameStateManager::setupUiCallbacks() {
             m_hud.addFloatingText("+$" + std::to_string(val), scr.x, scr.y - 25.0f, UI::Theme::GOLD);
         }
     });
+
+    // 8. Checkpoint Crossings
+    m_physics.setOnCheckpoint([this](const Physics::CheckpointInfo& cp) {
+        m_profile.addCoins(cp.coinReward);
+        m_profile.recordStageCheckpoint(m_selectedBiome, cp.index);
+        m_audio.playStuntCheer();
+
+        if (cp.isFinishLine) {
+            std::string msg = "STAGE CLEARED! +" + std::to_string(cp.coinReward);
+            m_hud.triggerStunt(msg, cp.coinReward, UI::Theme::GOLD);
+            const auto& spec = Physics::BiomeRegistry::getBiome(m_selectedBiome);
+            if (!spec.nextBiomeId.empty()) {
+                m_profile.unlockStage(spec.nextBiomeId);
+            }
+        } else {
+            std::string msg = "CHECKPOINT " + std::to_string(cp.index) + ": " + cp.name + "!";
+            m_hud.triggerStunt(msg, cp.coinReward, UI::Theme::GREEN_GAS);
+        }
+
+        Physics::Vec2 carPos = m_physics.vehicle().chassisPos();
+        Physics::Vec2 scr = m_camera.worldToScreen(carPos);
+        m_hud.addFloatingText("+$" + std::to_string(cp.coinReward), scr.x, scr.y - 35.0f, UI::Theme::GOLD);
+    });
 }
 
 void GameStateManager::changeState(StateType newState) {
-    m_currentState = newState;
+    if (m_currentState != newState) {
+        m_transitionTimer = 0.12f;
+        m_currentState = newState;
+    }
 }
 
 void GameStateManager::startRace(const std::string& biomeId) {
     m_selectedBiome = biomeId;
-    m_physics.reset(biomeId);
+    m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver());
+    m_camera.reset(m_physics.vehicle().chassisPos());
     m_particleSystem.clear();
     m_gameTime = 0.0f;
     changeState(StateType::GAMEPLAY);
@@ -196,12 +227,18 @@ void GameStateManager::handleInput(const InputController::State& input) {
 }
 
 void GameStateManager::fixedUpdate(float dt) {
+    if (m_transitionTimer > 0.0f) {
+        m_transitionTimer = std::max(0.0f, m_transitionTimer - dt);
+    }
+
     if (m_currentState == StateType::MAIN_MENU) {
         m_mainMenu.update(dt);
     } else if (m_currentState == StateType::GARAGE) {
         m_garage.update(dt);
     } else if (m_currentState == StateType::STAGE_SELECT) {
         m_stageSelect.update(dt);
+    } else if (m_currentState == StateType::GAME_OVER) {
+        m_gameOverScreen.update(dt);
     } else if (m_currentState == StateType::GAMEPLAY) {
         m_gameTime += dt;
 
@@ -212,13 +249,31 @@ void GameStateManager::fixedUpdate(float dt) {
         const auto& car = m_physics.vehicle();
         m_camera.update(dt, car.chassisPos(), car.chassisVel().x);
 
-        // Particles
+        // Exhaust smoke
         if (car.fuel() > 0.0f) {
-            m_particleSystem.emitSmoke(car.chassisPos() + Physics::Vec2(-1.2f, -0.1f), car.chassisVel());
+            float cosA = std::cos(car.chassisAngle());
+            float sinA = std::sin(car.chassisAngle());
+            Physics::Vec2 pipeLocal(-car.config().spriteWidth * 0.0055f, 0.0f);
+            Physics::Vec2 pipeWorld = car.chassisPos() + Physics::Vec2(pipeLocal.x * cosA - pipeLocal.y * sinA,
+                                                                       pipeLocal.x * sinA + pipeLocal.y * cosA);
+            m_particleSystem.emitSmoke(pipeWorld, car.chassisVel());
         }
-        if (car.isRearOnGround() && std::abs(car.chassisVel().x) > 2.0f) {
-            m_particleSystem.emitDirt(car.rearWheelPos(), {-1.0f, 0.4f});
+
+        // Realistic terrain interaction & wheel spray for rear & front tyres
+        const std::string& currentBiome = m_physics.terrain().getBiome();
+        if (car.isRearOnGround()) {
+            m_particleSystem.emitWheelSpray(car.rearWheelPos(), car.rearWheelRadius(),
+                                            car.rearContactTangent(), car.rearSlipSpeed(),
+                                            car.rearWheelAngularVel(), car.rearNormalForce(),
+                                            currentBiome);
         }
+        if (car.isFrontOnGround()) {
+            m_particleSystem.emitWheelSpray(car.frontWheelPos(), car.frontWheelRadius(),
+                                            car.frontContactTangent(), car.frontSlipSpeed(),
+                                            car.frontWheelAngularVel(), car.frontNormalForce(),
+                                            currentBiome);
+        }
+
         if (car.isChassisContact()) {
             m_particleSystem.emitSparkles(car.chassisPos() + Physics::Vec2(0.0f, -0.2f));
         }
@@ -231,6 +286,11 @@ void GameStateManager::fixedUpdate(float dt) {
         m_hud.setDistance(m_physics.distanceReached());
         m_hud.setRecord(m_profile.getRecordDistance(m_selectedBiome));
         m_hud.setCoins(m_profile.coins() + m_physics.coinsCollected());
+        m_hud.setCheckpointProgress(m_physics.currentCheckpoint(), 5);
+        const auto* nextCp = m_physics.terrain().getNextCheckpoint(m_physics.distanceReached());
+        if (nextCp) {
+            m_hud.setNextCheckpoint(nextCp->name, nextCp->distance);
+        }
         m_hud.update(dt);
 
         m_audio.updateEngineRpm(car.getEngineRpm());
@@ -257,7 +317,7 @@ void GameStateManager::fixedUpdate(float dt) {
 
 void GameStateManager::render(Graphics::Framebuffer& fb, float /*alpha*/) {
     if (m_currentState == StateType::MAIN_MENU) {
-        m_mainMenu.render(fb, m_profile.coins());
+        m_mainMenu.render(fb, m_profile);
     } else if (m_currentState == StateType::GARAGE) {
         m_garage.render(fb, m_profile);
     } else if (m_currentState == StateType::STAGE_SELECT) {
@@ -281,6 +341,13 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float /*alpha*/) {
         } else if (m_currentState == StateType::GAME_OVER) {
             m_gameOverScreen.render(fb);
         }
+    }
+
+    // 6. Smooth Screen Transition Fade Curtain
+    if (m_transitionTimer > 0.0f) {
+        float frac = m_transitionTimer / 0.12f;
+        uint32_t alpha = static_cast<uint32_t>(frac * 160.0f);
+        fb.fillRect(0, 0, m_width, m_height, (alpha << 24) | 0x060A12);
     }
 }
 

@@ -1,6 +1,7 @@
 #include "FuelBar.h"
 #include "RasterFont.h"
 #include "UITheme.h"
+#include "UIComponents.h"
 #include <algorithm>
 #include <string>
 
@@ -24,7 +25,7 @@ void FuelBar::setFuel(float fuelPercent) {
 void FuelBar::update(float dt) {
     if (m_fuelPercent < 25.0f) {
         m_blinkTimer += dt;
-        if (m_blinkTimer >= 0.25f) {
+        if (m_blinkTimer >= 0.22f) {
             m_blinkTimer = 0.0f;
             m_blinkState = !m_blinkState;
         }
@@ -35,18 +36,22 @@ void FuelBar::update(float dt) {
 }
 
 void FuelBar::render(Graphics::Framebuffer& fb) {
-    // 1. Outer Container Box
-    fb.fillRect(m_x, m_y, m_w, m_h, 0xEE101622);
-    fb.drawRect(m_x, m_y, m_w, m_h, Theme::CARD_BORDER);
+    // 1. Outer Arcade Pod Container
+    uint32_t borderCol = (m_fuelPercent < 25.0f && m_blinkState) ? 0xFFFF1744 : Theme::CARD_BORDER;
+    UIComponents::drawArcadePanel(fb, m_x, m_y, m_w, m_h, 0xEE090E18, borderCol, 0, 0, true, true);
 
-    // 2. "FUEL" Label
-    Graphics::RasterFont::drawString(fb, m_x + 6, m_y + 8, "FUEL", Theme::TEXT_MUTED, 1);
+    // 2. Pixel Fuel Pump Icon
+    uint32_t pumpCol = (m_fuelPercent < 25.0f) ? (m_blinkState ? 0xFFFF1744 : 0xFFB71C1C) : Theme::GOLD;
+    UIComponents::drawFuelPumpIcon(fb, m_x + 6, m_y + 5, pumpCol);
+
+    // "FUEL" Label
+    Graphics::RasterFont::drawString(fb, m_x + 22, m_y + 8, "FUEL", Theme::TEXT_WHITE, 1);
 
     // 3. Segmented Bar Area
-    int barStartX = m_x + 40;
-    int barStartY = m_y + 4;
-    int barW = m_w - 48;
-    int barH = m_h - 8;
+    int barStartX = m_x + 52;
+    int barStartY = m_y + 5;
+    int barW = m_w - 58;
+    int barH = m_h - 10;
 
     int totalSegments = 16;
     int segGap = 2;
@@ -72,20 +77,23 @@ void FuelBar::render(Graphics::Framebuffer& fb) {
 
             fb.fillRect(sx, sy, segW, barH, segColor);
             // Highlight bar top
-            fb.fillRect(sx, sy, segW, 2, 0x55FFFFFF);
+            fb.fillRect(sx, sy, segW, 2, 0x88FFFFFF);
         } else {
             // Inactive segment slot
-            fb.fillRect(sx, sy, segW, barH, 0xFF1C2533);
+            fb.fillRect(sx, sy, segW, barH, 0xFF141D28);
         }
+        fb.drawRect(sx, sy, segW, barH, 0xFF080C14);
     }
 
     // 4. Low Fuel Alert Warning Banner
     if (m_fuelPercent < 25.0f && m_blinkState) {
         int alertX = m_x + m_w + 10;
-        int alertY = m_y + 4;
-        fb.fillRect(alertX - 4, alertY - 2, 92, 18, 0xEEB71C1C);
-        fb.drawRect(alertX - 4, alertY - 2, 92, 18, 0xFFFF5252);
-        Graphics::RasterFont::drawString(fb, alertX, alertY + 3, "! LOW FUEL !", Theme::TEXT_WHITE, 1);
+        int alertY = m_y + 3;
+        int alertW = 100;
+        int alertH = 20;
+
+        UIComponents::drawArcadePanel(fb, alertX, alertY, alertW, alertH, 0xEEB71C1C, 0xFFFF5252, 0xFFFF5252, 2, true, true);
+        Graphics::RasterFont::drawStringCentered(fb, alertX + alertW / 2, alertY + 5, "! LOW FUEL !", Theme::TEXT_WHITE, 1);
     }
 }
 
