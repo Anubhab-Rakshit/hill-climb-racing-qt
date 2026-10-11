@@ -12,18 +12,10 @@
 #include "StageSelectScreen.h"
 #include "PauseOverlay.h"
 #include "GameOverScreen.h"
+#include "GameState.h"
 #include "SoundManager.h"
 
 namespace Core {
-
-enum class StateType {
-    MAIN_MENU,
-    STAGE_SELECT,
-    GARAGE,
-    GAMEPLAY,
-    PAUSED,
-    GAME_OVER
-};
 
 /**
  * @brief Manages screen transitions, coordinates rendering, and bridges UI with Physics.
@@ -50,6 +42,10 @@ public:
     const UI::StageSelectScreen& stageSelectScreen() const { return m_stageSelect; }
     Graphics::Camera& camera() { return m_camera; }
     const Graphics::Camera& camera() const { return m_camera; }
+    Graphics::ScanlineRasterizer& terrainRasterizer() { return m_terrainRasterizer; }
+    Graphics::ParticleSystem& particleSystem() { return m_particleSystem; }
+    UI::HUD& hud() { return m_hud; }
+    float gameTime() const { return m_gameTime; }
 
 private:
     StateType m_currentState;
@@ -57,6 +53,7 @@ private:
     int m_height;
     float m_gameTime;
     float m_transitionTimer;
+    float m_smokeTimer;
     std::string m_selectedBiome;
 
     // Subsystems

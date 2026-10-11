@@ -14,8 +14,10 @@ public:
     struct State {
         bool gas = false;
         bool brake = false;
+        bool reverse = false;
         bool pause = false;
         bool restart = false;
+        bool enter = false;
         int mouseX = 0;
         int mouseY = 0;
         bool mouseDown = false;

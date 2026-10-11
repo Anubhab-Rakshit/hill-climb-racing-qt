@@ -41,6 +41,8 @@ set(SOURCES
     src/graphics/RasterFont.cpp
     src/graphics/Sprite.cpp
     src/graphics/ScanlineRasterizer.cpp
+    src/graphics/DayNightCycle.cpp
+    src/graphics/EnvironmentRenderer.cpp
     src/graphics/Camera.cpp
     src/graphics/ParticleSystem.cpp
     # Physics Backend & Interfaces for teammates
@@ -81,6 +83,8 @@ set(HEADERS
     src/graphics/Sprite.h
     src/graphics/VehicleSprites.h
     src/graphics/ScanlineRasterizer.h
+    src/graphics/DayNightCycle.h
+    src/graphics/EnvironmentRenderer.h
     src/graphics/Camera.h
     src/graphics/ParticleSystem.h
     src/physics/PhysicsTypes.h

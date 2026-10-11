@@ -35,6 +35,11 @@ private:
     std::string m_unit;
     float m_redlineFrac;
     float m_animTime;
+
+    // Dial face raster cache
+    Graphics::Framebuffer m_faceCache;
+    bool m_faceCached = false;
+    void bakeDialFace();
 };
 
 } // namespace UI

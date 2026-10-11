@@ -22,14 +22,14 @@ void ParticleSystem::emitSmoke(const Physics::Vec2& worldPos, const Physics::Vec
 
     Particle p;
     p.pos = worldPos;
-    // Drifts backward and floats upward
-    float rx = (randomFloat() - 0.5f) * 1.5f;
-    float ry = randomFloat() * 1.8f + 0.5f;
-    p.vel = {carVel.x * 0.2f - 2.0f + rx, ry};
+    // Drifts backward gently with car velocity, low upward thermal drift
+    float rx = (randomFloat() - 0.5f) * 0.6f;
+    float ry = randomFloat() * 0.4f + 0.15f;
+    p.vel = {carVel.x * 0.25f - 0.7f + rx, ry};
     p.life = 0.0f;
-    p.maxLife = 0.8f + randomFloat() * 0.4f;
-    p.size = 2.0f;
-    p.color = 0xAA90A4AE;
+    p.maxLife = 0.24f + randomFloat() * 0.12f; // Short dissipation lifetime (under 0.36s)
+    p.size = 1.0f;
+    p.color = 0x8890A4AE;
     p.type = ParticleType::SMOKE;
 
     m_particles.push_back(p);
@@ -38,14 +38,14 @@ void ParticleSystem::emitSmoke(const Physics::Vec2& worldPos, const Physics::Vec
 void ParticleSystem::emitDirt(const Physics::Vec2& worldPos, const Physics::Vec2& wheelTangent) {
     if (m_particles.size() >= MAX_PARTICLES) return;
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 2; ++i) {
         Particle p;
         p.pos = worldPos;
-        float spray = (randomFloat() - 0.5f) * 4.0f;
-        p.vel = {wheelTangent.x * 0.8f + spray, std::abs(wheelTangent.y) * 0.8f + 2.5f + randomFloat() * 3.0f};
+        float spray = (randomFloat() - 0.5f) * 1.5f;
+        p.vel = {wheelTangent.x * 0.6f + spray, std::abs(wheelTangent.y) * 0.4f + 0.8f + randomFloat() * 1.0f};
         p.life = 0.0f;
-        p.maxLife = 0.4f + randomFloat() * 0.3f;
-        p.size = 2.0f;
+        p.maxLife = 0.20f + randomFloat() * 0.14f;
+        p.size = (randomFloat() > 0.6f) ? 1.6f : 1.0f;
         p.color = (i % 2 == 0) ? 0xFF6D4C41 : 0xFF4E342E;
         p.type = ParticleType::DIRT_CLOD;
         m_particles.push_back(p);
@@ -64,31 +64,32 @@ void ParticleSystem::emitWheelSpray(const Physics::Vec2& contactPos, float wheel
     // Only emit when tyre is slipping or spinning fast against the surface
     if (absSlip < 0.6f && wheelSurfSpeed < 3.5f) return;
 
-    float intensity = std::clamp(absSlip * 0.45f + (normalForce / 4000.0f) * 0.35f, 0.4f, 3.0f);
+    float intensity = std::clamp(absSlip * 0.40f + (normalForce / 4500.0f) * 0.30f, 0.4f, 2.2f);
 
-    // Ejection direction: backward along ground tangent, with upward rooster arc
+    // Ejection direction: backward along ground tangent, with low ground-skimming rooster arc
     float spinDir = (wheelAngVel > 0.1f) ? -1.0f : ((wheelAngVel < -0.1f) ? 1.0f : -1.0f);
     Physics::Vec2 throwDir = tangent * spinDir;
     // Ground normal is perpendicular to tangent
     Physics::Vec2 groundNorm(-tangent.y, tangent.x);
     if (groundNorm.y < 0.0f) groundNorm = -groundNorm;
 
-    // 1. Ballistic Dirt / Material Clods
-    int clodCount = std::min(3, static_cast<int>(intensity * 1.5f));
+    // 1. Ballistic Material Clods (Ground-skimming micro-granules)
+    int clodCount = std::min(2, static_cast<int>(intensity * 1.0f));
     for (int i = 0; i < clodCount; ++i) {
         if (m_particles.size() >= MAX_PARTICLES) break;
 
         Particle p;
-        p.pos = contactPos + Physics::Vec2((randomFloat() - 0.5f) * 0.15f, 0.02f);
+        p.pos = contactPos + Physics::Vec2((randomFloat() - 0.5f) * 0.10f, 0.02f);
 
-        float ejectSpeed = 4.0f + intensity * 3.5f + randomFloat() * 3.0f;
-        float spraySpread = (randomFloat() - 0.5f) * 0.6f;
-        Physics::Vec2 dir = (throwDir * 0.75f + groundNorm * (0.85f + randomFloat() * 0.6f) + Physics::Vec2(spraySpread, 0.0f)).normalized();
+        // Low, controlled ejection velocity: stays near the wheel and terrain
+        float ejectSpeed = 1.8f + intensity * 1.4f + randomFloat() * 1.0f;
+        float spraySpread = (randomFloat() - 0.5f) * 0.3f;
+        Physics::Vec2 dir = (throwDir * 0.88f + groundNorm * (0.18f + randomFloat() * 0.22f) + Physics::Vec2(spraySpread, 0.0f)).normalized();
 
         p.vel = dir * ejectSpeed;
         p.life = 0.0f;
-        p.maxLife = 0.35f + randomFloat() * 0.35f;
-        p.size = (randomFloat() > 0.4f) ? 3.0f : 2.0f;
+        p.maxLife = 0.18f + randomFloat() * 0.16f; // Fast dissipation (0.18 - 0.34s)
+        p.size = (randomFloat() > 0.5f) ? 1.6f : 1.0f;
         p.type = ParticleType::DIRT_CLOD;
 
         // Biome-specific clod colors
@@ -102,7 +103,7 @@ void ParticleSystem::emitWheelSpray(const Physics::Vec2& contactPos, float wheel
             p.color = (randomFloat() > 0.3f) ? 0xFF212121 : 0xFFFF5722; // Volcanic cinder
         } else if (biomeId == "moon") {
             p.color = (i % 2 == 0) ? 0xFF757575 : 0xFF616161;
-            p.vel *= 0.65f; // Lower ejection velocity
+            p.vel *= 0.55f; // Lower ejection velocity
         } else {
             // Countryside fertile soil
             p.color = (i % 2 == 0) ? 0xFF4E342E : 0xFF3E2723;
@@ -112,22 +113,22 @@ void ParticleSystem::emitWheelSpray(const Physics::Vec2& contactPos, float wheel
     }
 
     // 2. Fluttering Grass Blade Fragments (Countryside exclusive under tyre shear)
-    if (biomeId == "countryside" && absSlip > 1.0f) {
-        int grassCount = (randomFloat() > 0.4f) ? 1 : 2;
+    if (biomeId == "countryside" && absSlip > 1.2f) {
+        int grassCount = 1;
         for (int i = 0; i < grassCount; ++i) {
             if (m_particles.size() >= MAX_PARTICLES) break;
 
             Particle p;
-            p.pos = contactPos + Physics::Vec2((randomFloat() - 0.5f) * 0.2f, 0.05f);
+            p.pos = contactPos + Physics::Vec2((randomFloat() - 0.5f) * 0.15f, 0.04f);
 
-            float speed = 2.5f + randomFloat() * 3.5f;
-            Physics::Vec2 dir = (throwDir * 0.6f + groundNorm * (1.0f + randomFloat() * 0.7f)).normalized();
+            float speed = 1.4f + randomFloat() * 1.8f;
+            Physics::Vec2 dir = (throwDir * 0.7f + groundNorm * (0.3f + randomFloat() * 0.3f)).normalized();
             p.vel = dir * speed;
             p.life = 0.0f;
-            p.maxLife = 0.45f + randomFloat() * 0.30f;
-            p.size = 2.5f;
+            p.maxLife = 0.24f + randomFloat() * 0.16f;
+            p.size = 1.5f;
             p.angle = randomFloat() * 6.28f;
-            p.angularVel = (randomFloat() - 0.5f) * 18.0f;
+            p.angularVel = (randomFloat() - 0.5f) * 12.0f;
             p.color = (i % 2 == 0) ? 0xFF66BB6A : 0xFF81C784; // Vibrant green lawn flecks
             p.type = ParticleType::GRASS_FLECK;
 
@@ -135,41 +136,42 @@ void ParticleSystem::emitWheelSpray(const Physics::Vec2& contactPos, float wheel
         }
     }
 
-    // 3. Ambient Dust / Sand Plume
-    m_dustCooldown += 0.016f;
-    if (m_dustCooldown > 0.06f && m_particles.size() < MAX_PARTICLES) {
-        m_dustCooldown = 0.0f;
-        Particle p;
-        p.pos = contactPos + Physics::Vec2((randomFloat() - 0.5f) * 0.15f, 0.05f);
-        p.vel = throwDir * (1.2f + randomFloat() * 1.5f) + groundNorm * (0.6f + randomFloat() * 0.8f);
-        p.life = 0.0f;
-        p.maxLife = 0.60f + randomFloat() * 0.30f;
-        p.size = 2.5f;
-        p.type = ParticleType::DUST_PUFF;
+    // 3. Ambient Dust / Sand Plume (Suppressed in Moon vacuum)
+    if (biomeId != "moon") {
+        m_dustCooldown += 0.016f;
+        if (m_dustCooldown > 0.08f && m_particles.size() < MAX_PARTICLES) {
+            m_dustCooldown = 0.0f;
+            Particle p;
+            p.pos = contactPos + Physics::Vec2((randomFloat() - 0.5f) * 0.10f, 0.03f);
+            p.vel = throwDir * (0.8f + randomFloat() * 0.9f) + groundNorm * (0.25f + randomFloat() * 0.35f);
+            p.life = 0.0f;
+            p.maxLife = 0.22f + randomFloat() * 0.14f;
+            p.size = 1.2f;
+            p.type = ParticleType::DUST_PUFF;
 
-        if (biomeId == "desert") p.color = 0x88FFE082;
-        else if (biomeId == "arctic") p.color = 0x66FFFFFF;
-        else if (biomeId == "volcano") p.color = 0x77424242;
-        else if (biomeId == "mountain") p.color = 0x6690A4AE;
-        else if (biomeId == "moon") p.color = 0x559E9E9E;
-        else p.color = 0x778D6E63; // Countryside dusty soil
+            if (biomeId == "desert") p.color = 0x66FFE082;
+            else if (biomeId == "arctic") p.color = 0x55FFFFFF;
+            else if (biomeId == "volcano") p.color = 0x55424242;
+            else if (biomeId == "mountain") p.color = 0x5590A4AE;
+            else p.color = 0x558D6E63; // Countryside dusty soil
 
-        m_particles.push_back(p);
+            m_particles.push_back(p);
+        }
     }
 }
 
-void ParticleSystem::emitSparkles(const Physics::Vec2& worldPos) {
-    for (int i = 0; i < 10; ++i) {
+void ParticleSystem::emitSparkles(const Physics::Vec2& worldPos, uint32_t color) {
+    for (int i = 0; i < 12; ++i) {
         if (m_particles.size() >= MAX_PARTICLES) break;
         Particle p;
         p.pos = worldPos;
         float angle = randomFloat() * 6.28f;
-        float speed = 2.0f + randomFloat() * 4.0f;
+        float speed = 1.5f + randomFloat() * 3.5f;
         p.vel = {std::cos(angle) * speed, std::sin(angle) * speed};
         p.life = 0.0f;
-        p.maxLife = 0.5f;
-        p.size = 3.0f;
-        p.color = (i % 2 == 0) ? 0xFFFFD54F : 0xFFFFF9C4;
+        p.maxLife = 0.25f + randomFloat() * 0.15f;
+        p.size = 2.0f;
+        p.color = (i % 2 == 0) ? color : 0xFFFFFFFF;
         p.type = ParticleType::SPARKLE;
         m_particles.push_back(p);
     }
@@ -189,25 +191,25 @@ void ParticleSystem::update(float dt) {
 
         switch (p.type) {
             case ParticleType::DIRT_CLOD:
-                p.vel.y -= 16.5f * dt; // Strong gravity
-                p.vel.x *= 0.98f;     // Slight air resistance
+                p.vel.y -= 22.0f * dt; // Strong downward gravity pulls clods directly to ground
+                p.vel.x *= 0.94f;
                 break;
             case ParticleType::GRASS_FLECK:
-                p.vel.y -= 8.0f * dt;  // Gentle fluttering fall
-                p.vel.x *= 0.94f;     // Aerodynamic flutter drag
+                p.vel.y -= 10.0f * dt;
+                p.vel.x *= 0.92f;
                 break;
             case ParticleType::DUST_PUFF:
-                p.size += 6.5f * dt;   // Expanding puff
-                p.vel *= 0.92f;        // Drag
-                p.vel.y += 0.5f * dt;  // Slight thermal rise
+                p.size += 2.0f * dt;   // Subtle gentle expansion
+                p.vel *= 0.88f;        // Drag
+                p.vel.y += 0.2f * dt;
                 break;
             case ParticleType::SMOKE:
-                p.size += 3.5f * dt;
-                p.vel.y += 1.2f * dt;
-                p.vel.x *= 0.95f;
+                p.size += 1.8f * dt;
+                p.vel.y += 0.3f * dt;
+                p.vel.x *= 0.90f;
                 break;
             case ParticleType::SPARKLE:
-                p.vel *= 0.90f;
+                p.vel *= 0.86f;
                 break;
         }
 
@@ -233,32 +235,54 @@ void ParticleSystem::render(Framebuffer& fb, const Camera& cam) {
         uint32_t col = (a << 24) | (p.color & 0x00FFFFFF);
 
         if (p.type == ParticleType::SMOKE || p.type == ParticleType::DUST_PUFF) {
-            int r = static_cast<int>(p.size * (zoom / 22.0f));
-            if (r > 0) fb.fillCircle(sx, sy, r, col);
-        } else if (p.type == ParticleType::DIRT_CLOD) {
-            // Shaded multi-pixel soil clump
-            int s = static_cast<int>(p.size * (zoom / 22.0f));
-            if (s <= 1) {
-                fb.setPixelFast(sx, sy, col);
+            // Soft pixel-art cloud cluster with radial alpha falloff (never hard circles)
+            int r = std::clamp(static_cast<int>(p.size * (zoom / 65.0f)), 1, 4);
+            if (r <= 1) {
+                fb.blendPixelFast(sx, sy, col);
+            } else if (r == 2) {
+                fb.blendPixelFast(sx, sy, col);
+                uint32_t edgeCol = (col & 0x00FFFFFF) | ((a * 2 / 3) << 24);
+                fb.blendPixelFast(sx + 1, sy, edgeCol);
+                fb.blendPixelFast(sx - 1, sy, edgeCol);
+                fb.blendPixelFast(sx, sy + 1, edgeCol);
+                fb.blendPixelFast(sx, sy - 1, edgeCol);
             } else {
-                fb.fillRect(sx, sy, s, s, col);
-                // Top-left highlight & bottom-right shadow
-                uint32_t baseRgb = p.color & 0x00FFFFFFu;
-                uint32_t hiCol = (a << 24) | std::min(0x00FFFFFFu, baseRgb + 0x00151515u);
-                uint32_t shCol = (a << 24) | (baseRgb > 0x00151515u ? baseRgb - 0x00151515u : 0u);
-                fb.setPixelFast(sx, sy, hiCol);
-                fb.setPixelFast(sx + s - 1, sy + s - 1, shCol);
+                for (int dy = -r; dy <= r; ++dy) {
+                    for (int dx = -r; dx <= r; ++dx) {
+                        int d2 = dx * dx + dy * dy;
+                        if (d2 <= r * r) {
+                            float falloff = 1.0f - std::sqrt(static_cast<float>(d2)) / (r + 0.5f);
+                            uint32_t pA = static_cast<uint32_t>(a * falloff * 0.65f);
+                            if (pA > 0) {
+                                fb.blendPixelFast(sx + dx, sy + dy, (pA << 24) | (p.color & 0x00FFFFFF));
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (p.type == ParticleType::DIRT_CLOD) {
+            // Micro-pixel debris: 1-2 screen pixels (completely eliminates square blocks)
+            fb.blendPixelFast(sx, sy, col);
+            if (p.size > 1.4f) {
+                uint32_t subCol = (col & 0x00FFFFFF) | ((a * 3 / 4) << 24);
+                fb.blendPixelFast(sx + 1, sy, subCol);
+                fb.blendPixelFast(sx, sy + 1, (col & 0x00FFFFFF) | ((a / 2) << 24));
             }
         } else if (p.type == ParticleType::GRASS_FLECK) {
-            // Tumbling oblong grass blade (2x1 or 1x2 or 3x1 pixel strip)
-            bool horizontal = (std::abs(std::cos(p.angle)) > 0.5f);
-            if (horizontal) {
-                fb.fillRect(sx - 1, sy, 3, 1, col);
+            // Tumbling oblong grass blade: 2x1 or 1x2 micro-pixels
+            fb.blendPixelFast(sx, sy, col);
+            if (std::abs(std::cos(p.angle)) > 0.5f) {
+                fb.blendPixelFast(sx + 1, sy, col);
             } else {
-                fb.fillRect(sx, sy - 1, 1, 3, col);
+                fb.blendPixelFast(sx, sy + 1, col);
             }
         } else {
-            fb.fillRect(sx, sy, 2, 2, col);
+            // Sparkling star glint
+            fb.blendPixelFast(sx, sy, col);
+            if (p.life < p.maxLife * 0.45f) {
+                fb.blendPixelFast(sx + 1, sy, 0xFFFFFFFF);
+                fb.blendPixelFast(sx, sy - 1, 0xFFFFFFFF);
+            }
         }
     }
 }

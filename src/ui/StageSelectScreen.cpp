@@ -281,7 +281,16 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
     m_btnNextPage.render(fb, 1);
 
     std::string pageStr = "PAGE " + std::to_string(m_page + 1) + " OF 2";
-    Graphics::RasterFont::drawStringCentered(fb, cx, 61, pageStr, Theme::CYAN_UPGRADE, 1);
+    Graphics::RasterFont::drawStringCentered(fb, cx, 58, pageStr, Theme::CYAN_UPGRADE, 1);
+
+    // Illuminated Page Navigation Dots
+    for (int p = 0; p < 2; ++p) {
+        int dotX = cx - 10 + p * 20;
+        int dotY = 72;
+        uint32_t dotCol = (m_page == p) ? Theme::CYAN_UPGRADE : 0xFF2A3A4E;
+        fb.fillCircle(dotX, dotY, (m_page == p) ? 4 : 3, dotCol);
+        if (m_page == p) fb.setPixelFast(dotX, dotY, 0xFFFFFFFF);
+    }
 
     int cardW = 270;
     int cardH = 405;

@@ -5,6 +5,15 @@
 
 namespace Core {
 
+enum class StateType {
+    MAIN_MENU,
+    STAGE_SELECT,
+    GARAGE,
+    GAMEPLAY,
+    PAUSED,
+    GAME_OVER
+};
+
 class GameEngine;
 
 /**

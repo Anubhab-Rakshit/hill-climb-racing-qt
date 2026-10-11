@@ -42,7 +42,7 @@ public:
                         const Physics::Vec2& tangent, float slipSpeed,
                         float wheelAngVel, float normalForce,
                         const std::string& biomeId);
-    void emitSparkles(const Physics::Vec2& worldPos);
+    void emitSparkles(const Physics::Vec2& worldPos, uint32_t color = 0xFFFFD54F);
 
     void update(float dt);
     void render(Framebuffer& fb, const Camera& cam);

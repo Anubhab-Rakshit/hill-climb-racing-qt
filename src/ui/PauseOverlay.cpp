@@ -8,6 +8,7 @@ namespace UI {
 PauseOverlay::PauseOverlay()
     : m_width(Theme::VIRTUAL_WIDTH)
     , m_height(Theme::VIRTUAL_HEIGHT)
+    , m_animTime(0.0f)
     , m_btnResume(0, 0, 220, 44, "RESUME", Theme::GREEN_GAS)
     , m_btnRestart(0, 0, 220, 44, "RESTART", Theme::GOLD)
     , m_btnGarage(0, 0, 220, 44, "GARAGE", Theme::CYAN_UPGRADE)
@@ -16,6 +17,10 @@ PauseOverlay::PauseOverlay()
     m_btnResume.setKeyHint("ESC");
     m_btnRestart.setKeyHint("R");
     setDimensions(m_width, m_height);
+}
+
+void PauseOverlay::update(float dt) {
+    m_animTime += dt;
 }
 
 void PauseOverlay::setDimensions(int width, int height) {
@@ -66,8 +71,13 @@ void PauseOverlay::render(Graphics::Framebuffer& fb) {
     // 1. Semi-transparent dark overlay across whole screen
     fb.fillRect(0, 0, m_width, m_height, 0xD0060A12);
 
+    // Subtle scanline grid effect for authentic retro CRT pause overlay
+    for (int y = 0; y < m_height; y += 4) {
+        fb.drawLine(0, y, m_width, y, 0x1A000000);
+    }
+
     // 2. Centered Modal Box
-    int boxW = 360;
+    int boxW = 380;
     int boxH = 330;
     int boxX = (m_width - boxW) / 2;
     int boxY = (m_height - boxH) / 2;
@@ -82,21 +92,37 @@ void PauseOverlay::render(Graphics::Framebuffer& fb) {
 
     // Title Plaque
     int cx = m_width / 2;
-    // Pause Double-Bar Icon
-    fb.fillRect(cx - 100, boxY + 22, 5, 18, Theme::GOLD);
-    fb.fillRect(cx - 90, boxY + 22, 5, 18, Theme::GOLD);
-    fb.fillRect(cx + 85, boxY + 22, 5, 18, Theme::GOLD);
-    fb.fillRect(cx + 95, boxY + 22, 5, 18, Theme::GOLD);
+    // Pause Double-Bar Icons flanking title with ample clearance
+    fb.fillRect(cx - 128, boxY + 22, 5, 18, Theme::GOLD);
+    fb.fillRect(cx - 118, boxY + 22, 5, 18, Theme::GOLD);
+    fb.fillRect(cx + 113, boxY + 22, 5, 18, Theme::GOLD);
+    fb.fillRect(cx + 123, boxY + 22, 5, 18, Theme::GOLD);
 
     // Drop shadow title
     Graphics::RasterFont::drawStringCentered(fb, cx + 2, boxY + 24, "GAME PAUSED", 0xFF05080E, 3);
     Graphics::RasterFont::drawStringCentered(fb, cx, boxY + 22, "GAME PAUSED", Theme::GOLD, 3);
+
+    // Tech divider line under title
+    fb.drawLine(boxX + 30, boxY + 49, boxX + boxW - 30, boxY + 49, 0xFF1E2D3D);
+    fb.drawLine(boxX + 40, boxY + 50, boxX + boxW - 40, boxY + 50, 0x4400E5FF);
+
+    // Breathing pulse halo around RESUME button to draw intuitive player focus
+    float pulse = 0.5f + 0.5f * std::sin(m_animTime * 4.5f);
+    int haloAlpha = static_cast<int>(35 + 55 * pulse);
+    uint32_t haloColor = (static_cast<uint32_t>(haloAlpha) << 24) | (Theme::GREEN_GAS & 0x00FFFFFF);
+    fb.drawRect(m_btnResume.x() - 2, m_btnResume.y() - 2,
+                m_btnResume.width() + 4, m_btnResume.height() + 4, haloColor);
+    fb.drawRect(m_btnResume.x() - 3, m_btnResume.y() - 3,
+                m_btnResume.width() + 6, m_btnResume.height() + 6, (haloColor & 0x00FFFFFF) | 0x18000000);
 
     // Buttons
     m_btnResume.render(fb, 2);
     m_btnRestart.render(fb, 2);
     m_btnGarage.render(fb, 2);
     m_btnMenu.render(fb, 2);
+
+    // Subtle bottom key navigation hint
+    Graphics::RasterFont::drawStringCentered(fb, cx, boxY + boxH - 15, "PRESS [ESC] OR CLICK RESUME TO CONTINUE", Theme::TEXT_MUTED, 1);
 }
 
 } // namespace UI

@@ -23,6 +23,9 @@ void FuelBar::setFuel(float fuelPercent) {
 }
 
 void FuelBar::update(float dt) {
+    if (m_flashTimer > 0.0f) {
+        m_flashTimer = std::max(0.0f, m_flashTimer - dt);
+    }
     if (m_fuelPercent < 25.0f) {
         m_blinkTimer += dt;
         if (m_blinkTimer >= 0.22f) {
@@ -36,22 +39,27 @@ void FuelBar::update(float dt) {
 }
 
 void FuelBar::render(Graphics::Framebuffer& fb) {
-    // 1. Outer Arcade Pod Container
-    uint32_t borderCol = (m_fuelPercent < 25.0f && m_blinkState) ? 0xFFFF1744 : Theme::CARD_BORDER;
-    UIComponents::drawArcadePanel(fb, m_x, m_y, m_w, m_h, 0xEE090E18, borderCol, 0, 0, true, true);
+    // 1. Outer Aerodynamic Arcade Pod Container
+    uint32_t borderCol = (m_flashTimer > 0.0f) ? 0xFF00E676 :
+                         (m_fuelPercent < 25.0f && m_blinkState) ? 0xFFFF1744 : Theme::CARD_BORDER;
+    uint32_t accentCol = (m_flashTimer > 0.0f) ? 0xFF00E676 :
+                         (m_fuelPercent < 25.0f && m_blinkState) ? 0xFFFF1744 : 0;
+    UIComponents::drawArcadePanel(fb, m_x, m_y, m_w, m_h, 0xEE090E18, borderCol, accentCol, 2, true, true);
 
-    // 2. Pixel Fuel Pump Icon
+    // 2. Pixel Fuel Pump Icon (centered vertically)
+    int iconY = m_y + (m_h - 14) / 2;
     uint32_t pumpCol = (m_fuelPercent < 25.0f) ? (m_blinkState ? 0xFFFF1744 : 0xFFB71C1C) : Theme::GOLD;
-    UIComponents::drawFuelPumpIcon(fb, m_x + 6, m_y + 5, pumpCol);
+    UIComponents::drawFuelPumpIcon(fb, m_x + 8, iconY, pumpCol);
 
     // "FUEL" Label
-    Graphics::RasterFont::drawString(fb, m_x + 22, m_y + 8, "FUEL", Theme::TEXT_WHITE, 1);
+    int textY = m_y + (m_h - 9) / 2;
+    Graphics::RasterFont::drawString(fb, m_x + 24, textY, "FUEL", Theme::TEXT_WHITE, 1);
 
     // 3. Segmented Bar Area
-    int barStartX = m_x + 52;
-    int barStartY = m_y + 5;
-    int barW = m_w - 58;
-    int barH = m_h - 10;
+    int barStartX = m_x + 54;
+    int barH = m_h - 14;
+    int barStartY = m_y + (m_h - barH) / 2;
+    int barW = m_w - 62;
 
     int totalSegments = 16;
     int segGap = 2;
@@ -85,15 +93,15 @@ void FuelBar::render(Graphics::Framebuffer& fb) {
         fb.drawRect(sx, sy, segW, barH, 0xFF080C14);
     }
 
-    // 4. Low Fuel Alert Warning Banner
+    // 4. Low Fuel Alert Warning Banner (docked neatly directly below the fuel capsule)
     if (m_fuelPercent < 25.0f && m_blinkState) {
-        int alertX = m_x + m_w + 10;
-        int alertY = m_y + 3;
-        int alertW = 100;
-        int alertH = 20;
+        int alertX = m_x;
+        int alertY = m_y + m_h + 3;
+        int alertW = 120;
+        int alertH = 18;
 
         UIComponents::drawArcadePanel(fb, alertX, alertY, alertW, alertH, 0xEEB71C1C, 0xFFFF5252, 0xFFFF5252, 2, true, true);
-        Graphics::RasterFont::drawStringCentered(fb, alertX + alertW / 2, alertY + 5, "! LOW FUEL !", Theme::TEXT_WHITE, 1);
+        Graphics::RasterFont::drawStringCentered(fb, alertX + alertW / 2, alertY + 4, "! LOW FUEL !", Theme::TEXT_WHITE, 1);
     }
 }
 

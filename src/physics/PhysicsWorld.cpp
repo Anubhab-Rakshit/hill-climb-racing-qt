@@ -18,11 +18,13 @@ PhysicsWorld::PhysicsWorld()
 
 void PhysicsWorld::reset(const std::string& biomeId, VehicleType vehicleType, DriverType driverType) {
     m_terrain.setBiome(biomeId);
+    m_terrain.resetDeformation();
     float startX = 5.0f;
     float groundY = m_terrain.getHeight(startX);
     m_vehicle.setVehicleType(vehicleType);
     m_vehicle.setDriverType(driverType);
-    m_vehicle.reset(startX, groundY + 1.20f);
+    float restY = groundY + m_vehicle.suspRestLength() + m_vehicle.wheelRadius() - m_vehicle.rearMountOffset().y;
+    m_vehicle.reset(startX, restY);
 
     m_distance = 0.0f;
     m_coinsCollected = 0;
@@ -33,10 +35,16 @@ void PhysicsWorld::reset(const std::string& biomeId, VehicleType vehicleType, Dr
     m_cumulativeRotation = 0.0f;
     m_gameOver = false;
     m_gameOverReason = "";
+    m_deformAccum = 0.0f;
 }
 
 void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
-    if (m_gameOver) return;
+    if (m_gameOver) {
+        // Step passive vehicle wreck dynamics so it tumbles, slides, and settles stably on terrain with zero penetration
+        m_vehicle.applyInput(0.0f, 0.0f);
+        m_vehicle.step(dt, m_terrain, profile);
+        return;
+    }
 
     // Step multi-body vehicle
     m_vehicle.step(dt, m_terrain, profile);
@@ -50,7 +58,13 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
         m_terrain.applyWheelDeformation(m_vehicle.frontWheelPos().x, m_vehicle.frontWheelRadius(),
                                         m_vehicle.frontNormalForce(), m_vehicle.frontSlipSpeed(), dt);
     }
-    m_terrain.updateDeformation(dt, m_vehicle.chassisPos().x - 120.0f, m_vehicle.chassisPos().x + 120.0f);
+
+    // Pace elastic restoration to ~12.5 Hz to prevent redundant array scans
+    m_deformAccum += dt;
+    if (m_deformAccum >= 0.08f) {
+        m_terrain.updateDeformation(m_deformAccum, m_vehicle.chassisPos().x - 60.0f, m_vehicle.chassisPos().x + 60.0f);
+        m_deformAccum = 0.0f;
+    }
 
     // Update forward distance reached
     float currentX = m_vehicle.chassisPos().x;
@@ -83,6 +97,7 @@ void PhysicsWorld::checkItemCollisions() {
 
     for (size_t i = 0; i < items.size(); ++i) {
         if (items[i].collected) continue;
+        if (std::abs(items[i].position.x - carPos.x) > 2.5f) continue;
 
         float dx = items[i].position.x - carPos.x;
         float dy = items[i].position.y - carPos.y;
@@ -94,14 +109,11 @@ void PhysicsWorld::checkItemCollisions() {
 
             if (items[i].type == ItemType::FUEL_CANISTER) {
                 m_vehicle.addFuel(100.0f);
-                if (m_onStunt) {
-                    m_onStunt("+100 FUEL!", 0);
-                }
             } else {
                 m_coinsCollected += items[i].value;
-                if (m_onItem) {
-                    m_onItem(items[i].type, items[i].value);
-                }
+            }
+            if (m_onItem) {
+                m_onItem(items[i].type, items[i].value);
             }
         }
     }

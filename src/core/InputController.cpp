@@ -9,6 +9,7 @@ InputController::InputController() {
 void InputController::resetTransientActions() {
     m_state.pause = false;
     m_state.restart = false;
+    m_state.enter = false;
     m_state.mouseJustPressed = false;
     m_state.mouseJustReleased = false;
     m_state.mouseMoved = false;
@@ -22,10 +23,14 @@ void InputController::onKeyPress(QKeyEvent* event) {
         m_state.gas = true;
     } else if (k == Qt::Key_Left || k == Qt::Key_A) {
         m_state.brake = true;
+    } else if (k == Qt::Key_Down || k == Qt::Key_S) {
+        m_state.reverse = true;
     } else if (k == Qt::Key_Escape || k == Qt::Key_P) {
         m_state.pause = true;
     } else if (k == Qt::Key_R) {
         m_state.restart = true;
+    } else if (k == Qt::Key_Return || k == Qt::Key_Enter || k == Qt::Key_Space) {
+        m_state.enter = true;
     }
 }
 
@@ -37,6 +42,8 @@ void InputController::onKeyRelease(QKeyEvent* event) {
         m_state.gas = false;
     } else if (k == Qt::Key_Left || k == Qt::Key_A) {
         m_state.brake = false;
+    } else if (k == Qt::Key_Down || k == Qt::Key_S) {
+        m_state.reverse = false;
     }
 }
 

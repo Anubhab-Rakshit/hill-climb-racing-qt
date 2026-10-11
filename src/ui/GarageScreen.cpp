@@ -94,17 +94,17 @@ void GarageScreen::setDimensions(int width, int height) {
     m_btnNextDriver.setSize(30, 26);
 
     // Category Tabs
-    m_btnTabPowertrain.setPosition(cx - 225, 292);
-    m_btnTabPowertrain.setSize(220, 30);
-    m_btnTabChassis.setPosition(cx + 5, 292);
-    m_btnTabChassis.setSize(220, 30);
+    m_btnTabPowertrain.setPosition(cx - 225, 284);
+    m_btnTabPowertrain.setSize(220, 28);
+    m_btnTabChassis.setPosition(cx + 5, 284);
+    m_btnTabChassis.setSize(220, 28);
 
     // 8 Upgrade Buttons Layout
     int cardW = 210;
     int cardGap = 16;
     int totalCardsW = 4 * cardW + 3 * cardGap;
     int startX = (m_width - totalCardsW) / 2;
-    int cardY = 328;
+    int cardY = 322;
     int btnY = cardY + 128;
     int btnW = cardW - 24;
     int btnH = 38;
@@ -269,14 +269,18 @@ void GarageScreen::drawVehiclePreview(Graphics::Framebuffer& fb, int cx, int cy,
     int liftY = cy + 38;
 
     // Hydraulic Ram Cylinders
-    fb.fillRect(cx - 72, liftY + 8, 16, 20, 0xFF78909C);
-    fb.fillRect(cx - 70, liftY + 8, 12, 20, 0xFFCFD8DC);
-    fb.fillRect(cx + 56, liftY + 8, 16, 20, 0xFF78909C);
-    fb.fillRect(cx + 58, liftY + 8, 12, 20, 0xFFCFD8DC);
+    fb.fillRect(cx - 72, liftY + 8, 16, 16, 0xFF78909C);
+    fb.fillRect(cx - 70, liftY + 8, 12, 16, 0xFFCFD8DC);
+    fb.fillRect(cx + 56, liftY + 8, 16, 16, 0xFF78909C);
+    fb.fillRect(cx + 58, liftY + 8, 12, 16, 0xFFCFD8DC);
 
     // Lift Base Platform
     fb.fillRect(liftX, liftY, liftW, 8, 0xFF263238);
     fb.fillRect(liftX, liftY, liftW, 2, 0xFF90A4AE); // Top runner plate
+
+    // Neon inspection underglow beneath vehicle
+    int underglowW = 170;
+    fb.fillRect(cx - underglowW / 2, liftY - 2, underglowW, 2, 0x4400E5FF);
 
     // Warning Hazard Chevron Stripes
     for (int hx = liftX + 4; hx < liftX + liftW - 4; hx += 16) {
@@ -284,15 +288,19 @@ void GarageScreen::drawVehiclePreview(Graphics::Framebuffer& fb, int cx, int cy,
     }
 
     // Concrete Floor Divider Line
-    fb.fillRect(0, liftY + 26, m_width, 2, 0xFF142030);
+    fb.fillRect(0, liftY + 24, m_width, 2, 0xFF142030);
 
     // 2. Render Authentic Pixel Vehicle Sprite & Selected Driver
     Graphics::SpriteRenderer::renderGarageVehicle(fb, cx, cy, m_carBounceY, profile, m_viewedVehicle, profile.selectedDriver());
 
     const auto& cfg = Physics::VehicleRegistry::getConfig(m_viewedVehicle);
 
-    // 3. Vehicle Tagline
-    Graphics::RasterFont::drawStringCentered(fb, cx, cy + 54, cfg.tagline, Theme::GOLD, 1);
+    // 3. Vehicle Tagline (Clean Plaque)
+    int tagW = Graphics::RasterFont::getTextWidth(cfg.tagline, 1) + 20;
+    int tagX = cx - tagW / 2;
+    int tagY = liftY + 11;
+    UIComponents::drawArcadePanel(fb, tagX, tagY, tagW, 16, 0xEE090F18, 0xFF2A3A4E, 0, 0, false, false);
+    Graphics::RasterFont::drawStringCentered(fb, cx, tagY + 3, cfg.tagline, Theme::GOLD, 1);
 
     // 4. Modular Telemetry Spec Chips (5 distinct cards)
     int torquePct = static_cast<int>(profile.getEngineTorqueMultiplier(m_viewedVehicle) * 100);
@@ -322,7 +330,7 @@ void GarageScreen::drawVehiclePreview(Graphics::Framebuffer& fb, int cx, int cy,
     int chipGap = 8;
     int totalChipsW = 5 * chipW + 4 * chipGap;
     int startChipX = cx - totalChipsW / 2;
-    int chipY = cy + 66;
+    int chipY = tagY + 20;
 
     for (int c = 0; c < 5; ++c) {
         int x = startChipX + c * (chipW + chipGap);
@@ -357,16 +365,19 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     m_btnDrive.render(fb, 2);
 
     int cx = m_width / 2;
-    int headW = 320;
+    int headW = 350;
     int headX = cx - headW / 2;
-    UIComponents::drawArcadePanel(fb, headX, 12, headW, 36, 0xEE0B121C, 0xFF37474F, Theme::GOLD, 2, true, true);
-    Graphics::RasterFont::drawStringCentered(fb, cx, 22, "GARAGE & TUNING SHOP", Theme::GOLD, 2);
+    UIComponents::drawArcadePanel(fb, headX, 12, headW, 34, 0xEE0B121C, 0xFF37474F, Theme::GOLD, 2, true, true);
+    Graphics::RasterFont::drawString(fb, headX + 16, 21, "GARAGE & TUNING", Theme::GOLD, 2);
+
+    std::string vIdxStr = "[" + std::to_string(static_cast<int>(m_viewedVehicle) + 1) + "/10]";
+    Graphics::RasterFont::drawString(fb, headX + headW - 65, 23, vIdxStr, Theme::CYAN_UPGRADE, 1);
 
     // Master Currency Pill
     int coinBoxW = 155;
     int coinBoxH = 34;
     int coinBoxX = m_width - 335;
-    int coinBoxY = 15;
+    int coinBoxY = 12;
     UIComponents::drawCoinBadge(fb, coinBoxX, coinBoxY, coinBoxW, coinBoxH, profile.coins(), m_animTime);
 
     // 3. Vehicle Selection Row
@@ -376,11 +387,6 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     const auto& vehCfg = Physics::VehicleRegistry::getConfig(m_viewedVehicle);
     bool isUnlocked = profile.isVehicleUnlocked(m_viewedVehicle);
     bool isSelected = (profile.selectedVehicle() == m_viewedVehicle);
-
-    // Vehicle Index Counter above banner
-    std::string vIdxStr = "VEHICLE " + std::to_string(static_cast<int>(m_viewedVehicle) + 1) + " OF " +
-                          std::to_string(static_cast<int>(Physics::VehicleType::COUNT));
-    Graphics::RasterFont::drawStringCentered(fb, cx - 62, 41, vIdxStr, Theme::TEXT_MUTED, 1);
 
     // Vehicle Name Banner
     int vBannerX = cx - 200;
@@ -432,15 +438,17 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     int dBoxH = 26;
     UIComponents::drawArcadePanel(fb, dBoxX, dBoxY, dBoxW, dBoxH, 0xFF121B27, 0xFF2A3A52, 0, 0, true, true);
 
-    // Mini Driver Portrait Icon
+    // Mini Driver Portrait Icon (cleanly centered 20x20)
     const QImage& portrait = Graphics::VehicleSprites::getDriverPortrait(profile.selectedDriver());
     if (!portrait.isNull()) {
+        int pyOff = dBoxY + (dBoxH - portrait.height()) / 2;
+        int pxOff = dBoxX + 6;
         for (int py = 0; py < portrait.height(); ++py) {
             const uint32_t* line = reinterpret_cast<const uint32_t*>(portrait.scanLine(py));
             for (int px = 0; px < portrait.width(); ++px) {
                 uint32_t c = line[px];
                 if ((c >> 24) > 0) {
-                    fb.blendPixelFast(dBoxX + 6 + px, dBoxY + 3 + py, c);
+                    fb.blendPixelFast(pxOff + px, pyOff + py, c);
                 }
             }
         }
@@ -449,7 +457,7 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     Graphics::RasterFont::drawString(fb, dBoxX + 32, dBoxY + 7, driverTitle, driverCfg.themeColor, 1);
 
     // 5. Vehicle Interactive Preview on Hydraulic Lift
-    drawVehiclePreview(fb, cx, 190, profile);
+    drawVehiclePreview(fb, cx, 164, profile);
 
     // 6. Category Tabs
     m_btnTabPowertrain.setBaseColor((m_activeTab == 0) ? Theme::GOLD : 0xFF213142);
@@ -459,6 +467,15 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     m_btnTabChassis.setBaseColor((m_activeTab == 1) ? Theme::GOLD : 0xFF213142);
     m_btnTabChassis.setTextColor((m_activeTab == 1) ? 0xFF0B1422 : Theme::TEXT_MUTED);
     m_btnTabChassis.render(fb, 1);
+
+    // Glowing neon runner bar linking category tabs to upgrade grid
+    int tabUnderY = 284 + 28;
+    int activeTabX = (m_activeTab == 0) ? (cx - 225) : (cx + 5);
+    int activeTabW = 220;
+    fb.fillRect(cx - 225, tabUnderY, 450, 2, 0xFF1B2838);
+    fb.fillRect(activeTabX, tabUnderY, activeTabW, 3, Theme::GOLD);
+    fb.fillRect(activeTabX + 6, tabUnderY + 1, activeTabW - 12, 1, 0xFFFFFFFF);
+    fb.fillRect(activeTabX - 2, tabUnderY + 3, activeTabW + 4, 1, 0x55FFD700);
 
     // 7. 4 Upgrade Cards for Active Tab
     int cardW = 210;
@@ -499,7 +516,14 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
                                       Theme::GREEN_GAS, 0xFF192534, 0x88FFFFFF);
 
         // Description
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 96, meta.desc, Theme::TEXT_MUTED, 1);
+        std::string descText = meta.desc;
+        if (meta.type == Core::ProfileManager::UPGRADE_BRAKES) {
+            float bMult = profile.getBrakingMultiplier(m_viewedVehicle);
+            float sinHold = std::min(1.0f, 0.573576f * bMult);
+            int holdAngle = static_cast<int>(std::asin(sinHold) * (180.0f / 3.14159265f) + 0.5f);
+            descText = "Holds " + std::to_string(holdAngle) + " deg Slopes & Hill-Stop";
+        }
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 96, descText, Theme::TEXT_MUTED, 1);
 
         // Action Button State
         auto& btn = m_btnUpgrades[cardIdx];
@@ -520,6 +544,28 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
         }
 
         btn.render(fb, 2);
+    }
+
+    // Purchase / Unlock celebratory sparkle glints
+    if (m_flashTimer > 0.0f) {
+        float t = 1.0f - (m_flashTimer / 0.45f);
+        int sparkleCenterX = cx;
+        int sparkleCenterY = 164;
+        if (m_flashCardIdx >= 0 && m_flashCardIdx < 8) {
+            int cIdx = m_flashCardIdx % 4;
+            sparkleCenterX = startX + cIdx * (cardW + cardGap) + cardW / 2;
+            sparkleCenterY = cardY + 50;
+        }
+        for (int p = 0; p < 8; ++p) {
+            float ang = p * (6.28318f / 8.0f) + m_animTime * 4.0f;
+            float dist = 12.0f + 45.0f * t;
+            int px = sparkleCenterX + static_cast<int>(std::cos(ang) * dist);
+            int py = sparkleCenterY + static_cast<int>(std::sin(ang) * dist);
+            int sz = static_cast<int>((1.0f - t) * 3.0f) + 1;
+            uint32_t pCol = (p % 2 == 0) ? Theme::GOLD : Theme::CYAN_UPGRADE;
+            fb.fillCircle(px, py, sz, pCol);
+            fb.setPixelFast(px, py, 0xFFFFFFFF);
+        }
     }
 }
 

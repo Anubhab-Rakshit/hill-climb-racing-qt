@@ -16,6 +16,7 @@ static const std::vector<BiomeSpec> s_biomes = {
         0, // Free starter
         9.81f,  // 1.0G
         1.25f,  // Firm grass traction
+        1.00f,  // 1.0x Earth sea-level atmosphere
         1.0f,
         1.0f,
         // Sky & Parallax Colors
@@ -40,6 +41,7 @@ static const std::vector<BiomeSpec> s_biomes = {
         1500,
         9.81f,  // 1.0G
         1.05f,  // Loose sand friction
+        0.95f,  // Dry arid atmosphere
         1.15f,
         1.05f,
         // Sky & Parallax Colors
@@ -64,6 +66,7 @@ static const std::vector<BiomeSpec> s_biomes = {
         2500,
         9.81f,  // 1.0G
         0.82f,  // Slippery icy friction
+        1.15f,  // Dense cold sub-zero atmosphere
         1.25f,
         1.10f,
         // Sky & Parallax Colors
@@ -88,6 +91,7 @@ static const std::vector<BiomeSpec> s_biomes = {
         3500,
         9.81f,  // 1.0G
         1.20f,  // Rocky granite grip
+        0.85f,  // Thin high-altitude alpine air
         1.35f,
         1.15f,
         // Sky & Parallax Colors
@@ -112,6 +116,7 @@ static const std::vector<BiomeSpec> s_biomes = {
         5000,
         1.62f,  // 0.16G Lunar gravity
         1.15f,  // Regolith grip
+        0.00f,  // Strict 0.0x Lunar vacuum (no air resistance / no aero damping)
         1.40f,
         0.85f,  // Longer wavelengths for floaty low-g flight
         // Sky & Parallax Colors
@@ -136,6 +141,7 @@ static const std::vector<BiomeSpec> s_biomes = {
         7000,
         11.50f, // 1.17G Dense planetary gravity
         1.30f,  // Basalt grip
+        1.10f,  // Dense volcanic smog & ash
         1.45f,
         1.20f,
         // Sky & Parallax Colors
@@ -242,12 +248,12 @@ TerrainValidator::ValidationResult TerrainValidator::validateBiome(const std::st
     while (currentX < 1800.0f) {
         float dt = 0.05f;
         float slope = terrain.getSlope(currentX);
-        // Vehicle speed modeled by grade resistance: ~18 m/s flat, ~11 m/s on 25 deg climb
-        float speed = std::clamp(17.5f - slope * 12.0f, 9.0f, 24.0f);
+        // Vehicle speed modeled by grade resistance: calibrated frame speed (~10.5 m/s flat, ~6.6 m/s on climb)
+        float speed = std::clamp(10.5f - slope * 7.2f, 5.4f, 14.4f);
         currentX += speed * dt;
 
-        // Drain rate at full throttle
-        simFuel -= (1.2f + 3.5f) * dt;
+        // Drain rate at full throttle (calibrated to match Vehicle fuel burn per meter)
+        simFuel -= (1.2f + 3.5f) * 0.60f * dt;
         if (simFuel < minRemaining) minRemaining = simFuel;
 
         if (simFuel <= 0.0f) {

@@ -147,7 +147,7 @@ void VehicleSprites::init() {
     s_driverSprites[static_cast<size_t>(Physics::DriverType::NEIL)]  = createNeilDriver();
 
     for (size_t i = 0; i < s_driverSprites.size(); ++i) {
-        s_driverPortraits[i] = s_driverSprites[i].scaled(34, 34, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        s_driverPortraits[i] = s_driverSprites[i].scaled(20, 20, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     }
 
     s_initialized = true;

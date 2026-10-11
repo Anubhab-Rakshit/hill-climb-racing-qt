@@ -17,8 +17,34 @@ void Terrain::setBiome(const std::string& biomeId) {
     m_spec = BiomeRegistry::getBiome(biomeId);
     m_friction = m_spec.friction;
     m_gravity = m_spec.gravity;
+    m_airDensity = m_spec.airDensity;
+
+    // Precalculate static terrain base heights for 72,000 samples (zero runtime transcendental math)
+    m_baseHeightCache.resize(DEFORM_SAMPLES);
+    for (size_t i = 0; i < DEFORM_SAMPLES; ++i) {
+        float px = DEFORM_MIN_X + i * DEFORM_DX;
+        m_baseHeightCache[i] = computeRawBaseHeight(px);
+    }
+
     resetDeformation();
     spawnItems();
+}
+
+void Terrain::setTestIncline(float angleDeg) {
+    m_biomeId = "test_ramp";
+    m_friction = 1.35f;
+    m_gravity = 9.81f;
+    m_airDensity = 1.0f;
+    float rad = angleDeg * 3.14159265f / 180.0f;
+    float slopeVal = std::tan(rad);
+    m_baseHeightCache.resize(DEFORM_SAMPLES);
+    for (size_t i = 0; i < DEFORM_SAMPLES; ++i) {
+        float px = DEFORM_MIN_X + i * DEFORM_DX;
+        m_baseHeightCache[i] = px * slopeVal;
+    }
+    resetDeformation();
+    m_items.clear();
+    m_milestones.clear();
 }
 
 void Terrain::reset() {
@@ -34,6 +60,8 @@ void Terrain::resetDeformation() {
     } else {
         std::fill(m_deformGrid.begin(), m_deformGrid.end(), TerrainDeformation{});
     }
+    m_modifiedMinIdx = static_cast<int>(DEFORM_SAMPLES);
+    m_modifiedMaxIdx = -1;
 }
 
 float Terrain::getDifficultyFactor(float x) const {
@@ -51,6 +79,20 @@ const CheckpointInfo* Terrain::getNextCheckpoint(float currentDist) const {
 }
 
 float Terrain::getBaseHeight(float x) const {
+    if (m_baseHeightCache.empty()) {
+        return computeRawBaseHeight(x);
+    }
+    float fx = (x - DEFORM_MIN_X) / DEFORM_DX;
+    if (fx <= 0.0f) return 0.0f;
+    int idx = static_cast<int>(fx);
+    if (idx + 1 >= static_cast<int>(m_baseHeightCache.size())) {
+        return (idx < static_cast<int>(m_baseHeightCache.size())) ? m_baseHeightCache[idx] : computeRawBaseHeight(x);
+    }
+    float t = fx - static_cast<float>(idx);
+    return m_baseHeightCache[idx] * (1.0f - t) + m_baseHeightCache[idx + 1] * t;
+}
+
+float Terrain::computeRawBaseHeight(float x) const {
     // Starting runway is flat for smooth launch and acceleration
     if (x < 20.0f) {
         return 0.0f;
@@ -64,40 +106,49 @@ float Terrain::getBaseHeight(float x) const {
     float diff = getDifficultyFactor(x);
     float ampMult = 1.0f + 0.65f * diff;
 
+    // Smooth C1-continuous Hann envelope: w(0)=0, w'(0)=0, w(1)=0, w'(1)=0 (zero slope kinks at boundaries)
+    auto smoothWindow = [](float t) -> float {
+        float s = std::sin(t * 3.14159265f);
+        return s * s;
+    };
+
     if (m_biomeId == "desert") {
-        // Asymmetric windward sand dunes with slip-face drops
-        float d1 = std::sin(lx * 0.015f) * (8.5f * ampMult);
-        float d2 = std::sin(lx * 0.038f + 0.8f) * (2.8f + 1.6f * diff);
-        float slip = std::sin(lx * 0.085f) * (0.8f + 0.4f * diff);
+        // Asymmetric windward sand dunes with slip-face drops and varied crests
+        float pD = lx * 0.014f + 0.28f * std::sin(lx * 0.0041f);
+        float d1 = std::sin(pD) * (8.0f * ampMult);
+        float d2 = std::sin(lx * 0.036f) * (2.6f + 1.4f * diff);
+        float slip = std::sin(lx * 0.080f) * (0.7f + 0.3f * diff);
         // Dune bowl feature at 650m - 1100m
         float bowl = 0.0f;
         if (lx > 650.0f && lx < 1100.0f) {
             float bt = (lx - 650.0f) / 450.0f;
-            bowl = -std::sin(bt * 3.14159f) * (4.5f * diff);
+            bowl = -smoothWindow(bt) * (4.0f * diff);
         }
         return (d1 + d2 + slip + bowl) * ramp;
     } else if (m_biomeId == "arctic") {
         // Glacial ice plateaus and slippery crevasses
-        float a1 = std::sin(lx * 0.016f) * (9.0f * ampMult);
-        float a2 = std::sin(lx * 0.040f) * (3.0f + 1.6f * diff);
-        float iceRipples = std::sin(lx * 0.090f) * (0.7f + 0.3f * diff);
+        float pA = lx * 0.015f + 0.25f * std::sin(lx * 0.0039f);
+        float a1 = std::sin(pA) * (8.4f * ampMult);
+        float a2 = std::sin(lx * 0.038f) * (2.8f + 1.4f * diff);
+        float iceRipples = std::sin(lx * 0.082f) * (0.6f + 0.3f * diff);
         // Deep glacial crevasse with ramp recovery at 800m - 1200m
         float crevasse = 0.0f;
         if (lx > 800.0f && lx < 1200.0f) {
             float ct = (lx - 800.0f) / 400.0f;
-            crevasse = -std::sin(ct * 3.14159f) * (5.0f * diff);
+            crevasse = -smoothWindow(ct) * (4.2f * diff);
         }
         return (a1 + a2 + iceRipples + crevasse) * ramp;
     } else if (m_biomeId == "mountain") {
         // Craggy mountainous ascents, jagged rocky ledges and alpine peaks
-        float m1 = std::sin(lx * 0.017f) * (9.5f * ampMult);
-        float m2 = std::sin(lx * 0.042f) * (3.2f + 1.6f * diff);
-        float crag = std::sin(lx * 0.095f) * (0.8f + 0.4f * diff);
+        float pM = lx * 0.0155f + 0.28f * std::sin(lx * 0.0042f);
+        float m1 = std::sin(pM) * (8.8f * ampMult);
+        float m2 = std::sin(lx * 0.040f) * (2.9f + 1.4f * diff);
+        float crag = std::sin(lx * 0.088f) * (0.7f + 0.3f * diff);
         // Steep summit ascent at 950m - 1450m
         float summit = 0.0f;
         if (lx > 950.0f && lx < 1450.0f) {
             float st = (lx - 950.0f) / 500.0f;
-            summit = std::sin(st * 3.14159f) * (6.0f * diff);
+            summit = smoothWindow(st) * (5.0f * diff);
         }
         return (m1 + m2 + crag + summit) * ramp;
     } else if (m_biomeId == "moon") {
@@ -108,55 +159,57 @@ float Terrain::getBaseHeight(float x) const {
         float crater = 0.0f;
         if (lx > 700.0f && lx < 1150.0f) {
             float ct = (lx - 700.0f) / 450.0f;
-            crater = -std::sin(ct * 3.14159f) * (5.5f * diff);
+            crater = -smoothWindow(ct) * (5.0f * diff);
         }
         return (c1 + c2 + c3 + crater) * ramp;
     } else if (m_biomeId == "volcano") {
         // Basalt ridges, thermal vent steps and caldera rims
-        float v1 = std::sin(lx * 0.018f) * (10.0f * ampMult);
-        float v2 = std::sin(lx * 0.044f) * (3.2f + 1.6f * diff);
-        float basalt = std::sin(lx * 0.095f) * (0.8f + 0.4f * diff);
+        float pV = lx * 0.016f + 0.26f * std::sin(lx * 0.0040f);
+        float v1 = std::sin(pV) * (9.0f * ampMult);
+        float v2 = std::sin(lx * 0.042f) * (2.9f + 1.4f * diff);
+        float basalt = std::sin(lx * 0.088f) * (0.7f + 0.3f * diff);
         // Caldera wall ascent at 850m - 1350m
         float caldera = 0.0f;
         if (lx > 850.0f && lx < 1350.0f) {
             float vt = (lx - 850.0f) / 500.0f;
-            caldera = std::sin(vt * 3.14159f) * (6.5f * diff);
+            caldera = smoothWindow(vt) * (5.2f * diff);
         }
         return (v1 + v2 + basalt + caldera) * ramp;
     }
 
-    // Default Countryside: High-variety signature Hill Climb course
-    float baseHills = std::sin(lx * 0.015f) * (8.5f * ampMult);
-    float rhythmBumps = std::sin(lx * 0.042f) * (2.2f + 1.2f * diff);
-    float microRelief = std::sin(lx * 0.090f) * 0.5f;
+    // Default Countryside: High-variety signature Hill Climb course with non-uniform rolling curvature
+    float basePhase = (lx < 125.0f) ? (lx * 0.015f) : (lx * 0.015f + 0.28f * std::sin((lx - 125.0f) * 0.0042f));
+    float baseHills = std::sin(basePhase) * (8.5f * ampMult);
+    float rhythmBumps = std::sin(lx * 0.042f) * (2.0f + 1.0f * diff);
+    float microRelief = std::sin(lx * 0.090f) * 0.35f;
 
     // Feature 1: Ski Jump Launch Ramp (lx ~ 65 - 125m)
     float jumpRamp = 0.0f;
     if (lx > 65.0f && lx < 125.0f) {
         float jt = (lx - 65.0f) / 60.0f;
-        jumpRamp = std::sin(jt * 3.14159f) * 3.5f;
+        jumpRamp = smoothWindow(jt) * 3.2f;
     }
 
     // Feature 2: Technical Moguls & Washboards (lx ~ 550 - 850m)
     float moguls = 0.0f;
     if (lx > 550.0f && lx < 850.0f) {
         float mt = (lx - 550.0f) / 300.0f;
-        float envelope = std::sin(mt * 3.14159f);
-        moguls = std::sin(lx * 0.18f) * (0.6f + 0.4f * diff) * envelope;
+        float envelope = smoothWindow(mt);
+        moguls = std::sin(lx * 0.16f) * (0.45f + 0.25f * diff) * envelope;
     }
 
     // Feature 3: Mountain Wall Ascent (lx ~ 950 - 1300m)
     float mountainWall = 0.0f;
     if (lx > 950.0f && lx < 1300.0f) {
         float mt = (lx - 950.0f) / 350.0f;
-        mountainWall = std::sin(mt * 3.14159f) * (6.0f + 2.5f * diff);
+        mountainWall = smoothWindow(mt) * (5.0f + 1.8f * diff);
     }
 
     // Feature 4: Canyon Dip (lx ~ 1350 - 1680m)
     float canyon = 0.0f;
     if (lx > 1350.0f && lx < 1680.0f) {
         float ct = (lx - 1350.0f) / 330.0f;
-        canyon = -std::sin(ct * 3.14159f) * (5.0f * diff);
+        canyon = -smoothWindow(ct) * (4.0f * diff);
     }
 
     return (baseHills + rhythmBumps + microRelief + jumpRamp + moguls + mountainWall + canyon) * ramp;
@@ -164,15 +217,19 @@ float Terrain::getBaseHeight(float x) const {
 
 float Terrain::getHeight(float x) const {
     float base = getBaseHeight(x);
-    float deform = getDeformation(x).compression;
-    return base - deform;
+    if (m_modifiedMinIdx <= m_modifiedMaxIdx) {
+        float deform = getDeformation(x).compression;
+        return base - deform;
+    }
+    return base;
 }
 
 TerrainDeformation Terrain::getDeformation(float x) const {
-    if (m_deformGrid.empty()) return TerrainDeformation{};
+    if (m_deformGrid.empty() || m_modifiedMinIdx > m_modifiedMaxIdx) return TerrainDeformation{};
     float fx = (x - DEFORM_MIN_X) / DEFORM_DX;
-    if (fx < 0.0f) return m_deformGrid.front();
     int idx = static_cast<int>(fx);
+    if (idx < m_modifiedMinIdx - 1 || idx > m_modifiedMaxIdx + 1) return TerrainDeformation{};
+    if (idx < 0) return m_deformGrid.front();
     if (idx + 1 >= static_cast<int>(m_deformGrid.size())) {
         return (idx < static_cast<int>(m_deformGrid.size())) ? m_deformGrid[idx] : TerrainDeformation{};
     }
@@ -194,6 +251,9 @@ void Terrain::applyWheelDeformation(float wheelX, float wheelRadius, float norma
     float endX = wheelX + footprint;
     int idxStart = std::max(0, static_cast<int>((startX - DEFORM_MIN_X) / DEFORM_DX));
     int idxEnd = std::min(static_cast<int>(m_deformGrid.size()) - 1, static_cast<int>((endX - DEFORM_MIN_X) / DEFORM_DX));
+
+    m_modifiedMinIdx = std::min(m_modifiedMinIdx, idxStart);
+    m_modifiedMaxIdx = std::max(m_modifiedMaxIdx, idxEnd);
 
     // Biome-specific deformation limits and compaction rates
     float maxComp = 0.045f;
@@ -231,25 +291,32 @@ void Terrain::applyWheelDeformation(float wheelX, float wheelRadius, float norma
         float compDelta = compRate * loadFactor * dt * w;
         pt.compression = std::min(maxComp, pt.compression + compDelta);
 
-        // 2. Grass flattening under tire tread
-        float flatDelta = 8.0f * loadFactor * dt * w;
+        // 2. Grass flattening under tire tread (bends blades while preserving lush green color)
+        float flatDelta = 6.0f * loadFactor * dt * w;
         pt.grassFlattening = std::min(1.0f, pt.grassFlattening + flatDelta);
 
-        // 3. Grass tearing / soil exposure under slip, acceleration, and braking
-        float tearDelta = (absSlip * 0.18f + (loadFactor - 0.5f) * 0.12f) * 3.5f * dt * w;
-        pt.grassTear = std::min(1.0f, pt.grassTear + tearDelta);
+        // 3. Grass tearing / localized soil exposure occurs ONLY under genuine tire slip (burnout or skid)
+        // Clean rolling or static vehicle weight never uproots or tears turf
+        float slipThreshold = 1.2f; // m/s
+        float excessSlip = std::max(0.0f, absSlip - slipThreshold);
+        if (excessSlip > 0.05f) {
+            float tearDelta = excessSlip * 0.35f * dt * w;
+            pt.grassTear = std::min(1.0f, pt.grassTear + tearDelta);
+        }
 
         pt.age = 0.0f;
     }
 }
 
 void Terrain::updateDeformation(float dt, float activeMinX, float activeMaxX) {
-    if (m_deformGrid.empty()) return;
-    int idxStart = std::max(0, static_cast<int>((activeMinX - DEFORM_MIN_X) / DEFORM_DX));
-    int idxEnd = std::min(static_cast<int>(m_deformGrid.size()) - 1, static_cast<int>((activeMaxX - DEFORM_MIN_X) / DEFORM_DX));
+    if (m_deformGrid.empty() || m_modifiedMinIdx > m_modifiedMaxIdx) return;
+    int idxStart = std::max(m_modifiedMinIdx, static_cast<int>((activeMinX - DEFORM_MIN_X) / DEFORM_DX));
+    int idxEnd = std::min(m_modifiedMaxIdx, static_cast<int>((activeMaxX - DEFORM_MIN_X) / DEFORM_DX));
+    if (idxStart > idxEnd) return;
 
     for (int i = idxStart; i <= idxEnd; ++i) {
         auto& pt = m_deformGrid[i];
+        if (pt.grassFlattening <= 0.0f && pt.compression <= 0.0f && pt.grassTear <= 0.0f) continue;
         pt.age += dt;
 
         // Subtle gradual elastic restoration over time
@@ -358,7 +425,7 @@ void Terrain::spawnItems() {
         }
 
         WorldItem fuel;
-        fuel.position = {bestX, getHeight(bestX) + 1.6f};
+        fuel.position = {bestX, getHeight(bestX) + 1.25f};
         fuel.type = ItemType::FUEL_CANISTER;
         fuel.value = 100;
         fuel.collected = false;
@@ -387,12 +454,12 @@ void Terrain::spawnItems() {
         float slope = getSlope(x);
         float nextSlope = getSlope(x + 6.0f);
 
-        // Detecting a jump crest: spawn 5-coin rainbow arc over the crest
+        // Detecting a jump crest: spawn 5-coin rainbow arc over the crest (reachable jump arc: peak 2.5m above crest)
         if (slope > 0.15f && nextSlope < slope) {
             for (int k = 0; k < 5; ++k) {
                 float coinX = x + k * 3.0f;
                 float coinBaseY = getHeight(coinX);
-                float arcH = std::sin((static_cast<float>(k) / 4.0f) * 3.14159f) * 3.2f + 1.5f;
+                float arcH = std::sin((static_cast<float>(k) / 4.0f) * 3.14159f) * 1.4f + 1.15f;
 
                 WorldItem arcCoin;
                 arcCoin.position = {coinX, coinBaseY + arcH};
@@ -407,7 +474,7 @@ void Terrain::spawnItems() {
 
         // Standard ground-follow coins
         WorldItem coin;
-        coin.position = {x, y + 1.3f};
+        coin.position = {x, y + 1.15f};
         coin.type = (static_cast<int>(x) % 60 == 0) ? ItemType::COIN_GOLD :
                     (static_cast<int>(x) % 20 == 0) ? ItemType::COIN_SILVER : ItemType::COIN_BRONZE;
         coin.value = (coin.type == ItemType::COIN_GOLD) ? 100 : (coin.type == ItemType::COIN_SILVER) ? 25 : 5;

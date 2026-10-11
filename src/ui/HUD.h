@@ -20,6 +20,7 @@ public:
     void setDimensions(int width, int height);
 
     void setFuel(float fuelPercent) { m_fuelBar.setFuel(fuelPercent); }
+    void triggerFuelFlash() { m_fuelBar.triggerPickupFlash(); }
     void setSpeed(float kmh) { m_speedometer.setValue(kmh); }
     void setRpm(float rpm) { m_tachometer.setValue(rpm); }
     void setDistance(float meters) { m_distance = meters; }
@@ -37,9 +38,11 @@ public:
     void onMouseUp(int px, int py);
 
     bool isBrakePressed() const { return m_brakePedal.isPressed(); }
+    bool isReversePressed() const { return m_reversePedal.isPressed(); }
     bool isGasPressed() const { return m_gasPedal.isPressed(); }
 
     void setBrakeVirtualPressed(bool pressed);
+    void setReverseVirtualPressed(bool pressed);
     void setGasVirtualPressed(bool pressed);
 
     void setOnPauseClicked(std::function<void()> cb) { m_pauseButton.setOnClick(cb); }
@@ -61,6 +64,7 @@ private:
     StuntBanner m_stuntBanner;
 
     RetroButton m_brakePedal;
+    RetroButton m_reversePedal;
     RetroButton m_gasPedal;
     RetroButton m_pauseButton;
 

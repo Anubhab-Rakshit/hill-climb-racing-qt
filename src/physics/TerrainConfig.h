@@ -25,6 +25,7 @@ struct BiomeSpec {
 
     float gravity;             // m/s^2
     float friction;            // traction multiplier
+    float airDensity;          // atmospheric density (1.0 = Earth standard, 0.0 = lunar vacuum)
     float baseHeightAmp;       // amplitude scale
     float baseFrequency;       // spatial frequency scale
 

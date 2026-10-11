@@ -39,8 +39,12 @@ void PixelCanvas::paintEvent(QPaintEvent* /*event*/) {
         painter.fillRect(rect(), Qt::black);
     }
 
-    // Blit internal software framebuffer in a single hardware call
-    painter.drawImage(QRect(destX, destY, destW, destH), m_framebuffer.getImage());
+    // Blit internal software framebuffer: direct point blit when 1:1, scaled rect otherwise
+    if (destW == virtW && destH == virtH) {
+        painter.drawImage(destX, destY, m_framebuffer.getImage());
+    } else {
+        painter.drawImage(QRect(destX, destY, destW, destH), m_framebuffer.getImage());
+    }
 }
 
 void PixelCanvas::keyPressEvent(QKeyEvent* event) {

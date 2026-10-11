@@ -46,6 +46,7 @@ public:
     Terrain();
 
     void setBiome(const std::string& biomeId);
+    void setTestIncline(float angleDeg);
     const std::string& getBiome() const { return m_biomeId; }
     const BiomeSpec& getBiomeSpec() const { return m_spec; }
 
@@ -61,7 +62,9 @@ public:
     void resetDeformation();
 
     float getFriction() const { return m_friction; }
+    void setFriction(float f) { m_friction = f; }
     float getGravity() const { return m_gravity; }
+    float getAirDensity() const { return m_airDensity; }
 
     const std::vector<WorldItem>& getItems() const { return m_items; }
     std::vector<WorldItem>& getItems() { return m_items; }
@@ -80,6 +83,7 @@ private:
     BiomeSpec m_spec;
     float m_friction;
     float m_gravity;
+    float m_airDensity = 1.0f;
     std::vector<WorldItem> m_items;
     std::vector<MilestoneSign> m_milestones;
 
@@ -87,7 +91,11 @@ private:
     static constexpr float DEFORM_DX = 0.05f;
     static constexpr size_t DEFORM_SAMPLES = 72000;
     std::vector<TerrainDeformation> m_deformGrid;
+    std::vector<float> m_baseHeightCache;
+    int m_modifiedMinIdx = static_cast<int>(DEFORM_SAMPLES);
+    int m_modifiedMaxIdx = -1;
 
+    float computeRawBaseHeight(float x) const;
     void spawnItems();
 };
 

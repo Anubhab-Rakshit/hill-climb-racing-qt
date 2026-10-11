@@ -57,6 +57,7 @@ private:
 
     bool m_gameOver;
     std::string m_gameOverReason;
+    float m_deformAccum = 0.0f;
 
     std::function<void(const std::string&, int)> m_onStunt;
     std::function<void(ItemType, int)> m_onItem;

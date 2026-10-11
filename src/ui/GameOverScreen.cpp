@@ -129,26 +129,38 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
         tier = 1;
     }
 
-    // Draw True Pixel-Art Medal Badge
-    int medalCenterY = boxY + 68;
-    UIComponents::drawMedalBadge(fb, cx - 120, medalCenterY, tier, m_animTime);
+    // Draw True Pixel-Art Medal Badge + Centered Tier Banner
+    int medalCenterY = boxY + 66;
+    int medalCenterX = cx - 106;
+    UIComponents::drawMedalBadge(fb, medalCenterX, medalCenterY, tier, m_animTime);
 
-    // Medal Tier Banner next to badge
-    int tierW = 210;
+    // Medal Tier Banner centered next to badge (Badge: cx-122..cx-90, Banner: cx-78..cx+122)
+    int tierW = 200;
     int tierH = 22;
-    int tierX = cx - 95;
+    int tierX = cx - 78;
     int tierY = medalCenterY - 11;
     UIComponents::drawArcadePanel(fb, tierX, tierY, tierW, tierH, 0xEE111A26, medalCol, 0, 0, false, true);
     Graphics::RasterFont::drawStringCentered(fb, tierX + tierW / 2, tierY + 5, medalTitle, medalCol, 1);
 
     // New Record Banner if beaten
     if (m_isNewRecord) {
-        int recW = 240;
-        int recH = 20;
+        int recW = 260;
+        int recH = 22;
         int recX = cx - recW / 2;
         int recY = boxY + 88;
         UIComponents::drawArcadePanel(fb, recX, recY, recW, recH, 0xFFD84315, Theme::GOLD, 0, 0, false, true);
-        Graphics::RasterFont::drawStringCentered(fb, cx, recY + 4, "* NEW RECORD DISTANCE! *", Theme::TEXT_WHITE, 1);
+        Graphics::RasterFont::drawStringCentered(fb, cx, recY + 5, "* NEW RECORD DISTANCE! *", Theme::TEXT_WHITE, 1);
+
+        // Celebratory starburst glints flanking the record banner
+        for (int s = 0; s < 6; ++s) {
+            float sa = s * 1.047f + m_animTime * 3.0f;
+            int sx1 = recX - 16 + static_cast<int>(std::cos(sa) * 8.0f);
+            int sy1 = recY + 11 + static_cast<int>(std::sin(sa) * 8.0f);
+            int sx2 = recX + recW + 16 + static_cast<int>(std::cos(-sa) * 8.0f);
+            int sy2 = recY + 11 + static_cast<int>(std::sin(-sa) * 8.0f);
+            fb.setPixelFast(sx1, sy1, (s % 2 == 0) ? Theme::GOLD : 0xFFFFFFFF);
+            fb.setPixelFast(sx2, sy2, (s % 2 == 0) ? Theme::GOLD : 0xFFFFFFFF);
+        }
     }
 
     // Stats Table Grid
@@ -179,6 +191,10 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
     drawRow(tableY + 96, "TOTAL AIR TIME", ss.str(), Theme::GREEN_GAS, true);
 
     // Action Buttons
+    float pulseAlpha = (std::sin(m_animTime * 4.0f) * 0.5f + 0.5f);
+    uint32_t pulseCol = UI::Theme::blend(0x0000E676, 0x6600E676, pulseAlpha);
+    fb.drawRect(m_btnRetry.x() - 1, m_btnRetry.y() - 1, m_btnRetry.width() + 2, m_btnRetry.height() + 2, pulseCol);
+
     m_btnRetry.render(fb, 2);
     m_btnGarage.render(fb, 2);
     m_btnMenu.render(fb, 2);

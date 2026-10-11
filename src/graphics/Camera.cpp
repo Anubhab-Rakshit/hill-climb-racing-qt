@@ -8,10 +8,25 @@ Camera::Camera(int screenWidth, int screenHeight)
     : m_screenW(screenWidth)
     , m_screenH(screenHeight)
     , m_pos({0.0f, 0.0f})
+    , m_prevPos({0.0f, 0.0f})
     , m_shakeOffset({0.0f, 0.0f})
+    , m_prevShakeOffset({0.0f, 0.0f})
     , m_zoom(44.0f) // 44 pixels per meter base scale for authentic Hill Climb framing
+    , m_prevZoom(44.0f)
     , m_trauma(0.0f)
+    , m_renderAlpha(1.0f)
 {
+}
+
+void Camera::reset(const Physics::Vec2& pos) {
+    m_pos = pos;
+    m_prevPos = pos;
+    m_shakeOffset = {0.0f, 0.0f};
+    m_prevShakeOffset = {0.0f, 0.0f};
+    m_zoom = 44.0f;
+    m_prevZoom = 44.0f;
+    m_trauma = 0.0f;
+    m_renderAlpha = 1.0f;
 }
 
 void Camera::addTrauma(float amount) {
@@ -19,8 +34,13 @@ void Camera::addTrauma(float amount) {
 }
 
 void Camera::update(float dt, const Physics::Vec2& targetPos, float targetSpeedX) {
-    // 1. Dynamic Look-ahead based on forward speed
-    float lookAheadX = std::clamp(targetSpeedX * 0.35f, 0.0f, 7.0f);
+    // Cache previous physics tick state for rendering interpolation
+    m_prevPos = m_pos;
+    m_prevZoom = m_zoom;
+    m_prevShakeOffset = m_shakeOffset;
+
+    // 1. Dynamic Look-ahead based on calibrated forward speed
+    float lookAheadX = std::clamp(targetSpeedX * 0.58f, 0.0f, 7.0f);
     Physics::Vec2 desiredPos = {targetPos.x + lookAheadX, targetPos.y + 0.9f};
 
     // Smooth position lerp
@@ -28,8 +48,8 @@ void Camera::update(float dt, const Physics::Vec2& targetPos, float targetSpeedX
     m_pos.x += (desiredPos.x - m_pos.x) * (1.0f - std::exp(-lerpSpeed * dt));
     m_pos.y += (desiredPos.y - m_pos.y) * (1.0f - std::exp(-lerpSpeed * dt));
 
-    // 2. Speed-dependent Zoom Out
-    float targetZoom = 46.0f - std::clamp(std::abs(targetSpeedX) * 0.40f, 0.0f, 12.0f);
+    // 2. Speed-dependent Zoom Out (calibrated for 60% physical velocity)
+    float targetZoom = 46.0f - std::clamp(std::abs(targetSpeedX) * 0.65f, 0.0f, 12.0f);
     m_zoom += (targetZoom - m_zoom) * (1.0f - std::exp(-4.0f * dt));
 
     // 3. Traumatic Shake
@@ -45,15 +65,33 @@ void Camera::update(float dt, const Physics::Vec2& targetPos, float targetSpeedX
     }
 }
 
+float Camera::x() const {
+    float a = m_renderAlpha;
+    return (m_prevPos.x + (m_pos.x - m_prevPos.x) * a) +
+           (m_prevShakeOffset.x + (m_shakeOffset.x - m_prevShakeOffset.x) * a);
+}
+
+float Camera::y() const {
+    float a = m_renderAlpha;
+    return (m_prevPos.y + (m_pos.y - m_prevPos.y) * a) +
+           (m_prevShakeOffset.y + (m_shakeOffset.y - m_prevShakeOffset.y) * a);
+}
+
+float Camera::zoom() const {
+    return m_prevZoom + (m_zoom - m_prevZoom) * m_renderAlpha;
+}
+
 Physics::Vec2 Camera::worldToScreen(const Physics::Vec2& world) const {
-    float sx = m_screenW * 0.5f + (world.x - x()) * m_zoom;
-    float sy = m_screenH * 0.55f - (world.y - y()) * m_zoom;
+    float curZoom = zoom();
+    float sx = m_screenW * 0.5f + (world.x - x()) * curZoom;
+    float sy = m_screenH * 0.55f - (world.y - y()) * curZoom;
     return {sx, sy};
 }
 
 Physics::Vec2 Camera::screenToWorld(const Physics::Vec2& screen) const {
-    float wx = x() + (screen.x - m_screenW * 0.5f) / m_zoom;
-    float wy = y() - (screen.y - m_screenH * 0.55f) / m_zoom;
+    float curZoom = zoom();
+    float wx = x() + (screen.x - m_screenW * 0.5f) / curZoom;
+    float wy = y() - (screen.y - m_screenH * 0.55f) / curZoom;
     return {wx, wy};
 }
 

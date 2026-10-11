@@ -33,14 +33,20 @@ void UIComponents::drawArcadePanel(Graphics::Framebuffer& fb,
 {
     if (w <= 4 || h <= 4) return;
 
-    // 1. Soft Outer Drop Shadow
-    fb.fillRect(x + 2, y + 2, w, h, 0x8805080E);
+    // 1. Soft Outer Drop Shadow (Right and Bottom perimeter strips only, avoiding redundant under-panel fill)
+    fb.fillRect(x + w, y + 2, 2, h, 0x8805080E);
+    fb.fillRect(x + 2, y + h, w - 2, 2, 0x8805080E);
 
     // 2. Main Outer Border
     fb.drawRect(x, y, w, h, borderCol);
 
-    // 3. Inner Fill
-    fb.fillRect(x + 1, y + 1, w - 2, h - 2, bgCol);
+    // 3. Inner Fill (fast solid scanline fill for opaque/dense panels)
+    uint32_t a = (bgCol >> 24) & 0xFF;
+    if (a >= 200) {
+        fb.fillRect(x + 1, y + 1, w - 2, h - 2, 0xFF000000 | (bgCol & 0x00FFFFFF));
+    } else {
+        fb.fillRect(x + 1, y + 1, w - 2, h - 2, bgCol);
+    }
 
     // 4. Corner Notches (Diagonal cut on 4 corners for arcade hardware look)
     if (drawNotches) {

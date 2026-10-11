@@ -22,6 +22,10 @@ public:
     void setBaseColor(uint32_t color) { m_baseColor = color; }
     void setTextColor(uint32_t color) { m_textColor = color; }
     void setOnClick(std::function<void()> cb) { m_onClick = cb; }
+    int x() const { return m_x; }
+    int y() const { return m_y; }
+    int width() const { return m_w; }
+    int height() const { return m_h; }
 
     void setEnabled(bool enabled) { m_enabled = enabled; }
     bool isEnabled() const { return m_enabled; }

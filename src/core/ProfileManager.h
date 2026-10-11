@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 #include "VehicleConfig.h"
 
 namespace Core {
@@ -97,6 +98,14 @@ public:
     bool isStageCompleted(const std::string& stageId) const;
     void setStageCompleted(const std::string& stageId, bool completed = true);
 
+    // Audio Settings
+    float masterVolume() const { return m_masterVolume; }
+    void setMasterVolume(float vol) { m_masterVolume = std::clamp(vol, 0.0f, 1.0f); save(); }
+    float musicVolume() const { return m_musicVolume; }
+    void setMusicVolume(float vol) { m_musicVolume = std::clamp(vol, 0.0f, 1.0f); save(); }
+    float sfxVolume() const { return m_sfxVolume; }
+    void setSfxVolume(float vol) { m_sfxVolume = std::clamp(vol, 0.0f, 1.0f); save(); }
+
     // Serialization
     void load();
     void save() const;
@@ -105,6 +114,10 @@ private:
     int m_coins;
     Physics::VehicleType m_selectedVehicle;
     Physics::DriverType m_selectedDriver;
+
+    float m_masterVolume = 1.0f;
+    float m_musicVolume = 0.75f;
+    float m_sfxVolume = 0.85f;
 
     // Upgrade levels per vehicle: [VehicleType][UpgradeType]
     int m_upgradeLevels[static_cast<int>(Physics::VehicleType::COUNT)][UPGRADE_COUNT];

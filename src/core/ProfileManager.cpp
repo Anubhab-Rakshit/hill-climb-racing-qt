@@ -342,6 +342,10 @@ void ProfileManager::load() {
             }
         }
     }
+
+    m_masterVolume = settings.value("vol_master", 1.0f).toFloat();
+    m_musicVolume = settings.value("vol_music", 0.75f).toFloat();
+    m_sfxVolume = settings.value("vol_sfx", 0.85f).toFloat();
 }
 
 void ProfileManager::save() const {
@@ -349,6 +353,9 @@ void ProfileManager::save() const {
     settings.setValue("coins", m_coins);
     settings.setValue("selected_vehicle", static_cast<int>(m_selectedVehicle));
     settings.setValue("selected_driver", static_cast<int>(m_selectedDriver));
+    settings.setValue("vol_master", m_masterVolume);
+    settings.setValue("vol_music", m_musicVolume);
+    settings.setValue("vol_sfx", m_sfxVolume);
 
     int numVehicles = static_cast<int>(Physics::VehicleType::COUNT);
     for (int v = 0; v < numVehicles; ++v) {

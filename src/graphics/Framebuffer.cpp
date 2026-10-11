@@ -33,16 +33,22 @@ void Framebuffer::fillRect(int x, int y, int w, int h, uint32_t color) {
 
     if (x0 >= x1 || y0 >= y1) return;
 
-    uint8_t a = (color >> 24) & 0xFF;
-    bool isOpaque = (a == 255);
+    uint32_t sa = (color >> 24) & 0xFF;
+    if (sa == 0) return;
+    bool isOpaque = (sa == 255);
+    uint32_t opCol = 0xFF000000 | (color & 0x00FFFFFF);
+    uint32_t sr = (color >> 16) & 0xFF;
+    uint32_t sg = (color >> 8) & 0xFF;
+    uint32_t sb = color & 0xFF;
+    uint32_t invA = 255 - sa;
 
     for (int cy = y0; cy < y1; ++cy) {
         uint32_t* line = scanLine(cy);
         if (isOpaque) {
-            std::fill(line + x0, line + x1, color);
+            std::fill(line + x0, line + x1, opCol);
         } else {
             for (int cx = x0; cx < x1; ++cx) {
-                blendPixelFast(cx, cy, color);
+                line[cx] = blendOpaqueDst(line[cx], sr, sg, sb, sa, invA);
             }
         }
     }
@@ -130,9 +136,14 @@ void Framebuffer::fillCircle(int xc, int yc, int r, uint32_t color) {
     int y0 = std::max(0, yc - r);
     int y1 = std::min(m_height - 1, yc + r);
 
-    uint8_t a = (color >> 24) & 0xFF;
-    bool isOpaque = (a == 255);
+    uint32_t sa = (color >> 24) & 0xFF;
+    if (sa == 0) return;
+    bool isOpaque = (sa == 255);
     uint32_t opCol = 0xFF000000 | (color & 0x00FFFFFF);
+    uint32_t sr = (color >> 16) & 0xFF;
+    uint32_t sg = (color >> 8) & 0xFF;
+    uint32_t sb = color & 0xFF;
+    uint32_t invA = 255 - sa;
 
     for (int y = y0; y <= y1; ++y) {
         int64_t dy = y - yc;
@@ -142,12 +153,12 @@ void Framebuffer::fillCircle(int xc, int yc, int r, uint32_t color) {
         int x0 = std::max(0, xc - dx);
         int x1 = std::min(m_width - 1, xc + dx);
         if (x0 <= x1) {
+            uint32_t* line = scanLine(y);
             if (isOpaque) {
-                uint32_t* line = scanLine(y);
                 std::fill(line + x0, line + x1 + 1, opCol);
             } else {
                 for (int x = x0; x <= x1; ++x) {
-                    blendPixelFast(x, y, color);
+                    line[x] = blendOpaqueDst(line[x], sr, sg, sb, sa, invA);
                 }
             }
         }
@@ -196,9 +207,14 @@ void Framebuffer::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, u
     if (y0 == y2) return; // Degenerate horizontal segment
 
     int totalHeight = y2 - y0;
-    uint8_t a = (color >> 24) & 0xFF;
-    bool isOpaque = (a == 255);
+    uint32_t sa = (color >> 24) & 0xFF;
+    if (sa == 0) return;
+    bool isOpaque = (sa == 255);
     uint32_t opCol = 0xFF000000 | (color & 0x00FFFFFF);
+    uint32_t sr = (color >> 16) & 0xFF;
+    uint32_t sg = (color >> 8) & 0xFF;
+    uint32_t sb = color & 0xFF;
+    uint32_t invA = 255 - sa;
 
     for (int i = 0; i <= totalHeight; ++i) {
         int cy = y0 + i;
@@ -220,12 +236,12 @@ void Framebuffer::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, u
         int endX = std::min(m_width - 1, bx);
 
         if (startX <= endX) {
+            uint32_t* line = scanLine(cy);
             if (isOpaque) {
-                uint32_t* line = scanLine(cy);
                 std::fill(line + startX, line + endX + 1, opCol);
             } else {
                 for (int cx = startX; cx <= endX; ++cx) {
-                    blendPixelFast(cx, cy, color);
+                    line[cx] = blendOpaqueDst(line[cx], sr, sg, sb, sa, invA);
                 }
             }
         }
