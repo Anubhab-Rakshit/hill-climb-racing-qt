@@ -1,3 +1,4 @@
+﻿#define _USE_MATH_DEFINES
 #include "Vehicle.h"
 #include <cmath>
 #include <algorithm>
@@ -81,6 +82,8 @@ void Vehicle::reset(float startX, float startY, float startAngle) {
     m_gasInput = 0.0f;
     m_brakeInput = 0.0f;
     m_reverseInput = 0.0f;
+    m_tiltLeftInput = 0.0f;
+    m_tiltRightInput = 0.0f;
 
     m_rearContact = true;
     m_frontContact = true;
@@ -105,7 +108,9 @@ void Vehicle::reset(float startX, float startY, float startAngle) {
     m_brakePressure = 0.0f;
 }
 
-void Vehicle::applyInput(float gas, float brake, float reverse) {
+void Vehicle::applyInput(float gas, float brake, float reverse, float tiltLeft, float tiltRight) {
+    m_tiltLeftInput = std::clamp(tiltLeft, 0.0f, 1.0f);
+    m_tiltRightInput = std::clamp(tiltRight, 0.0f, 1.0f);
     m_gasInput = std::clamp(gas, 0.0f, 1.0f);
     m_brakeInput = std::clamp(brake, 0.0f, 1.0f);
     m_reverseInput = std::clamp(reverse, 0.0f, 1.0f);
@@ -559,12 +564,14 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
 
     // 3. Stunt & In-Air Pitch Controls
     if (!m_rearContact && !m_frontContact) {
-        float airPitchTorque = 680.0f * m_config.baseAirAgility * downforceMult;
-        if (effectiveGas > 0.0f) {
-            m_chassisAngularVel += (airPitchTorque * effectiveGas / m_chassisInertia) * dt;
+        float airPitchTorque = 780.0f * m_config.baseAirAgility * downforceMult;
+        float pitchBack = std::max(effectiveGas, m_tiltLeftInput);
+        float pitchForward = std::max(effectiveBrake, m_tiltRightInput);
+        if (pitchBack > 0.0f) {
+            m_chassisAngularVel += (airPitchTorque * pitchBack / m_chassisInertia) * dt;
         }
-        if (effectiveBrake > 0.0f) {
-            m_chassisAngularVel -= (airPitchTorque * effectiveBrake / m_chassisInertia) * dt;
+        if (pitchForward > 0.0f) {
+            m_chassisAngularVel -= (airPitchTorque * pitchForward / m_chassisInertia) * dt;
         }
     } else if (m_rearContact && !m_frontContact) {
         if (m_chassisAngle > 0.40f && m_chassisAngularVel > 0.0f) {

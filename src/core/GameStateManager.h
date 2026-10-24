@@ -12,13 +12,13 @@
 #include "StageSelectScreen.h"
 #include "PauseOverlay.h"
 #include "GameOverScreen.h"
-#include "GameState.h"
 #include "SoundManager.h"
 
 namespace Core {
 
 /**
  * @brief Manages screen transitions, coordinates rendering, and bridges UI with Physics.
+ * Supports Single Player and Split-Screen 2-Truck Multiplayer Racing.
  */
 class GameStateManager {
 public:
@@ -29,6 +29,7 @@ public:
     void changeState(StateType newState);
     StateType currentState() const { return m_currentState; }
     void startRace(const std::string& biomeId);
+    void startMultiplayerRace();
 
     void handleInput(const InputController::State& input);
     void fixedUpdate(float dt);
@@ -54,15 +55,21 @@ private:
     float m_gameTime;
     float m_transitionTimer;
     float m_smokeTimer;
+    float m_smokeTimer2 = 0.0f;
     std::string m_selectedBiome;
 
     // Subsystems
     ProfileManager m_profile;
     Physics::PhysicsWorld m_physics;
     Graphics::Camera m_camera;
+    Graphics::Camera m_camera2;
     Graphics::ScanlineRasterizer m_terrainRasterizer;
     Graphics::ParticleSystem m_particleSystem;
     Audio::SoundManager m_audio;
+
+    // Multiplayer Split-Screen Viewport Buffers (960 x 266 each)
+    Graphics::Framebuffer m_fbP1;
+    Graphics::Framebuffer m_fbP2;
 
     // UI Screens
     UI::MainMenuScreen m_mainMenu;
@@ -73,6 +80,9 @@ private:
     UI::GameOverScreen m_gameOverScreen;
 
     void setupUiCallbacks();
+    void renderMultiplayer(Graphics::Framebuffer& fb, float alpha);
+    void renderCompactHud(Graphics::Framebuffer& fb, const Physics::Vehicle& veh, float dist,
+                          const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint);
 };
 
 } // namespace Core

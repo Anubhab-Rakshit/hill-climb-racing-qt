@@ -1,5 +1,6 @@
-#include "Framebuffer.h"
+﻿#include "Framebuffer.h"
 #include <cstdlib>
+#include <cstring>
 
 namespace Graphics {
 
@@ -245,6 +246,21 @@ void Framebuffer::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, u
                 }
             }
         }
+    }
+}
+
+void Framebuffer::blit(int destX, int destY, const Framebuffer& src) {
+    int w = std::min(src.width(), m_width - destX);
+    int h = std::min(src.height(), m_height - destY);
+    if (w <= 0 || h <= 0) return;
+
+    int copyBytes = w * static_cast<int>(sizeof(uint32_t));
+    for (int y = 0; y < h; ++y) {
+        int dy = destY + y;
+        if (dy < 0 || dy >= m_height) continue;
+        const uint32_t* srcRow = src.scanLine(y);
+        uint32_t* dstRow = scanLine(dy) + destX;
+        std::memcpy(dstRow, srcRow, copyBytes);
     }
 }
 

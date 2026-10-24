@@ -14,12 +14,14 @@ MainMenuScreen::MainMenuScreen()
     : m_width(Theme::VIRTUAL_WIDTH)
     , m_height(Theme::VIRTUAL_HEIGHT)
     , m_animTime(0.0f)
-    , m_btnStart(540, 150, 340, 52, "START RACE", Theme::GREEN_GAS)
-    , m_btnGarage(540, 212, 340, 48, "GARAGE & TUNING", Theme::GOLD)
-    , m_btnStages(540, 270, 340, 48, "STAGE SELECT", Theme::CYAN_UPGRADE)
-    , m_btnQuit(540, 328, 340, 42, "QUIT GAME", 0xFF2A3A4E)
+    , m_btnStart(540, 126, 340, 46, "START SOLO RACE", Theme::GREEN_GAS)
+    , m_btnMultiplayer(540, 178, 340, 46, "2P MULTIPLAYER", 0xFFFF5722)
+    , m_btnGarage(540, 230, 340, 44, "GARAGE & TUNING", Theme::GOLD)
+    , m_btnStages(540, 280, 340, 44, "STAGE SELECT", Theme::CYAN_UPGRADE)
+    , m_btnQuit(540, 330, 340, 38, "QUIT GAME", 0xFF2A3A4E)
 {
     m_btnStart.setKeyHint("ENTER");
+    m_btnMultiplayer.setKeyHint("M");
     m_btnGarage.setKeyHint("G");
     m_btnStages.setKeyHint("S");
     m_btnQuit.setKeyHint("ESC");
@@ -32,23 +34,27 @@ void MainMenuScreen::setDimensions(int width, int height) {
 
     int btnW = 340;
     int btnX = width - btnW - 70; // 550 on 960 canvas
-    int startY = 150;
+    int startY = 126;
 
     m_btnStart.setPosition(btnX, startY);
-    m_btnStart.setSize(btnW, 52);
+    m_btnStart.setSize(btnW, 46);
 
-    m_btnGarage.setPosition(btnX, startY + 62);
-    m_btnGarage.setSize(btnW, 48);
+    m_btnMultiplayer.setPosition(btnX, startY + 52);
+    m_btnMultiplayer.setSize(btnW, 46);
 
-    m_btnStages.setPosition(btnX, startY + 120);
-    m_btnStages.setSize(btnW, 48);
+    m_btnGarage.setPosition(btnX, startY + 104);
+    m_btnGarage.setSize(btnW, 44);
 
-    m_btnQuit.setPosition(btnX, startY + 178);
-    m_btnQuit.setSize(btnW, 42);
+    m_btnStages.setPosition(btnX, startY + 154);
+    m_btnStages.setSize(btnW, 44);
+
+    m_btnQuit.setPosition(btnX, startY + 204);
+    m_btnQuit.setSize(btnW, 38);
 }
 
 void MainMenuScreen::onMouseMove(int px, int py) {
     m_btnStart.onMouseMove(px, py);
+    m_btnMultiplayer.onMouseMove(px, py);
     m_btnGarage.onMouseMove(px, py);
     m_btnStages.onMouseMove(px, py);
     m_btnQuit.onMouseMove(px, py);
@@ -56,6 +62,7 @@ void MainMenuScreen::onMouseMove(int px, int py) {
 
 bool MainMenuScreen::onMouseDown(int px, int py) {
     if (m_btnStart.onMouseDown(px, py)) return true;
+    if (m_btnMultiplayer.onMouseDown(px, py)) return true;
     if (m_btnGarage.onMouseDown(px, py)) return true;
     if (m_btnStages.onMouseDown(px, py)) return true;
     if (m_btnQuit.onMouseDown(px, py)) return true;
@@ -64,6 +71,7 @@ bool MainMenuScreen::onMouseDown(int px, int py) {
 
 void MainMenuScreen::onMouseUp(int px, int py) {
     m_btnStart.onMouseUp(px, py);
+    m_btnMultiplayer.onMouseUp(px, py);
     m_btnGarage.onMouseUp(px, py);
     m_btnStages.onMouseUp(px, py);
     m_btnQuit.onMouseUp(px, py);
@@ -244,7 +252,13 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     uint32_t pulseCol = UI::Theme::blend(0x0000E676, 0x6600E676, pulseAlpha);
     fb.drawRect(m_btnStart.x() - 1, m_btnStart.y() - 1, m_btnStart.width() + 2, m_btnStart.height() + 2, pulseCol);
 
+    // Dynamic glowing accent on 2P MULTIPLAYER button
+    float mpPulse = (std::sin(m_animTime * 5.0f + 1.2f) * 0.5f + 0.5f);
+    uint32_t mpCol = UI::Theme::blend(0x00FF3D00, 0x88FF7043, mpPulse);
+    fb.drawRect(m_btnMultiplayer.x() - 1, m_btnMultiplayer.y() - 1, m_btnMultiplayer.width() + 2, m_btnMultiplayer.height() + 2, mpCol);
+
     m_btnStart.render(fb, 2);
+    m_btnMultiplayer.render(fb, 2);
     m_btnGarage.render(fb, 2);
     m_btnStages.render(fb, 2);
     m_btnQuit.render(fb, 2);
@@ -252,7 +266,7 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     // Career Highlights Box beneath buttons
     int btnW = 340;
     int btnX = m_width - btnW - 70;
-    int tickY = 385;
+    int tickY = 376;
     int tickH = 88;
     UIComponents::drawArcadePanel(fb, btnX, tickY, btnW, tickH, 0xF00B1422, Theme::CARD_BORDER, Theme::CYAN_UPGRADE, 3, true, true);
 
@@ -356,29 +370,48 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     fb.fillRect(0, footY, m_width, footH, 0xEE090E18);
     fb.drawLine(0, footY, m_width, footY, 0xFF1E2B3E);
 
-    int startKx = cx - 380;
+    int startKx = cx - 440;
     int ky = footY + 6;
 
-    // A / LEFT: BRAKE
-    UIComponents::drawKeycap(fb, startKx, ky, "A");
-    UIComponents::drawKeycap(fb, startKx + 22, ky, "LEFT");
-    Graphics::RasterFont::drawString(fb, startKx + 64, ky + 4, "BRAKE & TILT BACK", Theme::TEXT_WHITE, 1);
+    // ENTER: SOLO
+    UIComponents::drawKeycap(fb, startKx, ky, "ENTER");
+    Graphics::RasterFont::drawString(fb, startKx + 46, ky + 4, "SOLO", Theme::GREEN_GAS, 1);
 
-    // D / RIGHT: GAS
-    int midKx = startKx + 225;
-    UIComponents::drawKeycap(fb, midKx, ky, "D");
-    UIComponents::drawKeycap(fb, midKx + 22, ky, "RIGHT");
-    Graphics::RasterFont::drawString(fb, midKx + 68, ky + 4, "GAS & TILT FWD", Theme::TEXT_WHITE, 1);
+    // M: 2P RACE
+    int mKx = startKx + 95;
+    UIComponents::drawKeycap(fb, mKx, ky, "M");
+    Graphics::RasterFont::drawString(fb, mKx + 22, ky + 4, "2P RACE", 0xFFFF9100, 1);
 
-    // ESC: PAUSE / QUIT
-    int rightKx = midKx + 220;
-    UIComponents::drawKeycap(fb, rightKx, ky, "ESC");
-    Graphics::RasterFont::drawString(fb, rightKx + 36, ky + 4, "QUIT / BACK", Theme::TEXT_WHITE, 1);
+    // P1: WASD
+    int p1Kx = mKx + 95;
+    Graphics::RasterFont::drawString(fb, p1Kx, ky + 4, "P1:", Theme::TEXT_MUTED, 1);
+    UIComponents::drawKeycap(fb, p1Kx + 26, ky, "W");
+    UIComponents::drawKeycap(fb, p1Kx + 46, ky, "A");
+    UIComponents::drawKeycap(fb, p1Kx + 64, ky, "S");
+    UIComponents::drawKeycap(fb, p1Kx + 82, ky, "D");
 
-    // ENTER: SELECT
-    int enterKx = rightKx + 150;
-    UIComponents::drawKeycap(fb, enterKx, ky, "ENTER");
-    Graphics::RasterFont::drawString(fb, enterKx + 46, ky + 4, "START RACE", Theme::TEXT_WHITE, 1);
+    // P2: ARROWS
+    int p2Kx = p1Kx + 115;
+    Graphics::RasterFont::drawString(fb, p2Kx, ky + 4, "P2:", Theme::TEXT_MUTED, 1);
+    UIComponents::drawKeycap(fb, p2Kx + 26, ky, "UP");
+    UIComponents::drawKeycap(fb, p2Kx + 50, ky, "DN");
+    UIComponents::drawKeycap(fb, p2Kx + 72, ky, "LT");
+    UIComponents::drawKeycap(fb, p2Kx + 94, ky, "RT");
+
+    // G: GARAGE
+    int gKx = p2Kx + 130;
+    UIComponents::drawKeycap(fb, gKx, ky, "G");
+    Graphics::RasterFont::drawString(fb, gKx + 20, ky + 4, "GARAGE", Theme::TEXT_MUTED, 1);
+
+    // S: STAGES
+    int sKx = gKx + 90;
+    UIComponents::drawKeycap(fb, sKx, ky, "S");
+    Graphics::RasterFont::drawString(fb, sKx + 20, ky + 4, "STAGES", Theme::TEXT_MUTED, 1);
+
+    // ESC: QUIT
+    int escKx = sKx + 90;
+    UIComponents::drawKeycap(fb, escKx, ky, "ESC");
+    Graphics::RasterFont::drawString(fb, escKx + 36, ky + 4, "QUIT", Theme::TEXT_MUTED, 1);
 }
 
 } // namespace UI

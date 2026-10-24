@@ -3,6 +3,14 @@ QT += core gui widgets multimedia
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
+DEFINES += _USE_MATH_DEFINES
+
+win32-msvc* {
+    QMAKE_CXXFLAGS_DEBUG -= -Zi
+    QMAKE_CXXFLAGS_DEBUG += -Z7
+    QMAKE_CFLAGS_DEBUG -= -Zi
+    QMAKE_CFLAGS_DEBUG += -Z7
+}
 
 TARGET = hill-climbing-qt
 TEMPLATE = app
@@ -26,9 +34,14 @@ SOURCES += \
     src/graphics/RasterFont.cpp \
     src/graphics/Sprite.cpp \
     src/graphics/ScanlineRasterizer.cpp \
+    src/graphics/DayNightCycle.cpp \
+    src/graphics/EnvironmentRenderer.cpp \
     src/graphics/Camera.cpp \
     src/graphics/ParticleSystem.cpp \
+    src/graphics/VehicleSprites.cpp \
+    src/physics/TerrainConfig.cpp \
     src/physics/Terrain.cpp \
+    src/physics/VehicleConfig.cpp \
     src/physics/Vehicle.cpp \
     src/physics/PhysicsWorld.cpp \
     src/ui/RetroButton.cpp \
@@ -41,6 +54,7 @@ SOURCES += \
     src/ui/StageSelectScreen.cpp \
     src/ui/PauseOverlay.cpp \
     src/ui/GameOverScreen.cpp \
+    src/ui/UIComponents.cpp \
     src/audio/SoundManager.cpp
 
 HEADERS += \
@@ -53,14 +67,21 @@ HEADERS += \
     src/graphics/PixelCanvas.h \
     src/graphics/RasterFont.h \
     src/graphics/Sprite.h \
+    src/graphics/VehicleSprites.h \
+    src/graphics/CarSpritesData.h \
     src/graphics/ScanlineRasterizer.h \
+    src/graphics/DayNightCycle.h \
+    src/graphics/EnvironmentRenderer.h \
     src/graphics/Camera.h \
     src/graphics/ParticleSystem.h \
     src/physics/PhysicsTypes.h \
+    src/physics/TerrainConfig.h \
     src/physics/Terrain.h \
+    src/physics/VehicleConfig.h \
     src/physics/Vehicle.h \
     src/physics/PhysicsWorld.h \
     src/ui/UITheme.h \
+    src/ui/UIComponents.h \
     src/ui/RetroButton.h \
     src/ui/AnalogGauge.h \
     src/ui/FuelBar.h \
@@ -72,3 +93,6 @@ HEADERS += \
     src/ui/PauseOverlay.h \
     src/ui/GameOverScreen.h \
     src/audio/SoundManager.h
+
+RESOURCES += \
+    assets/vehicles.qrc

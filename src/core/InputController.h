@@ -8,16 +8,34 @@ namespace Core {
 /**
  * @brief Low-latency non-blocking Input Controller.
  * Eliminates OS key-repeat delays and combines keyboard + touch/mouse pedal states.
+ * Supports dual-player split keyboard controls: P1 (WASD) vs P2 (Arrow Keys).
  */
 class InputController {
 public:
-    struct State {
+    struct PlayerControls {
         bool gas = false;
         bool brake = false;
         bool reverse = false;
+        bool tiltLeft = false;
+        bool tiltRight = false;
+    };
+
+    struct State {
+        // Player 1 controls (W = gas, S = brake/rev, A = tilt left, D = tilt right)
+        PlayerControls p1;
+
+        // Player 2 controls (Up = gas, Down = brake/rev, Left = tilt left, Right = tilt right)
+        PlayerControls p2;
+
+        // Single Player combined convenience flags
+        bool gas = false;
+        bool brake = false;
+        bool reverse = false;
+
         bool pause = false;
         bool restart = false;
         bool enter = false;
+        bool multiplayer = false;
         int mouseX = 0;
         int mouseY = 0;
         bool mouseDown = false;
@@ -41,6 +59,8 @@ public:
 
 private:
     State m_state;
+
+    void updateCombinedInputs();
 };
 
 } // namespace Core

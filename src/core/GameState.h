@@ -10,6 +10,7 @@ enum class StateType {
     STAGE_SELECT,
     GARAGE,
     GAMEPLAY,
+    MULTIPLAYER_RACE,
     PAUSED,
     GAME_OVER
 };

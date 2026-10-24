@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "PhysicsTypes.h"
 #include "Terrain.h"
@@ -16,7 +16,7 @@ public:
     Vehicle(VehicleType type = VehicleType::OFFROADER, DriverType driver = DriverType::BILL);
 
     void reset(float startX = 5.0f, float startY = 3.0f, float startAngle = 0.0f);
-    void applyInput(float gas, float brake, float reverse = 0.0f);
+    void applyInput(float gas, float brake, float reverse = 0.0f, float tiltLeft = 0.0f, float tiltRight = 0.0f);
 
     void step(float dt, const Terrain& terrain, const Core::ProfileManager& profile);
 
@@ -80,6 +80,7 @@ public:
     bool isAirborne() const { return !m_rearContact && !m_frontContact && !m_chassisContact; }
     bool isDriverDown() const { return m_driverDown; }
     bool isOutOfFuel() const { return m_fuel <= 0.0f; }
+    bool isLowFuel() const { return m_fuel < 25.0f; }
 
     float getMaxTerrainPenetration(const Terrain& terrain) const;
 
@@ -162,6 +163,8 @@ private:
     float m_gasInput;
     float m_brakeInput;
     float m_reverseInput;
+    float m_tiltLeftInput;
+    float m_tiltRightInput;
 
     bool m_rearContact;
     bool m_frontContact;
