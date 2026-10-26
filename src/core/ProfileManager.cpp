@@ -113,9 +113,8 @@ void ProfileManager::recordDistance(const std::string& stageId, float distance) 
 }
 
 bool ProfileManager::isStageUnlocked(const std::string& stageId) const {
-    auto it = m_stageUnlocked.find(stageId);
-    if (it != m_stageUnlocked.end()) return it->second;
-    return false;
+    (void)stageId;
+    return true; // Unlocked all stages for testing
 }
 
 void ProfileManager::unlockStage(const std::string& stageId) {

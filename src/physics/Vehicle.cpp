@@ -9,20 +9,20 @@ Vehicle::Vehicle() {
 }
 
 void Vehicle::reset(float startX, float startY) {
-    m_chassisMass = 440.0f;
-    m_chassisInertia = 280.0f;
+    m_chassisMass = 480.0f;
+    m_chassisInertia = 340.0f; // Increased for more stable pitch dynamics
     m_chassisPos = {startX, startY};
     m_chassisVel = {0.0f, 0.0f};
     m_chassisAngle = 0.0f;
     m_chassisAngularVel = 0.0f;
 
     m_wheelRadius = 0.32f;
-    m_wheelMass = 20.0f;
+    m_wheelMass = 25.0f;
     m_wheelInertia = 0.5f * m_wheelMass * m_wheelRadius * m_wheelRadius;
 
-    m_suspRestLength = 0.28f;
-    m_suspMinLength = 0.14f;
-    m_suspMaxLength = 0.44f;
+    m_suspRestLength = 0.32f;
+    m_suspMinLength = 0.12f;
+    m_suspMaxLength = 0.48f;
     m_rearSuspensionLength = m_suspRestLength;
     m_frontSuspensionLength = m_suspRestLength;
     m_rearSuspVel = 0.0f;
@@ -175,8 +175,9 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
                 float bumpPen = m_suspMinLength - suspLen;
                 suspLen = m_suspMinLength;
                 if (suspVel < 0.0f) suspVel = 0.0f;
-                // Direct upward impulse on chassis from bottoming out
-                m_chassisVel += (normal * (bumpPen * 45000.0f / m_chassisMass)) * dt;
+                // Direct upward impulse on chassis from bottoming out (capped to avoid explosive glitches)
+                float impulse = std::min(bumpPen * 25000.0f, 6000.0f);
+                m_chassisVel += (normal * (impulse / m_chassisMass)) * dt;
             } else if (suspLen > m_suspMaxLength) {
                 suspLen = m_suspMaxLength;
                 if (suspVel > 0.0f) suspVel = 0.0f;
@@ -222,7 +223,8 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             // Apply tractive force to chassis at mount point
             Vec2 tractiveVec = tangent * tractiveForce;
             m_chassisVel += (tractiveVec / m_chassisMass) * dt;
-            float trqTractive = ((mount.x - m_chassisPos.x) * tractiveVec.y - (mount.y - m_chassisPos.y) * tractiveVec.x) * 0.15f;
+            // Increased torque multiplier from 0.15f to 0.75f for proper realistic weight transfer (leaning back on gas)
+            float trqTractive = ((mount.x - m_chassisPos.x) * tractiveVec.y - (mount.y - m_chassisPos.y) * tractiveVec.x) * 0.75f;
             m_chassisAngularVel += (trqTractive / m_chassisInertia) * dt;
 
             // Wheel rotation reaction from traction
@@ -259,7 +261,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     // 3. Stunt & In-Air Pitch Controls
     if (!m_rearContact && !m_frontContact) {
         // In-Air Pitch Control (Signature Hill Climb Racing flip stunt mechanic)
-        float airPitchTorque = 680.0f;
+        float airPitchTorque = 950.0f;
         if (effectiveGas > 0.0f) {
             // Leans back (counter-clockwise rotation for backflips)
             m_chassisAngularVel += (airPitchTorque * effectiveGas / m_chassisInertia) * dt;
@@ -270,20 +272,20 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
         }
     } else if (m_rearContact && !m_frontContact) {
         // Anti-wheelie stabilization when front wheel is airborne
-        if (m_chassisAngle > 0.40f && m_chassisAngularVel > 0.0f) {
-            m_chassisAngularVel *= std::max(0.0f, 1.0f - 10.0f * dt);
+        if (m_chassisAngle > 0.65f && m_chassisAngularVel > 0.0f) {
+            m_chassisAngularVel *= std::max(0.0f, 1.0f - 8.0f * dt);
         }
-        if (m_chassisAngle > 0.55f) {
-            m_chassisAngularVel -= (850.0f * (m_chassisAngle - 0.55f) / m_chassisInertia) * dt;
+        if (m_chassisAngle > 0.85f) {
+            m_chassisAngularVel -= (850.0f * (m_chassisAngle - 0.85f) / m_chassisInertia) * dt;
         }
         // Braking slams the front wheels back down onto the ground
         if (m_brakeInput > 0.0f) {
-            m_chassisAngularVel -= (1000.0f * m_brakeInput / m_chassisInertia) * dt;
+            m_chassisAngularVel -= (1200.0f * m_brakeInput / m_chassisInertia) * dt;
         }
     } else if (!m_rearContact && m_frontContact) {
         // Stoppie recovery on throttle
         if (effectiveGas > 0.0f) {
-            m_chassisAngularVel += (650.0f * effectiveGas / m_chassisInertia) * dt;
+            m_chassisAngularVel += (850.0f * effectiveGas / m_chassisInertia) * dt;
         }
     }
 

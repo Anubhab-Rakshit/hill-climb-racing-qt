@@ -15,16 +15,16 @@ Terrain::Terrain()
 void Terrain::setBiome(const std::string& biomeId) {
     m_biomeId = biomeId;
     if (biomeId == "desert") {
-        m_friction = 1.05f;
+        m_friction = 0.45f; // Very slippery sand dunes
         m_gravity = 9.81f;
     } else if (biomeId == "moon") {
-        m_friction = 1.15f;
-        m_gravity = 1.62f;
+        m_friction = 1.0f; 
+        m_gravity = 3.5f; // Low gravity but increased slightly so it's not too floaty
     } else if (biomeId == "mountain") {
-        m_friction = 1.20f;
+        m_friction = 1.45f; // High grip craggy rocks
         m_gravity = 9.81f;
     } else { // Countryside
-        m_friction = 1.25f;
+        m_friction = 1.15f;
         m_gravity = 9.81f;
     }
     spawnItems();
@@ -55,7 +55,9 @@ float Terrain::getHeight(float x) const {
         // Wide deep impact craters and massive parabolic low-gravity launch mounds
         float c1 = std::sin(lx * 0.014f) * 18.0f;
         float c2 = std::cos(lx * 0.032f) * 7.5f;
-        float crater = (std::sin(lx * 0.07f) < -0.4f) ? -3.5f : 0.0f;
+        // Smooth continuous crater pits instead of impossible square-wave cliffs
+        float craterSin = std::sin(lx * 0.07f);
+        float crater = (craterSin < -0.2f) ? (craterSin + 0.2f) * 4.5f : 0.0f;
         return (c1 + c2 + crater) * ramp;
     } else if (m_biomeId == "mountain") {
         // Craggy mountainous ascents, jagged rocky ledges and alpine peaks
@@ -86,7 +88,9 @@ float Terrain::getHeight(float x) const {
     // Feature 2: Moguls & Washboards (lx ~ 130 - 195m)
     float moguls = 0.0f;
     if (lx > 130.0f && lx < 195.0f) {
-        moguls = std::sin(lx * 0.65f) * 1.5f;
+        // Fade in/out to avoid impossible vertical cliffs at the edges
+        float fade = std::sin(((lx - 130.0f) / 65.0f) * 3.14159f);
+        moguls = std::sin(lx * 0.65f) * 1.5f * fade;
     }
 
     // Feature 3: Mountain Wall Ascent (lx ~ 200 - 310m)
