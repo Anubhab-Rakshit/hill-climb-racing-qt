@@ -26,4 +26,9 @@ All audio assets used in this project are licensed under **Creative Commons Zero
 | `impacts/crash.wav` | Collision | qubodup | [OpenGameArt: Crash Collision](https://opengameart.org/content/crash-collision) | CC0 1.0 | Violent car rollover & metal crunch |
 | `environment/wind_loop.wav` | Environment | SketchMan3 | [OpenGameArt: Wind Whoosh Loop](https://opengameart.org/content/wind-whoosh-loop) | CC0 1.0 | Aerodynamic wind rush loop |
 | `music/menu_music.wav` | Music | TinyWorlds | [OpenGameArt: Happy Adventure Loop](https://opengameart.org/content/happy-adventure-loop) | CC0 1.0 | Chiptune main menu theme |
+| `music/garage_music.wav` | Music | Zane Little Music | [OpenGameArt: Post-Adventure Tea Party](https://opengameart.org/content/10-free-chiptune-tracks-a-bag-of-chips) | CC0 1.0 | Cozy garage & workshop theme |
 | `music/race_music.wav` | Music | Sudocolon | [OpenGameArt: Hyperton](https://opengameart.org/content/hyperton) | CC0 1.0 | High-octane arcade racing soundtrack |
+| `music/race_desert.wav` | Music | Zane Little Music | [OpenGameArt: Dizzy Racing](https://opengameart.org/content/10-free-chiptune-tracks-a-bag-of-chips) | CC0 1.0 | Fast arcade desert racing theme |
+| `music/race_moon.wav` | Music | Zane Little Music | [OpenGameArt: Space Cadet Training Montage](https://opengameart.org/content/10-free-chiptune-tracks-a-bag-of-chips) | CC0 1.0 | Cosmic sci-fi space theme |
+| `music/race_mountain.wav` | Music | Sudocolon | [OpenGameArt: Chip Bit Danger](https://opengameart.org/content/chip-bit-danger) | CC0 1.0 | High-energy mountain/volcano rock theme |
+| `music/game_over.wav` | Music | Sudocolon | [OpenGameArt: Icy Game Over](https://opengameart.org/content/icy-game-over) | CC0 1.0 | Defeat and game over jingle |

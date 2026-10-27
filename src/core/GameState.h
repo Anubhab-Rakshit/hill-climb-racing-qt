@@ -11,7 +11,8 @@ enum class StateType {
     GARAGE,
     GAMEPLAY,
     PAUSED,
-    GAME_OVER
+    GAME_OVER,
+    LEVEL_COMPLETE
 };
 
 class GameEngine;

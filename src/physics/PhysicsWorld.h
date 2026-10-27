@@ -17,7 +17,8 @@ public:
 
     void reset(const std::string& biomeId = "countryside",
                VehicleType vehicleType = VehicleType::OFFROADER,
-               DriverType driverType = DriverType::BILL);
+               DriverType driverType = DriverType::BILL,
+               int level = 1);
     void step(float dt, const Core::ProfileManager& profile);
 
     Vehicle& vehicle() { return m_vehicle; }

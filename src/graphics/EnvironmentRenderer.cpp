@@ -591,7 +591,7 @@ void EnvironmentRenderer::drawFence(Framebuffer& fb, int sx1, int sy1, int sx2, 
     }
 }
 
-void EnvironmentRenderer::drawBarn(Framebuffer& fb, int sx, int sy, const LightingState& lighting) {
+void EnvironmentRenderer::drawBarn(Framebuffer& fb, int sx, int sy, const LightingState& lighting, const Physics::Terrain& terrain, const Camera& cam) {
     // Grand agricultural landmark: ~220px wide, ~135px tall
     if (sx < -240 || sx > fb.width() + 240 || sy < -180 || sy > fb.height() + 180) return;
 
@@ -608,7 +608,29 @@ void EnvironmentRenderer::drawBarn(Framebuffer& fb, int sx, int sy, const Lighti
     uint32_t doorCol   = DayNightCycle::applyAmbient(0xFF4E342E, lighting.ambientColor, lighting.ambientBrightness);
     uint32_t stoneCol  = DayNightCycle::applyAmbient(0xFF78909C, lighting.ambientColor, lighting.ambientBrightness);
 
-    // 1. Stone masonry foundation along bottom
+    // Sample terrain height at both edges of the barn for slope-aware foundation
+    Physics::Vec2 leftWorld = cam.screenToWorld(Physics::Vec2(static_cast<float>(bx), 0.0f));
+    float leftGroundY = terrain.getHeight(leftWorld.x);
+    Physics::Vec2 leftGroundScr = cam.worldToScreen(Physics::Vec2(leftWorld.x, leftGroundY));
+    int leftBaseY = static_cast<int>(leftGroundScr.y);
+
+    Physics::Vec2 rightWorld = cam.screenToWorld(Physics::Vec2(static_cast<float>(bx + bW), 0.0f));
+    float rightGroundY = terrain.getHeight(rightWorld.x);
+    Physics::Vec2 rightGroundScr = cam.worldToScreen(Physics::Vec2(rightWorld.x, rightGroundY));
+    int rightBaseY = static_cast<int>(rightGroundScr.y);
+
+    // Extend stone foundation down to the ground at each column
+    for (int col = bx - 2; col < bx + bW + 2; ++col) {
+        // Lerp the ground Y across the barn width
+        float t = static_cast<float>(col - bx) / static_cast<float>(bW);
+        int groundAtCol = static_cast<int>(leftBaseY + t * (rightBaseY - leftBaseY));
+        int fillTop = sy - 8;
+        if (groundAtCol > fillTop) {
+            fb.fillRect(col, fillTop, 1, groundAtCol - fillTop, stoneCol);
+        }
+    }
+
+    // 1. Stone masonry foundation along bottom (original thin strip)
     fb.fillRect(bx - 2, sy - 8, bW + 4, 8, stoneCol);
     for (int st = bx; st < bx + bW; st += 14) {
         fb.setPixelFast(st, sy - 4, 0xFF37474F);
@@ -1326,11 +1348,12 @@ void EnvironmentRenderer::renderForegroundScenery(Framebuffer& fb, const Camera&
         int typeSelector = (seed >> 12) & 15;
 
         if (biomeId == "countryside") {
-            // Milestone landmarks every ~400m and ~600m
-            if (std::abs(k % 18) == 0) {
-                drawBarn(fb, sx, sy, lighting);
-            } else if (std::abs(k % 26) == 0) {
+            // Milestone landmarks: Windmills and grand oak landmarks (houses/barns removed)
+            if (std::abs(k % 24) == 0) {
                 drawWindmill(fb, sx, sy, gameTime, lighting);
+            } else if (std::abs(k % 16) == 0) {
+                int grandOakH = 230 + (seed % 40); // Towering grand oak landmark
+                drawOakTree(fb, sx, sy, grandOakH, lighting);
             } else if (typeSelector < 5) {
                 int treeH = 175 + (seed % 60); // 175 - 235 px tall
                 drawOakTree(fb, sx, sy, treeH, lighting);

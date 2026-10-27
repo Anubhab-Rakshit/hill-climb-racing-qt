@@ -16,8 +16,8 @@ PhysicsWorld::PhysicsWorld()
 {
 }
 
-void PhysicsWorld::reset(const std::string& biomeId, VehicleType vehicleType, DriverType driverType) {
-    m_terrain.setBiome(biomeId);
+void PhysicsWorld::reset(const std::string& biomeId, VehicleType vehicleType, DriverType driverType, int level) {
+    m_terrain.setBiome(biomeId, level);
     m_terrain.resetDeformation();
     float startX = 5.0f;
     float groundY = m_terrain.getHeight(startX);

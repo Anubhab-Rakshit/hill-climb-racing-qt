@@ -48,7 +48,7 @@ private:
     void drawPineTree(Framebuffer& fb, int sx, int sy, int h, const LightingState& lighting, bool snowCovered = false);
     void drawBush(Framebuffer& fb, int sx, int sy, int r, const LightingState& lighting, uint32_t flowerColor = 0);
     void drawFence(Framebuffer& fb, int sx1, int sy1, int sx2, int sy2, const LightingState& lighting);
-    void drawBarn(Framebuffer& fb, int sx, int sy, const LightingState& lighting);
+    void drawBarn(Framebuffer& fb, int sx, int sy, const LightingState& lighting, const Physics::Terrain& terrain, const Camera& cam);
     void drawWindmill(Framebuffer& fb, int sx, int sy, float gameTime, const LightingState& lighting);
 
     void drawSaguaroCactus(Framebuffer& fb, int sx, int sy, int h, int arms, const LightingState& lighting);

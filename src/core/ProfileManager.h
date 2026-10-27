@@ -92,11 +92,15 @@ public:
     int getStageUnlockCost(const std::string& stageId) const;
     bool unlockStageWithCoins(const std::string& stageId);
 
-    // Checkpoint Progression
+    // Checkpoint & Level Progression
     int getStageCheckpointProgress(const std::string& stageId) const;
     void recordStageCheckpoint(const std::string& stageId, int checkpointIndex);
     bool isStageCompleted(const std::string& stageId) const;
     void setStageCompleted(const std::string& stageId, bool completed = true);
+
+    int getStageLevelProgress(const std::string& stageId) const;
+    void recordStageLevelCompleted(const std::string& stageId, int level);
+    bool isStageLevelUnlocked(const std::string& stageId, int level) const;
 
     // Audio Settings
     float masterVolume() const { return m_masterVolume; }
@@ -127,6 +131,7 @@ private:
     std::map<std::string, bool> m_stageUnlocked;
     std::map<std::string, int> m_stageCheckpoints;
     std::map<std::string, bool> m_stageCompleted;
+    std::map<std::string, int> m_stageLevelProgress;
 };
 
 } // namespace Core

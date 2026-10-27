@@ -86,7 +86,7 @@ void Vehicle::reset(float startX, float startY, float startAngle) {
     m_frontContact = true;
     m_chassisContact = false;
     m_driverDown = false;
-    m_spawnGraceTimer = 3.0f;
+    m_spawnGraceTimer = 0.25f;
 
     m_rearSlipSpeed = 0.0f;
     m_frontSlipSpeed = 0.0f;
@@ -183,8 +183,8 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     if (!m_driverDown && m_fuel > 0.0f && activeThrottle > 0.0f) {
         float speedRatio = std::clamp(getSpeedKmh() / (m_config.baseTopSpeedKmh * transMult), 0.0f, 1.2f);
         float slope = terrain.getSlope(m_chassisPos.x);
-        float load = std::clamp(0.6f + std::abs(slope) * 1.5f + (1.0f - speedRatio * 0.35f), 0.5f, 1.5f);
-        float drainRate = activeThrottle * (3.3f + 0.9f * load) * 0.60f;
+        float load = std::clamp(0.70f + std::max(0.0f, slope) * 2.20f - std::min(0.0f, slope) * 0.35f + (1.0f - speedRatio * 0.25f), 0.60f, 2.20f);
+        float drainRate = activeThrottle * (3.50f + 1.10f * load) * 0.92f;
         m_fuel = std::max(0.0f, m_fuel - drainRate * dt);
     }
 
@@ -211,10 +211,13 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     Vec2 rearMount = getMount(m_rearMountOffset.x, m_rearMountOffset.y);
     Vec2 frontMount = getMount(m_frontMountOffset.x, m_frontMountOffset.y);
 
-    // Aerodynamic Downforce (Pushes chassis onto terrain at high speed, absent in vacuum)
-    float speedSq = m_chassisVel.lengthSquared();
-    float downforceMag = m_config.baseDownforce * downforceMult * speedSq * terrain.getAirDensity();
-    m_chassisVel += downDir * (downforceMag / m_chassisMass) * dt;
+    // Aerodynamic Downforce: Applies ground effect only when wheels are on the ground.
+    // When airborne, downforce is zero so the vehicle can fly, glide, and jump freely!
+    if (m_rearContact || m_frontContact) {
+        float speedSq = m_chassisVel.lengthSquared();
+        float downforceMag = m_config.baseDownforce * downforceMult * speedSq * terrain.getAirDensity();
+        m_chassisVel += downDir * (downforceMag / m_chassisMass) * dt;
+    }
 
     // 2. Calibrated Ground-Hugging Suspension & Traction Solver
     float k_susp = m_config.baseSpringRate * suspStiffnessMult;
@@ -268,17 +271,18 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             float deltaX = m_suspRestLength - suspLen;
             float springForce = (deltaX > 0.0f) ? (k_susp * deltaX) : 0.0f;
 
-            // Asymmetric damping: compliant in bump (compression), heavy on rebound (2.8x) to prevent catapulting
+            // Asymmetric damping: compliant in bump, controlled on rebound to prevent uncontrolled bouncing
             float damperForce = 0.0f;
             if (v_comp >= 0.0f) {
                 // Compression stroke (bump)
                 damperForce = c_susp * (v_comp + 0.10f * v_comp * std::abs(v_comp));
             } else {
-                // Rebound stroke: 2.8x damping dissipates stored spring energy and stops repeated bouncing
-                damperForce = (2.8f * c_susp) * v_comp;
+                // Rebound stroke: 2.2x damping dissipates stored spring energy
+                damperForce = (2.2f * c_susp) * v_comp;
             }
 
             float suspForceMag = springForce + damperForce;
+
             suspForceMag = std::max(0.0f, suspForceMag);
 
             // Progressive elastomeric bump-stop when fully compressed
@@ -293,7 +297,8 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             // Apply normal ground force to chassis
             Vec2 normalForceVec = normal * (suspForceMag * std::max(0.35f, downDotNormal));
             m_chassisVel += (normalForceVec / m_chassisMass) * dt;
-            Vec2 r = mount - m_chassisPos;
+            Vec2 contactPt = wheelPos - normal * m_wheelRadius;
+            Vec2 r = contactPt - m_chassisPos;
             float torqueNormal = r.x * normalForceVec.y - r.y * normalForceVec.x;
             m_chassisAngularVel += (torqueNormal / m_chassisInertia) * dt;
 
@@ -301,40 +306,38 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             wheelPos = mount + downDir * suspLen;
             wheelVel = mountVel + downDir * (-v_comp);
 
+            // Surface velocity relative to ground tangent and slope pull
+            float surfSpeed = Vec2::dot(wheelVel, tangent);
+            float downslopePull = 0.5f * m_chassisMass * gravity * (-tangent.y);
+            const bool braking = (m_brakePressure > 0.001f && effectiveGas < 0.01f && effectiveReverse < 0.01f);
+
             // Drive Torque, Braking, and Calibrated Pacing (Scaled for 60% physical velocity)
             float peakTorque = m_config.basePeakTorque * torqueMult * 0.72f;
             float topSpeedMs = (m_config.baseTopSpeedKmh * transMult) / (3.6f * SPEED_CALIBRATION);
             float maxDriveOmega = (m_wheelRadius > 0.001f) ? (topSpeedMs / m_wheelRadius) : 100.0f;
-            float currentOmega = std::max(0.0f, wheelAngVel);
-            float speedRatio = std::clamp(currentOmega / maxDriveOmega, 0.0f, 1.0f);
+            float speedRatio = (topSpeedMs > 0.001f) ? std::clamp(std::max(0.0f, surfSpeed) / topSpeedMs, 0.0f, 1.0f) : 0.0f;
             float currentMaxTorque = peakTorque * (1.0f - speedRatio * speedRatio);
 
             // Forward Engine Drive
             if (effectiveGas > 0.0f) {
                 float driveTorque = effectiveGas * currentMaxTorque * driveRatio;
                 wheelAngVel += (driveTorque / m_wheelInertia) * dt;
-                if (wheelAngVel > maxDriveOmega) {
-                    wheelAngVel = maxDriveOmega;
+                if (wheelAngVel > maxDriveOmega * 1.25f) {
+                    wheelAngVel = maxDriveOmega * 1.25f;
                 }
             }
 
             // Dedicated Reverse Engine Drive
+            float maxRevOmega = maxDriveOmega * 0.45f;
+            float revSpeedRatio = (topSpeedMs > 0.001f) ? std::clamp(std::max(0.0f, -surfSpeed) / (topSpeedMs * 0.45f), 0.0f, 1.0f) : 0.0f;
+            float currentMaxRevTorque = (peakTorque * 0.65f) * (1.0f - revSpeedRatio * revSpeedRatio);
             if (effectiveReverse > 0.0f) {
-                float maxRevOmega = maxDriveOmega * 0.45f;
-                float currentRevOmega = std::max(0.0f, -wheelAngVel);
-                float revSpeedRatio = std::clamp(currentRevOmega / maxRevOmega, 0.0f, 1.0f);
-                float currentMaxRevTorque = (peakTorque * 0.65f) * (1.0f - revSpeedRatio * revSpeedRatio);
                 float revDriveTorque = effectiveReverse * currentMaxRevTorque * driveRatio;
                 wheelAngVel -= (revDriveTorque / m_wheelInertia) * dt;
-                if (wheelAngVel < -maxRevOmega) {
-                    wheelAngVel = -maxRevOmega;
+                if (wheelAngVel < -maxRevOmega * 1.25f) {
+                    wheelAngVel = -maxRevOmega * 1.25f;
                 }
             }
-
-            // Surface velocity relative to ground tangent and slope pull
-            float surfSpeed = Vec2::dot(wheelVel, tangent);
-            float downslopePull = 0.5f * m_chassisMass * gravity * (-tangent.y);
-            const bool braking = (m_brakePressure > 0.001f && effectiveGas < 0.01f && effectiveReverse < 0.01f);
 
             // Traction & Friction calculation (Pacejka Curve)
             float wheelLinSpeed = wheelAngVel * m_wheelRadius;
@@ -423,12 +426,19 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
                     tractiveRatio = sign * std::max(std::abs(tractiveRatio), 0.88f);
                 }
                 tractiveForce = -std::clamp(tractiveRatio * maxFriction, -maxFriction, maxFriction);
+                if (effectiveGas > 0.0f && tractiveForce > 0.0f) {
+                    float maxEngineForce = (driveRatio > 0.0f && m_wheelRadius > 0.001f) ? (effectiveGas * currentMaxTorque * driveRatio / m_wheelRadius) : 0.0f;
+                    tractiveForce = std::min(tractiveForce, maxEngineForce);
+                } else if (effectiveReverse > 0.0f && tractiveForce < 0.0f) {
+                    float maxRevEngineForce = (driveRatio > 0.0f && m_wheelRadius > 0.001f) ? (effectiveReverse * currentMaxRevTorque * driveRatio / m_wheelRadius) : 0.0f;
+                    tractiveForce = std::max(tractiveForce, -maxRevEngineForce);
+                }
             }
 
             // Apply tractive force to chassis at mount point
             Vec2 tractiveVec = tangent * tractiveForce;
             m_chassisVel += (tractiveVec / m_chassisMass) * dt;
-            float trqTractive = (r.x * tractiveVec.y - r.y * tractiveVec.x) * 0.16f;
+            float trqTractive = (r.x * tractiveVec.y - r.y * tractiveVec.x) * 0.42f;
             m_chassisAngularVel += (trqTractive / m_chassisInertia) * dt;
 
             // Rolling resistance on terrain
@@ -559,7 +569,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
 
     // 3. Stunt & In-Air Pitch Controls
     if (!m_rearContact && !m_frontContact) {
-        float airPitchTorque = 680.0f * m_config.baseAirAgility * downforceMult;
+        float airPitchTorque = 1250.0f * m_config.baseAirAgility * downforceMult;
         if (effectiveGas > 0.0f) {
             m_chassisAngularVel += (airPitchTorque * effectiveGas / m_chassisInertia) * dt;
         }
@@ -567,18 +577,22 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             m_chassisAngularVel -= (airPitchTorque * effectiveBrake / m_chassisInertia) * dt;
         }
     } else if (m_rearContact && !m_frontContact) {
-        if (m_chassisAngle > 0.40f && m_chassisAngularVel > 0.0f) {
-            m_chassisAngularVel *= std::max(0.0f, 1.0f - 10.0f * dt);
-        }
-        if (m_chassisAngle > 0.55f) {
-            m_chassisAngularVel -= (850.0f * (m_chassisAngle - 0.55f) / m_chassisInertia) * dt;
+        // Rear-wheel contact only (Wheelie regime):
+        // Holding throttle exerts powerful pitch-up torque around rear axle when already elevated.
+        // Tapping brake drops the front wheels.
+        if (effectiveGas > 0.0f && m_chassisAngle > 0.35f) {
+            m_chassisAngularVel += (950.0f * effectiveGas / m_chassisInertia) * dt;
         }
         if (effectiveBrake > 0.0f) {
-            m_chassisAngularVel -= (1000.0f * effectiveBrake / m_chassisInertia) * dt;
+            m_chassisAngularVel -= (1400.0f * effectiveBrake / m_chassisInertia) * dt;
         }
     } else if (!m_rearContact && m_frontContact) {
+        // Front-wheel contact only (Stoppie / Nose-down regime):
+        // Gas pulls the tail back down, while braking accentuates forward pitch (front-flip rollover risk).
         if (effectiveGas > 0.0f) {
-            m_chassisAngularVel += (650.0f * effectiveGas / m_chassisInertia) * dt;
+            m_chassisAngularVel += (1100.0f * effectiveGas / m_chassisInertia) * dt;
+        } else if (effectiveBrake > 0.0f) {
+            m_chassisAngularVel -= (1250.0f * effectiveBrake / m_chassisInertia) * dt;
         }
     }
 
@@ -718,18 +732,18 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     // In-air rotational damping and aerodynamic attitude stability
     if (!m_rearContact && !m_frontContact) {
         if (airDensity > 0.0001f) {
-            // Aerodynamic pitch damping (opposes rotation as bumpers sweep through atmosphere)
-            float aeroPitchDamp = (0.75f + 0.06f * speed) * airDensity;
+            // Aerodynamic pitch damping (moderate, allowing full acrobatic flips and smooth flight)
+            float aeroPitchDamp = (0.20f + 0.015f * speed) * airDensity;
             m_chassisAngularVel *= std::max(0.0f, 1.0f - aeroPitchDamp * dt);
 
-            // Aerodynamic weather-vane torque aligns vehicle nose along velocity vector
-            if (speed > 2.0f) {
+            // Subtle weather-vane torque aligns vehicle nose only when player is hands-off controls
+            if (speed > 2.0f && effectiveGas < 0.05f && effectiveBrake < 0.05f) {
                 Vec2 u_long(cosA, sinA);
                 Vec2 u_perp(-sinA, cosA);
                 float v_long = Vec2::dot(m_chassisVel, u_long);
                 float v_perp = Vec2::dot(m_chassisVel, u_perp);
                 float angleOfAttack = std::atan2(v_perp, std::max(1.0f, v_long));
-                float weatherVaneTorque = -angleOfAttack * (0.35f + 0.04f * speed) * airDensity;
+                float weatherVaneTorque = -angleOfAttack * (0.15f + 0.02f * speed) * airDensity;
                 m_chassisAngularVel += weatherVaneTorque * dt;
             }
         } else {
@@ -879,7 +893,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     if (m_spawnGraceTimer > 0.0f) {
         m_spawnGraceTimer -= dt;
     } else if (!m_driverDown) {
-        bool isOverturned = (finalCosA < -0.15f); // Tilted past ~98 degrees
+        bool isOverturned = (finalCosA < -0.15f); // Tilted past ~98 degrees (approaching upside down)
         Vec2 head = driverHeadPos();
         float headGround = terrain.getHeight(head.x);
 
@@ -889,19 +903,25 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             if (hull[i].isRoof) {
                 Vec2 p = getFinalMount(hull[i].localPos);
                 float gy = terrain.getHeight(p.x);
-                if (p.y - hull[i].radius <= gy + 0.04f) {
+                if (p.y - hull[i].radius <= gy + 0.05f) {
                     roofGroundContact = true;
                     break;
                 }
             }
         }
 
-        if (isOverturned && (roofGroundContact || head.y <= headGround + 0.04f)) {
+        // Direct helmet ground contact while tilted past ~60 degrees (cosA < 0.50)
+        if (head.y <= headGround + 0.08f && finalCosA < 0.50f) {
             m_driverDown = true;
         }
 
-        // Violent high-speed roof impact while severely tilted
-        if (finalCosA < 0.20f && roofGroundContact && m_chassisVel.length() > 6.0f) {
+        // Rollover: overturned with roof/helmet terrain contact
+        if (isOverturned && (roofGroundContact || head.y <= headGround + 0.06f)) {
+            m_driverDown = true;
+        }
+
+        // Violent roof impact while severely tilted
+        if (finalCosA < 0.35f && roofGroundContact && m_chassisVel.length() > 4.5f) {
             m_driverDown = true;
         }
     }
@@ -963,11 +983,15 @@ float Vehicle::getMaxTerrainPenetration(const Terrain& terrain) const {
     }
 
     float rearGy = terrain.getHeight(m_rearWheelPos.x);
-    float rearPen = (rearGy + m_wheelRadius) - m_rearWheelPos.y;
+    Vec2 rearNorm = terrain.getNormal(m_rearWheelPos.x);
+    float rearTargetY = rearGy + m_wheelRadius * std::max(0.20f, rearNorm.y);
+    float rearPen = rearTargetY - m_rearWheelPos.y;
     if (rearPen > maxPen) maxPen = rearPen;
 
     float frontGy = terrain.getHeight(m_frontWheelPos.x);
-    float frontPen = (frontGy + m_wheelRadius) - m_frontWheelPos.y;
+    Vec2 frontNorm = terrain.getNormal(m_frontWheelPos.x);
+    float frontTargetY = frontGy + m_wheelRadius * std::max(0.20f, frontNorm.y);
+    float frontPen = frontTargetY - m_frontWheelPos.y;
     if (frontPen > maxPen) maxPen = frontPen;
 
     return maxPen;

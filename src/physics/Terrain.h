@@ -45,10 +45,13 @@ class Terrain {
 public:
     Terrain();
 
-    void setBiome(const std::string& biomeId);
+    void setBiome(const std::string& biomeId, int level = 1);
     void setTestIncline(float angleDeg);
     const std::string& getBiome() const { return m_biomeId; }
     const BiomeSpec& getBiomeSpec() const { return m_spec; }
+    int currentLevel() const { return m_level; }
+    float currentLevelLength() const { return m_levelSpec.lengthMeters; }
+    const LevelSpec& currentLevelSpec() const { return m_levelSpec; }
 
     float getBaseHeight(float x) const;
     float getHeight(float x) const;
@@ -70,7 +73,7 @@ public:
     std::vector<WorldItem>& getItems() { return m_items; }
 
     const std::vector<MilestoneSign>& getMilestones() const { return m_milestones; }
-    const std::vector<CheckpointInfo>& getCheckpoints() const { return m_spec.checkpoints; }
+    const std::vector<CheckpointInfo>& getCheckpoints() const { return m_activeCheckpoints; }
     const CheckpointInfo* getNextCheckpoint(float currentDist) const;
 
     void collectItem(size_t index);
@@ -80,12 +83,15 @@ public:
 
 private:
     std::string m_biomeId;
+    int m_level = 1;
     BiomeSpec m_spec;
+    LevelSpec m_levelSpec;
     float m_friction;
     float m_gravity;
     float m_airDensity = 1.0f;
     std::vector<WorldItem> m_items;
     std::vector<MilestoneSign> m_milestones;
+    std::vector<CheckpointInfo> m_activeCheckpoints;
 
     static constexpr float DEFORM_MIN_X = -50.0f;
     static constexpr float DEFORM_DX = 0.05f;

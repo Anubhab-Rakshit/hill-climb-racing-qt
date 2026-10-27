@@ -22,7 +22,7 @@ public:
     void setDimensions(int width, int height);
 
     void setOnBack(std::function<void()> cb) { m_btnBack.setOnClick(cb); }
-    void setOnSelectStage(std::function<void(const std::string& stageId)> cb) { m_onSelectStage = cb; }
+    void setOnSelectStage(std::function<void(const std::string& stageId, int level)> cb) { m_onSelectStage = cb; }
     void setButtonSound(std::function<void()> cb);
 
     void onMouseMove(int px, int py);
@@ -34,6 +34,10 @@ public:
 
     int currentPage() const { return m_page; }
     void setPage(int p) { m_page = (p < 0) ? 0 : (p > 1) ? 1 : p; }
+
+    int getSelectedLevel(int stageIdx) const {
+        return (stageIdx >= 0 && stageIdx < 6) ? m_selectedLevel[stageIdx] : 1;
+    }
 
 private:
     int m_width;
@@ -48,7 +52,11 @@ private:
     // 6 Stage Select Buttons
     RetroButton m_btnStageAction[6];
 
-    std::function<void(const std::string& stageId)> m_onSelectStage;
+    // 5 Level buttons per stage (30 level buttons total)
+    RetroButton m_btnLevels[6][5];
+    int m_selectedLevel[6];
+
+    std::function<void(const std::string& stageId, int level)> m_onSelectStage;
 
     void drawStageThumbnail(Graphics::Framebuffer& fb, int x, int y, int w, int h, int stageIdx);
 };

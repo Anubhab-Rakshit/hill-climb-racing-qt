@@ -16,11 +16,20 @@ struct CheckpointInfo {
     bool isFinishLine;         // true for final checkpoint 5
 };
 
+struct LevelSpec {
+    int levelIndex;            // 1 to 5
+    std::string name;          // e.g. "THE FOOTHILLS"
+    std::string subtitle;      // e.g. "Gentle Rolling Crests"
+    float lengthMeters;        // total distance to clear the level
+    int completionRewardCoins; // clear reward
+    std::vector<CheckpointInfo> checkpoints; // checkpoints inside this level
+};
+
 struct BiomeSpec {
     std::string id;
     std::string name;
     std::string tagline;
-    std::string nextBiomeId;   // Biome unlocked upon clearing checkpoint 5
+    std::string nextBiomeId;   // Biome unlocked upon clearing level 5
     int unlockCostCoins;       // Alternative coin unlock price
 
     float gravity;             // m/s^2
@@ -41,7 +50,16 @@ struct BiomeSpec {
     uint32_t soilColor;        // Loam / sediment
     uint32_t bedrockColor;     // Deep subterranean strata
 
+    std::vector<LevelSpec> levels;
     std::vector<CheckpointInfo> checkpoints;
+
+    const LevelSpec& getLevel(int lvl) const {
+        if (lvl >= 1 && lvl <= static_cast<int>(levels.size())) {
+            return levels[lvl - 1];
+        }
+        static LevelSpec fallback{1, "LEVEL 1", "Stage Course", 600.0f, 2000, {}};
+        return levels.empty() ? fallback : levels[0];
+    }
 };
 
 class BiomeRegistry {
@@ -49,6 +67,7 @@ public:
     static const BiomeSpec& getBiome(const std::string& id);
     static const std::vector<BiomeSpec>& getAllBiomes();
     static bool exists(const std::string& id);
+    static const LevelSpec& getLevelSpec(const std::string& biomeId, int levelIndex);
 };
 
 class TerrainValidator {

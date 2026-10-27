@@ -27,7 +27,12 @@ namespace Audio {
 enum class MusicTrack {
     NONE = 0,
     MENU,
-    RACE
+    GARAGE,
+    RACE,
+    RACE_DESERT,
+    RACE_MOUNTAIN,
+    RACE_MOON,
+    GAME_OVER
 };
 
 /**
@@ -56,11 +61,14 @@ public:
     void playFuelPickup();
     void playStuntCheer();
     void playCrash();
+    void playGameOverJingle();
     void playSoftImpact(float intensity = 1.0f);
     void playHardImpact(float intensity = 1.0f);
     void playLandingSoft(float intensity = 1.0f);
     void playLandingHard(float intensity = 1.0f);
     void playJumpTakeoff();
+    void playTurboBlowOff(float intensity = 1.0f);
+    void playLowFuelChime(float intensity = 1.0f);
 
     // Volume Controls (Master, Music, SFX)
     float masterVolume() const { return m_masterVolume; }
@@ -86,6 +94,12 @@ public:
     float currentTyreRollVolume() const { return m_tyreRollVolume; }
     float currentTyreSkidVolume() const { return m_tyreSkidVolume; }
     float currentWindVolume() const { return m_windVolume; }
+    float currentMenuAmbienceVolume() const { return m_menuAmbienceVol; }
+    float currentGarageAmbienceVolume() const { return m_garageAmbienceVol; }
+    float currentRaceAmbienceVolume() const { return m_raceAmbienceVol; }
+    float currentSuspensionVolume() const { return m_suspensionVol; }
+    float currentTurboSpoolVolume() const { return m_turboSpoolVol; }
+    float currentLowFuelWarningVolume() const { return m_lowFuelChimeVol; }
     MusicTrack currentMusicTrack() const { return m_activeMusicTrack; }
     float currentMusicVolume() const { return m_musicCurrentVol; }
     float lastImpactIntensity() const { return m_lastImpactIntensity; }
@@ -134,6 +148,17 @@ private:
     // Environmental Wind
     float m_windVolume;
 
+    // Atmospheric Ambience & Dynamic Vehicle Sounds (Smoothly slew-rate modulated)
+    float m_menuAmbienceVol;
+    float m_garageAmbienceVol;
+    float m_raceAmbienceVol;
+    float m_suspensionVol;
+    float m_turboSpoolVol;
+    float m_turboSpoolPitch;
+    float m_lowFuelChimeVol;
+    float m_prevVehicleThrottle;
+    float m_lowFuelTimer;
+
     // Airborne & Landing State Tracking
     bool m_wasAirborne;
     float m_airborneTime;
@@ -153,7 +178,12 @@ private:
     MusicTrack m_activeMusicTrack;
     float m_musicCurrentVol;
     float m_menuMusicVol;
+    float m_garageMusicVol;
     float m_raceMusicVol;
+    float m_raceDesertVol;
+    float m_raceMountainVol;
+    float m_raceMoonVol;
+    float m_gameOverMusicVol;
 
     // Coin Combo Streak Pitch Counter
     int m_coinStreak;
@@ -174,7 +204,12 @@ private:
 
     // Music Loops
     std::unique_ptr<QSoundEffect> m_sndMenuMusic;
+    std::unique_ptr<QSoundEffect> m_sndGarageMusic;
     std::unique_ptr<QSoundEffect> m_sndRaceMusic;
+    std::unique_ptr<QSoundEffect> m_sndRaceDesert;
+    std::unique_ptr<QSoundEffect> m_sndRaceMountain;
+    std::unique_ptr<QSoundEffect> m_sndRaceMoon;
+    std::unique_ptr<QSoundEffect> m_sndGameOverMusic;
 
     // Continuous Environmental & Tyre Loops
     std::unique_ptr<QSoundEffect> m_sndTyreRoll;
@@ -183,6 +218,15 @@ private:
     std::unique_ptr<QSoundEffect> m_sndTyreSkidSand;
     std::unique_ptr<QSoundEffect> m_sndWind;
 
+    // Atmospheric Ambience & Vehicle Motion Loops
+    std::unique_ptr<QSoundEffect> m_sndMenuAmbience;
+    std::unique_ptr<QSoundEffect> m_sndGarageAmbience;
+    std::unique_ptr<QSoundEffect> m_sndRaceAmbience;
+    std::unique_ptr<QSoundEffect> m_sndSuspension;
+    std::unique_ptr<QSoundEffect> m_sndTurbo;
+    std::unique_ptr<QSoundEffect> m_sndBlowOff;
+    std::unique_ptr<QSoundEffect> m_sndLowFuel;
+
     // Multi-tier Engine Soundbank Loops (Cross-faded seamlessly across RPM spectrum)
     static constexpr int ENGINE_TIER_COUNT = 5;
     std::unique_ptr<QSoundEffect> m_sndEngine[ENGINE_TIER_COUNT];
@@ -190,13 +234,25 @@ private:
 
     // Pre-synthesized PCM buffers for software mixer & headless verification
     std::vector<int16_t> m_bankMenuMusic;
+    std::vector<int16_t> m_bankGarageMusic;
     std::vector<int16_t> m_bankRaceMusic;
+    std::vector<int16_t> m_bankRaceDesert;
+    std::vector<int16_t> m_bankRaceMountain;
+    std::vector<int16_t> m_bankRaceMoon;
+    std::vector<int16_t> m_bankGameOverMusic;
     std::vector<int16_t> m_bankEngineTiers[ENGINE_TIER_COUNT];
     std::vector<int16_t> m_bankTyreRoll;
     std::vector<int16_t> m_bankTyreSkidAsphalt;
     std::vector<int16_t> m_bankTyreSkidDirt;
     std::vector<int16_t> m_bankTyreSkidSand;
     std::vector<int16_t> m_bankWind;
+    std::vector<int16_t> m_bankMenuAmbience;
+    std::vector<int16_t> m_bankGarageAmbience;
+    std::vector<int16_t> m_bankRaceAmbience;
+    std::vector<int16_t> m_bankSuspension;
+    std::vector<int16_t> m_bankTurbo;
+    std::vector<int16_t> m_bankBlowOff;
+    std::vector<int16_t> m_bankLowFuel;
     std::vector<int16_t> m_bankClick;
     std::vector<int16_t> m_bankCoin;
     std::vector<int16_t> m_bankFuel;
@@ -220,8 +276,16 @@ private:
     float m_synthEnginePhase;
     float m_synthWindPhase;
     float m_synthSkidPhase;
+    float m_synthTurboPhase;
     int m_synthMenuMusicPos;
+    int m_synthGarageMusicPos;
     int m_synthRaceMusicPos;
+    int m_synthRaceDesertPos;
+    int m_synthRaceMountainPos;
+    int m_synthRaceMoonPos;
+    int m_synthMenuAmbiencePos;
+    int m_synthGarageAmbiencePos;
+    int m_synthRaceAmbiencePos;
 
     std::unique_ptr<QMediaPlayer> m_menuMusicPlayer;
     std::unique_ptr<QMediaPlayer> m_raceMusicPlayer;

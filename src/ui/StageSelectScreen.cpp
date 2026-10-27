@@ -38,12 +38,21 @@ StageSelectScreen::StageSelectScreen()
 {
     m_btnBack.setKeyHint("ESC");
     for (int i = 0; i < 6; ++i) {
-        m_btnStageAction[i] = RetroButton(0, 0, 240, 42, "PLAY", Theme::GREEN_GAS);
+        m_selectedLevel[i] = 1;
+        m_btnStageAction[i] = RetroButton(0, 0, 240, 42, "PLAY LEVEL 1", Theme::GREEN_GAS);
         m_btnStageAction[i].setKeyHint("ENTER");
-        std::string sId = s_stages[i].id;
-        m_btnStageAction[i].setOnClick([this, sId]() {
-            if (m_onSelectStage) m_onSelectStage(sId);
+        m_btnStageAction[i].setOnClick([this, i]() {
+            if (m_onSelectStage) {
+                m_onSelectStage(s_stages[i].id, m_selectedLevel[i]);
+            }
         });
+
+        for (int l = 0; l < 5; ++l) {
+            m_btnLevels[i][l] = RetroButton(0, 0, 44, 28, std::to_string(l + 1), 0xFF2A394A);
+            m_btnLevels[i][l].setOnClick([this, i, l]() {
+                m_selectedLevel[i] = l + 1;
+            });
+        }
     }
 
     setDimensions(m_width, m_height);
@@ -55,6 +64,9 @@ void StageSelectScreen::setButtonSound(std::function<void()> cb) {
     m_btnNextPage.setOnSound(cb);
     for (int i = 0; i < 6; ++i) {
         m_btnStageAction[i].setOnSound(cb);
+        for (int l = 0; l < 5; ++l) {
+            m_btnLevels[i][l].setOnSound(cb);
+        }
     }
 }
 
@@ -65,29 +77,48 @@ void StageSelectScreen::setDimensions(int width, int height) {
     m_btnBack.setPosition(20, 14);
 
     int cx = m_width / 2;
-    m_btnPrevPage.setPosition(cx - 130, 54);
-    m_btnPrevPage.setSize(75, 26);
-    m_btnNextPage.setPosition(cx + 55, 54);
-    m_btnNextPage.setSize(75, 26);
+    m_btnPrevPage.setPosition(cx - 130, 48);
+    m_btnPrevPage.setSize(75, 24);
+    m_btnNextPage.setPosition(cx + 55, 48);
+    m_btnNextPage.setSize(75, 24);
 
     int cardW = 270;
     int cardGap = 20;
     int totalCardsW = 3 * cardW + 2 * cardGap;
     int startX = (m_width - totalCardsW) / 2;
-    int cardY = 88;
+    int cardY = 76;
     int btnW = cardW - 28;
-    int btnH = 40;
-    int btnY = cardY + 355;
+    int btnH = 42;
+    int btnY = cardY + 316;
+
+    int lvlBtnW = 44;
+    int lvlBtnH = 28;
+    int lvlGap = 5;
+    int lvlY = cardY + 178;
 
     for (int i = 0; i < 3; ++i) {
+        int cardLeft = startX + i * (cardW + cardGap);
+        int x = cardLeft + 14;
+
         // Page 0 buttons (0..2)
-        int x = startX + i * (cardW + cardGap) + 14;
         m_btnStageAction[i].setPosition(x, btnY);
         m_btnStageAction[i].setSize(btnW, btnH);
+
+        for (int l = 0; l < 5; ++l) {
+            int lx = cardLeft + 15 + l * (lvlBtnW + lvlGap);
+            m_btnLevels[i][l].setPosition(lx, lvlY);
+            m_btnLevels[i][l].setSize(lvlBtnW, lvlBtnH);
+        }
 
         // Page 1 buttons (3..5)
         m_btnStageAction[i + 3].setPosition(x, btnY);
         m_btnStageAction[i + 3].setSize(btnW, btnH);
+
+        for (int l = 0; l < 5; ++l) {
+            int lx = cardLeft + 15 + l * (lvlBtnW + lvlGap);
+            m_btnLevels[i + 3][l].setPosition(lx, lvlY);
+            m_btnLevels[i + 3][l].setSize(lvlBtnW, lvlBtnH);
+        }
     }
 }
 
@@ -103,6 +134,9 @@ void StageSelectScreen::onMouseMove(int px, int py) {
     int startIdx = m_page * 3;
     for (int i = startIdx; i < startIdx + 3; ++i) {
         m_btnStageAction[i].onMouseMove(px, py);
+        for (int l = 0; l < 5; ++l) {
+            m_btnLevels[i][l].onMouseMove(px, py);
+        }
     }
 }
 
@@ -114,13 +148,28 @@ bool StageSelectScreen::onMouseDown(int px, int py, Core::ProfileManager& profil
     int startIdx = m_page * 3;
     for (int i = startIdx; i < startIdx + 3; ++i) {
         const std::string& sId = s_stages[i].id;
-        if (!profile.isStageUnlocked(sId) && m_btnStageAction[i].contains(px, py)) {
+        bool stageUnlocked = profile.isStageUnlocked(sId);
+
+        if (!stageUnlocked && m_btnStageAction[i].contains(px, py)) {
             if (profile.unlockStageWithCoins(sId)) {
-                m_btnStageAction[i].setText("PLAY");
+                m_btnStageAction[i].setText("PLAY LEVEL " + std::to_string(m_selectedLevel[i]));
                 m_btnStageAction[i].setBaseColor(Theme::GREEN_GAS);
             }
             return true;
         }
+
+        if (stageUnlocked) {
+            for (int l = 0; l < 5; ++l) {
+                if (m_btnLevels[i][l].contains(px, py)) {
+                    if (profile.isStageLevelUnlocked(sId, l + 1)) {
+                        m_selectedLevel[i] = l + 1;
+                        m_btnLevels[i][l].onMouseDown(px, py);
+                        return true;
+                    }
+                }
+            }
+        }
+
         if (m_btnStageAction[i].onMouseDown(px, py)) return true;
     }
 
@@ -143,6 +192,9 @@ void StageSelectScreen::onMouseUp(int px, int py) {
     int startIdx = m_page * 3;
     for (int i = startIdx; i < startIdx + 3; ++i) {
         m_btnStageAction[i].onMouseUp(px, py);
+        for (int l = 0; l < 5; ++l) {
+            m_btnLevels[i][l].onMouseUp(px, py);
+        }
     }
 }
 
@@ -293,11 +345,11 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
     }
 
     int cardW = 270;
-    int cardH = 405;
+    int cardH = 430;
     int cardGap = 20;
     int totalCardsW = 3 * cardW + 2 * cardGap;
     int startX = (m_width - totalCardsW) / 2;
-    int cardY = 88;
+    int cardY = 76;
 
     int startIdx = m_page * 3;
     for (int i = 0; i < 3; ++i) {
@@ -316,58 +368,90 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
         Graphics::RasterFont::drawString(fb, x + 34, y + 11, stage.name, Theme::TEXT_WHITE, 2);
 
         // Thumbnail
-        drawStageThumbnail(fb, x + 14, y + 36, cardW - 28, 105, idx);
+        drawStageThumbnail(fb, x + 14, y + 36, cardW - 28, 86, idx);
 
         // Info Chips
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 150, stage.desc, Theme::TEXT_MUTED, 1);
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 168, "GRAVITY: " + stage.gravity, Theme::CYAN_UPGRADE, 1);
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 128, stage.desc, Theme::TEXT_MUTED, 1);
 
-        // Difficulty Rating with Pixel Stars
-        int starStartX = x + cardW / 2 - (5 * 10) / 2;
-        int starY = y + 186;
-        Graphics::RasterFont::drawString(fb, x + 30, starY - 1, "DIFFICULTY:", Theme::TEXT_MUTED, 1);
+        // Gravity & Difficulty on one line
+        std::string gravDiff = "GRAV: " + stage.gravity + " | DIFF: ";
+        int diffLen = static_cast<int>(gravDiff.size()) * 8;
+        int diffTotalW = diffLen + stage.difficultyStars * 12;
+        int diffStartX = x + (cardW - diffTotalW) / 2;
+        Graphics::RasterFont::drawString(fb, diffStartX, y + 144, gravDiff, Theme::CYAN_UPGRADE, 1);
         for (int s = 0; s < 5; ++s) {
-            UIComponents::drawStar(fb, starStartX + 35 + s * 12, starY + 2, 4, (s < stage.difficultyStars), Theme::GOLD, 0xFF37474F);
+            UIComponents::drawStar(fb, diffStartX + diffLen + s * 11, y + 147, 4, (s < stage.difficultyStars), Theme::GOLD, 0xFF37474F);
         }
 
-        // Checkpoint Progression Display Box
-        int cpCleared = profile.getStageCheckpointProgress(stage.id);
-        bool completed = profile.isStageCompleted(stage.id);
-
-        int progBoxW = cardW - 28;
-        int progBoxH = 46;
-        int progBoxX = x + 14;
-        int progBoxY = y + 204;
-
-        UIComponents::drawArcadePanel(fb, progBoxX, progBoxY, progBoxW, progBoxH, 0xFF121B27, 0xFF2A3A4E, 0, 0, false, false);
-
-        if (completed) {
-            Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, progBoxY + 8, "STAGE CLEARED (5/5)", Theme::GREEN_GAS, 1);
-            // 5 Glowing Gold Pixel Stars
-            int starsStartX = x + cardW / 2 - (5 * 18) / 2 + 8;
-            for (int s = 0; s < 5; ++s) {
-                UIComponents::drawStar(fb, starsStartX + s * 18, progBoxY + 28, 5, true, Theme::GOLD, 0xFFFFA000);
-            }
-        } else {
-            std::string cpStr = "CHECKPOINTS: " + std::to_string(cpCleared) + " / 5";
-            Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, progBoxY + 8, cpStr, Theme::GOLD, 1);
-
-            // 5 Segmented Illuminated Progress Bars
-            UIComponents::drawSegmentedBar(fb, progBoxX + 16, progBoxY + 24, progBoxW - 32, 12, cpCleared, 5,
-                                          Theme::GREEN_GAS, 0xFF192534, 0x88FFFFFF);
-        }
-
-        // High Score Record Box
-        float rec = profile.getRecordDistance(stage.id);
-        std::string recStr = "RECORD: " + UIComponents::formatNumber(static_cast<int64_t>(rec)) + "m";
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 266, recStr, Theme::GOLD, 2);
-
-        // Unlock status & Action Button
         bool unlocked = profile.isStageUnlocked(stage.id);
+        int lvlProgress = profile.getStageLevelProgress(stage.id);
+        int selLevel = m_selectedLevel[idx];
+
+        // Level Selection Header
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 162, "SELECT LEVEL (1 - 5):", Theme::GOLD, 1);
+
+        // 5 Level Buttons
+        for (int l = 0; l < 5; ++l) {
+            bool isLvlUnlocked = unlocked && profile.isStageLevelUnlocked(stage.id, l + 1);
+            bool isLvlDone = unlocked && (lvlProgress >= l + 1);
+            bool isSel = (selLevel == l + 1);
+
+            uint32_t col = isSel ? Theme::GOLD :
+                           (isLvlDone ? 0xFF2E7D32 :
+                           (isLvlUnlocked ? 0xFF37474F : 0xFF1C252C));
+
+            m_btnLevels[idx][l].setBaseColor(col);
+            m_btnLevels[idx][l].setEnabled(isLvlUnlocked);
+            m_btnLevels[idx][l].render(fb, 1);
+
+            int lx = x + 15 + l * 49;
+            int ly = y + 178;
+
+            if (isSel) {
+                // Bright white highlight outline around selected level button
+                fb.drawRect(lx - 2, ly - 2, 48, 32, 0xFFFFFFFF);
+                fb.drawRect(lx - 1, ly - 1, 46, 30, Theme::GOLD);
+            }
+            if (isLvlDone) {
+                // Tiny gold crown/star badge on cleared levels
+                UIComponents::drawStar(fb, lx + 22, ly + 4, 3, true, Theme::GOLD, 0xFFFFA000);
+            } else if (!isLvlUnlocked) {
+                // Dim lock dash
+                Graphics::RasterFont::drawStringCentered(fb, lx + 22, ly + 18, "-", 0xFF546E7A, 1);
+            }
+        }
+
+        // Level Details Box
+        int lvlBoxW = cardW - 28;
+        int lvlBoxH = 74;
+        int lvlBoxX = x + 14;
+        int lvlBoxY = y + 214;
+
+        UIComponents::drawArcadePanel(fb, lvlBoxX, lvlBoxY, lvlBoxW, lvlBoxH, 0xFF0D1420, 0xFF2A3A4E, 0, 0, false, false);
+
+        const auto& lvlSpec = Physics::BiomeRegistry::getLevelSpec(stage.id, selLevel);
+        bool curLvlDone = unlocked && (lvlProgress >= selLevel);
+
+        std::string lvlTitle = "LVL " + std::to_string(selLevel) + ": " + lvlSpec.name + " (" + std::to_string(static_cast<int>(lvlSpec.lengthMeters)) + "m)";
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, lvlBoxY + 8, lvlTitle, Theme::GOLD, 1);
+
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, lvlBoxY + 24, lvlSpec.subtitle, Theme::TEXT_WHITE, 1);
+
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, lvlBoxY + 40, "3 CHECKPOINTS | CP3 FINISH", Theme::CYAN_UPGRADE, 1);
+
+        std::string rewardStr = "BONUS: +$" + UIComponents::formatNumber(lvlSpec.completionRewardCoins) + (curLvlDone ? " [CLEARED]" : "");
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, lvlBoxY + 56, rewardStr, curLvlDone ? Theme::GREEN_GAS : Theme::GOLD, 1);
+
+        // High Score / Cleared Summary
+        float rec = profile.getRecordDistance(stage.id);
+        std::string summaryStr = "BEST: " + UIComponents::formatNumber(static_cast<int64_t>(rec)) + "m | CLEARED: " + std::to_string(lvlProgress) + "/5";
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 296, summaryStr, Theme::TEXT_MUTED, 1);
+
+        // Action Button
         auto& btn = m_btnStageAction[idx];
 
         if (unlocked) {
-            btn.setText("PLAY");
+            btn.setText("PLAY LEVEL " + std::to_string(selLevel));
             btn.setBaseColor(Theme::GREEN_GAS);
             btn.setEnabled(true);
         } else {
@@ -377,13 +461,12 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
             btn.setBaseColor(canAfford ? Theme::GOLD : 0xFF37474F);
             btn.setEnabled(canAfford);
 
-            // Requirement hint under button
             std::string reqHint = "(" + stage.unlockRequirement + ")";
-            Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 338, reqHint, Theme::TEXT_MUTED, 1);
+            Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 366, reqHint, Theme::TEXT_MUTED, 1);
         }
 
-        btn.setPosition(x + 14, y + 355);
-        btn.setSize(cardW - 28, 40);
+        btn.setPosition(x + 14, y + 316);
+        btn.setSize(cardW - 28, 42);
         btn.render(fb, 2);
     }
 }

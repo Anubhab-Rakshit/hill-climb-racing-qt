@@ -10,8 +10,13 @@ Every asset is validated as a standard uncompressed 16-bit PCM RIFF WAV file, na
 
 | Asset File | Creator | Source URL | Format | Channels | Sample Rate | Duration | License | Purpose / Description |
 |---|---|---|---|---|---|---|---|---|
-| `music/menu_music.wav` | TinyWorlds | [OpenGameArt: Happy Adventure Loop](https://opengameart.org/content/happy-adventure-loop) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 46.81 s | CC0 1.0 | Upbeat retro chiptune theme for Main Menu, Garage, and Stage Select screens. |
-| `music/race_music.wav` | Sudocolon | [OpenGameArt: Hyperton](https://opengameart.org/content/hyperton) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 96.05 s | CC0 1.0 | High-adrenaline arcade electronic racing track played during active gameplay. |
+| `music/menu_music.wav` | TinyWorlds | [OpenGameArt: Happy Adventure Loop](https://opengameart.org/content/happy-adventure-loop) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 46.81 s | CC0 1.0 | Upbeat retro chiptune theme for Main Menu and Stage Select screens. |
+| `music/garage_music.wav` | Zane Little Music | [OpenGameArt: Post-Adventure Tea Party](https://opengameart.org/content/10-free-chiptune-tracks-a-bag-of-chips) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 225.04 s | CC0 1.0 | Relaxing, cozy retro chiptune groove for the vehicle Garage screen. |
+| `music/race_music.wav` | Sudocolon | [OpenGameArt: Hyperton](https://opengameart.org/content/hyperton) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 96.05 s | CC0 1.0 | High-adrenaline arcade electronic racing track for Countryside & Arctic stages. |
+| `music/race_desert.wav` | Zane Little Music | [OpenGameArt: Dizzy Racing](https://opengameart.org/content/10-free-chiptune-tracks-a-bag-of-chips) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 136.50 s | CC0 1.0 | Energetic, fast-paced racing theme for the Desert stage. |
+| `music/race_moon.wav` | Zane Little Music | [OpenGameArt: Space Cadet Training Montage](https://opengameart.org/content/10-free-chiptune-tracks-a-bag-of-chips) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 73.02 s | CC0 1.0 | Cosmic sci-fi chiptune synthwave track for the Moon stage. |
+| `music/race_mountain.wav` | Sudocolon | [OpenGameArt: Chip Bit Danger](https://opengameart.org/content/chip-bit-danger) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 59.04 s | CC0 1.0 | Driving, action-packed chiptune rock for Mountain and Volcano stages. |
+| `music/game_over.wav` | Sudocolon | [OpenGameArt: Icy Game Over](https://opengameart.org/content/icy-game-over) | PCM WAV 16-bit | 1 (Mono) | 22,050 Hz | 8.31 s | CC0 1.0 | Melancholic 8-bit defeat and wreck sequence jingle. |
 
 ---
 

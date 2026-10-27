@@ -215,6 +215,15 @@ SoundManager::SoundManager(QObject* parent)
     , m_currentBiome("countryside")
     , m_isSkidding(false)
     , m_windVolume(0.0f)
+    , m_menuAmbienceVol(0.0f)
+    , m_garageAmbienceVol(0.0f)
+    , m_raceAmbienceVol(0.0f)
+    , m_suspensionVol(0.0f)
+    , m_turboSpoolVol(0.0f)
+    , m_turboSpoolPitch(1.0f)
+    , m_lowFuelChimeVol(0.0f)
+    , m_prevVehicleThrottle(0.0f)
+    , m_lowFuelTimer(0.0f)
     , m_wasAirborne(false)
     , m_airborneTime(0.0f)
     , m_isAirborne(false)
@@ -227,7 +236,12 @@ SoundManager::SoundManager(QObject* parent)
     , m_activeMusicTrack(MusicTrack::NONE)
     , m_musicCurrentVol(0.0f)
     , m_menuMusicVol(0.0f)
+    , m_garageMusicVol(0.0f)
     , m_raceMusicVol(0.0f)
+    , m_raceDesertVol(0.0f)
+    , m_raceMountainVol(0.0f)
+    , m_raceMoonVol(0.0f)
+    , m_gameOverMusicVol(0.0f)
     , m_coinStreak(0)
     , m_coinStreakTimer(0.0f)
     , m_sndClick(std::make_unique<QSoundEffect>(this))
@@ -241,17 +255,37 @@ SoundManager::SoundManager(QObject* parent)
     , m_sndLandingHard(std::make_unique<QSoundEffect>(this))
     , m_sndJump(std::make_unique<QSoundEffect>(this))
     , m_sndMenuMusic(std::make_unique<QSoundEffect>(this))
+    , m_sndGarageMusic(std::make_unique<QSoundEffect>(this))
     , m_sndRaceMusic(std::make_unique<QSoundEffect>(this))
+    , m_sndRaceDesert(std::make_unique<QSoundEffect>(this))
+    , m_sndRaceMountain(std::make_unique<QSoundEffect>(this))
+    , m_sndRaceMoon(std::make_unique<QSoundEffect>(this))
+    , m_sndGameOverMusic(std::make_unique<QSoundEffect>(this))
     , m_sndTyreRoll(std::make_unique<QSoundEffect>(this))
     , m_sndTyreSkidAsphalt(std::make_unique<QSoundEffect>(this))
     , m_sndTyreSkidDirt(std::make_unique<QSoundEffect>(this))
     , m_sndTyreSkidSand(std::make_unique<QSoundEffect>(this))
     , m_sndWind(std::make_unique<QSoundEffect>(this))
+    , m_sndMenuAmbience(std::make_unique<QSoundEffect>(this))
+    , m_sndGarageAmbience(std::make_unique<QSoundEffect>(this))
+    , m_sndRaceAmbience(std::make_unique<QSoundEffect>(this))
+    , m_sndSuspension(std::make_unique<QSoundEffect>(this))
+    , m_sndTurbo(std::make_unique<QSoundEffect>(this))
+    , m_sndBlowOff(std::make_unique<QSoundEffect>(this))
+    , m_sndLowFuel(std::make_unique<QSoundEffect>(this))
     , m_synthEnginePhase(0.0f)
     , m_synthWindPhase(0.0f)
     , m_synthSkidPhase(0.0f)
+    , m_synthTurboPhase(0.0f)
     , m_synthMenuMusicPos(0)
+    , m_synthGarageMusicPos(0)
     , m_synthRaceMusicPos(0)
+    , m_synthRaceDesertPos(0)
+    , m_synthRaceMountainPos(0)
+    , m_synthRaceMoonPos(0)
+    , m_synthMenuAmbiencePos(0)
+    , m_synthGarageAmbiencePos(0)
+    , m_synthRaceAmbiencePos(0)
     , m_menuMusicPlayer(std::make_unique<QMediaPlayer>(this))
     , m_raceMusicPlayer(std::make_unique<QMediaPlayer>(this))
     , m_menuAudioOut(std::make_unique<QAudioOutput>(this))
@@ -875,6 +909,380 @@ void SoundManager::initProceduralSounds() {
             m_raceMusicPlayer->setSource(QUrl::fromLocalFile(racePath));
         }
     }
+
+    // 16b. Garage Music ("Post-Adventure Tea Party" - CC0 Zane Little Music)
+    {
+        QString path = resolveAsset("music/garage_music.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankGarageMusic, fileSR)) {
+            attachEffect(m_sndGarageMusic.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            m_bankGarageMusic = m_bankMenuMusic;
+            attachEffect(m_sndGarageMusic.get(), path, true);
+        }
+    }
+
+    // 16c. Desert Race Music ("Dizzy Racing" - CC0 Zane Little Music)
+    {
+        QString path = resolveAsset("music/race_desert.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankRaceDesert, fileSR)) {
+            attachEffect(m_sndRaceDesert.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            m_bankRaceDesert = m_bankRaceMusic;
+            attachEffect(m_sndRaceDesert.get(), path, true);
+        }
+    }
+
+    // 16d. Mountain & Volcano Race Music ("Chip Bit Danger" - CC0 Sudocolon)
+    {
+        QString path = resolveAsset("music/race_mountain.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankRaceMountain, fileSR)) {
+            attachEffect(m_sndRaceMountain.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            m_bankRaceMountain = m_bankRaceMusic;
+            attachEffect(m_sndRaceMountain.get(), path, true);
+        }
+    }
+
+    // 16e. Moon Race Music ("Space Cadet Training Montage" - CC0 Zane Little Music)
+    {
+        QString path = resolveAsset("music/race_moon.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankRaceMoon, fileSR)) {
+            attachEffect(m_sndRaceMoon.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            m_bankRaceMoon = m_bankRaceMusic;
+            attachEffect(m_sndRaceMoon.get(), path, true);
+        }
+    }
+
+    // 16f. Game Over Jingle ("Icy Game Over" - CC0 Sudocolon)
+    {
+        QString path = resolveAsset("music/game_over.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankGameOverMusic, fileSR)) {
+            attachEffect(m_sndGameOverMusic.get(), path, false);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("game_over_jingle");
+            int count = static_cast<int>(SR * 2.0f);
+            m_bankGameOverMusic.resize(count);
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                float f = (t < 0.5f) ? 330.0f : (t < 1.0f ? 293.66f : 261.63f);
+                float env = std::exp(-std::fmod(t, 0.5f) * 6.0f);
+                float s = std::sin(2.0f * M_PI * f * t) * env * 0.5f;
+                m_bankGameOverMusic[i] = static_cast<int16_t>(s * 20000.0f);
+            }
+            writeWavFile(fbPath, m_bankGameOverMusic, SR);
+            attachEffect(m_sndGameOverMusic.get(), fbPath, false);
+        }
+    }
+
+    // 17. Menu Atmosphere Ambience (Calm Outdoor Breeze, Ambient Pad & Gentle Melodic Birdsong)
+    {
+        QString path = resolveAsset("environment/menu_ambience.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankMenuAmbience, fileSR)) {
+            attachEffect(m_sndMenuAmbience.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("ambience_menu");
+            int count = static_cast<int>(SR * 6.0f);
+            m_bankMenuAmbience.resize(count);
+
+            float lpState = 0.0f;
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                // Soft warm breeze: filtered noise with slow breath modulation
+                float n = rnd();
+                float cutoff = 0.025f + 0.012f * std::sin(2.0f * M_PI * 0.15f * t);
+                lpState += (n - lpState) * cutoff;
+                float breeze = lpState * 1.4f;
+
+                // Calming ambient pad (A major / C# minor harmonics: 220Hz, 330Hz, 440Hz, 554Hz)
+                float pad1 = std::sin(2.0f * M_PI * 220.0f * t) * (0.05f + 0.03f * std::sin(2.0f * M_PI * 0.22f * t));
+                float pad2 = std::sin(2.0f * M_PI * 329.6f * t) * (0.04f + 0.02f * std::sin(2.0f * M_PI * 0.31f * t + 1.0f));
+                float pad3 = std::sin(2.0f * M_PI * 440.0f * t) * (0.03f + 0.015f * std::sin(2.0f * M_PI * 0.18f * t + 2.0f));
+                float pad4 = std::sin(2.0f * M_PI * 554.4f * t) * 0.02f;
+                float pad = pad1 + pad2 + pad3 + pad4;
+
+                // Gentle distant birdsong at t=1.4s and t=4.2s (soft sine chirps, no harsh frequencies)
+                float bird = 0.0f;
+                if (t >= 1.40f && t < 1.62f) {
+                    float bT = t - 1.40f;
+                    float freq = (bT < 0.10f) ? 2350.0f : 2800.0f;
+                    float env = std::sin(static_cast<float>(M_PI) * (bT / 0.22f));
+                    bird += std::sin(2.0f * M_PI * freq * t) * env * 0.12f;
+                }
+                if (t >= 4.20f && t < 4.45f) {
+                    float bT = t - 4.20f;
+                    float freq = (bT < 0.08f) ? 2200.0f : (bT < 0.16f ? 2600.0f : 3100.0f);
+                    float env = std::sin(static_cast<float>(M_PI) * (bT / 0.25f));
+                    bird += std::sin(2.0f * M_PI * freq * t) * env * 0.10f;
+                }
+
+                float s = breeze * 0.40f + pad * 0.45f + bird * 0.35f;
+
+                // Smooth cosine loop boundary windowing (first & last 2048 samples)
+                if (i < 2048) {
+                    float win = 0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * i / 2048.0f));
+                    s *= win;
+                } else if (i > count - 2048) {
+                    float win = 0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * (count - 1 - i) / 2048.0f));
+                    s *= win;
+                }
+
+                m_bankMenuAmbience[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 20000.0f);
+            }
+            writeWavFile(fbPath, m_bankMenuAmbience, SR);
+            attachEffect(m_sndMenuAmbience.get(), fbPath, true);
+        }
+    }
+
+    // 18. Garage Atmosphere Ambience (Warm Room Tone, Soft Draft & Gentle Tool Clicks)
+    {
+        QString path = resolveAsset("environment/garage_ambience.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankGarageAmbience, fileSR)) {
+            attachEffect(m_sndGarageAmbience.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("ambience_garage");
+            int count = static_cast<int>(SR * 5.0f);
+            m_bankGarageAmbience.resize(count);
+
+            float lpDraft = 0.0f;
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                // Warm indoor room hum (60Hz + 120Hz pure sine, warm acoustic warmth)
+                float hum = std::sin(2.0f * M_PI * 60.0f * t) * 0.08f + std::sin(2.0f * M_PI * 120.0f * t) * 0.035f;
+
+                // Ventilation air draft
+                float n = rnd();
+                lpDraft += (n - lpDraft) * 0.018f;
+                float draft = lpDraft * 1.2f;
+
+                // Distant subtle mechanic workshop ratchet click at t=2.0s
+                float tool = 0.0f;
+                if (t >= 2.0f && t < 2.08f) {
+                    float dtClick = t - 2.0f;
+                    int subPulse = static_cast<int>(dtClick / 0.016f);
+                    float pT = std::fmod(dtClick, 0.016f);
+                    if (subPulse < 4) {
+                        tool = std::sin(2.0f * M_PI * 850.0f * pT) * std::exp(-pT * 120.0f) * 0.08f;
+                    }
+                }
+                // Gentle soft wrench tap at t=3.8s
+                if (t >= 3.80f && t < 3.88f) {
+                    float dtTap = t - 3.80f;
+                    tool = std::sin(2.0f * M_PI * 1175.0f * dtTap) * std::exp(-dtTap * 60.0f) * 0.09f;
+                }
+
+                float s = hum * 0.45f + draft * 0.35f + tool * 0.40f;
+
+                if (i < 2048) {
+                    float win = 0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * i / 2048.0f));
+                    s *= win;
+                } else if (i > count - 2048) {
+                    float win = 0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * (count - 1 - i) / 2048.0f));
+                    s *= win;
+                }
+
+                m_bankGarageAmbience[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 20000.0f);
+            }
+            writeWavFile(fbPath, m_bankGarageAmbience, SR);
+            attachEffect(m_sndGarageAmbience.get(), fbPath, true);
+        }
+    }
+
+    // 19. Racing Biome Ambience (Dynamic Outdoor Track Wind & Terrain Atmosphere)
+    {
+        QString path = resolveAsset("environment/race_ambience.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankRaceAmbience, fileSR)) {
+            attachEffect(m_sndRaceAmbience.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("ambience_race");
+            int count = static_cast<int>(SR * 6.0f);
+            m_bankRaceAmbience.resize(count);
+
+            float lpAir = 0.0f;
+            float bpFoliage = 0.0f;
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                float n = rnd();
+                // Rolling outdoor wind with smooth gust swell
+                float cutoff = 0.035f + 0.015f * std::sin(2.0f * M_PI * 0.18f * t);
+                lpAir += (n - lpAir) * cutoff;
+                float windGust = lpAir * 1.5f;
+
+                // Subtle foliage rustle (bandpass around 1200Hz)
+                float bpIn = n - lpAir;
+                bpFoliage += (bpIn - bpFoliage) * 0.12f;
+                float rustle = bpFoliage * 0.06f;
+
+                // Sub-bass earth presence (48Hz)
+                float sub = std::sin(2.0f * M_PI * 48.0f * t) * 0.05f;
+
+                float s = windGust * 0.50f + rustle * 0.35f + sub * 0.30f;
+
+                if (i < 2048) {
+                    float win = 0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * i / 2048.0f));
+                    s *= win;
+                } else if (i > count - 2048) {
+                    float win = 0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * (count - 1 - i) / 2048.0f));
+                    s *= win;
+                }
+
+                m_bankRaceAmbience[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 20000.0f);
+            }
+            writeWavFile(fbPath, m_bankRaceAmbience, SR);
+            attachEffect(m_sndRaceAmbience.get(), fbPath, true);
+        }
+    }
+
+    // 20. Suspension Hydraulic Damper Breath
+    {
+        QString path = resolveAsset("vehicle/suspension.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankSuspension, fileSR)) {
+            attachEffect(m_sndSuspension.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("suspension");
+            int count = static_cast<int>(SR * 0.40f);
+            m_bankSuspension.resize(count);
+            float bpState = 0.0f;
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                float n = rnd();
+                // Sweep center frequency downward from 850Hz to 320Hz
+                float sweepCoeff = 0.18f - 0.12f * (t / 0.40f);
+                bpState += (n - bpState) * sweepCoeff;
+                // Attack over 0.03s, exponential decay over rest
+                float env = (t < 0.03f) ? (t / 0.03f) : std::exp(-(t - 0.03f) * 11.0f);
+                float s = bpState * env * 1.5f;
+                m_bankSuspension[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 18000.0f);
+            }
+            writeWavFile(fbPath, m_bankSuspension, SR);
+            attachEffect(m_sndSuspension.get(), fbPath, true);
+        }
+    }
+
+    // 21. Turbocharger Whine & Spool
+    {
+        QString path = resolveAsset("vehicle/turbo.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankTurbo, fileSR)) {
+            attachEffect(m_sndTurbo.get(), path, true);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("turbo");
+            int count = static_cast<int>(SR * 0.80f);
+            m_bankTurbo.resize(count);
+            float freq = 2400.0f;
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                float s1 = std::sin(2.0f * M_PI * freq * t);
+                float s2 = std::sin(2.0f * M_PI * freq * 2.0f * t) * 0.20f;
+                float hiss = rnd() * 0.08f;
+                float s = (s1 + s2 + hiss) * 0.40f;
+                if (i < 1024) {
+                    s *= (0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * i / 1024.0f)));
+                } else if (i > count - 1024) {
+                    s *= (0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * (count - 1 - i) / 1024.0f)));
+                }
+                m_bankTurbo[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 18000.0f);
+            }
+            writeWavFile(fbPath, m_bankTurbo, SR);
+            attachEffect(m_sndTurbo.get(), fbPath, true);
+        }
+    }
+
+    // 22. Blow-Off Valve (BOV) Flutter
+    {
+        QString path = resolveAsset("vehicle/blowoff.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankBlowOff, fileSR)) {
+            attachEffect(m_sndBlowOff.get(), path, false);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("blowoff");
+            int count = static_cast<int>(SR * 0.35f);
+            m_bankBlowOff.resize(count);
+            float bpN = 0.0f;
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                float n = rnd();
+                bpN += (n - bpN) * 0.25f;
+                // 16Hz flutter modulation: "whoo-t-t-t-t"
+                float flutter = 0.5f + 0.5f * std::cos(2.0f * M_PI * 16.0f * t);
+                float env = (t < 0.02f) ? (t / 0.02f) : std::exp(-(t - 0.02f) * 12.0f);
+                float carrier = std::sin(2.0f * M_PI * 1350.0f * t) * 0.35f + bpN * 0.65f;
+                float s = carrier * flutter * env;
+                m_bankBlowOff[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 22000.0f);
+            }
+            writeWavFile(fbPath, m_bankBlowOff, SR);
+            attachEffect(m_sndBlowOff.get(), fbPath, false);
+        }
+    }
+
+    // 23. Low Fuel Gentle Warning Chime
+    {
+        QString path = resolveAsset("vehicle/low_fuel.wav");
+        uint32_t fileSR = 22050;
+        bool loaded = false;
+        if (!path.isEmpty() && readWavFile(path, m_bankLowFuel, fileSR)) {
+            attachEffect(m_sndLowFuel.get(), path, false);
+            loaded = true;
+        }
+        if (!loaded) {
+            QString fbPath = makePath("low_fuel");
+            int count = static_cast<int>(SR * 0.28f);
+            m_bankLowFuel.resize(count);
+            for (int i = 0; i < count; ++i) {
+                float t = static_cast<float>(i) / SR;
+                // C5 (523.25 Hz) + C6 (1046.5 Hz) soft warm marimba chime
+                float tone1 = std::sin(2.0f * M_PI * 523.25f * t);
+                float tone2 = std::sin(2.0f * M_PI * 1046.5f * t) * 0.22f;
+                float env = (t < 0.005f) ? (t / 0.005f) : std::exp(-(t - 0.005f) * 15.0f);
+                float s = (tone1 + tone2) * env * 0.65f;
+                m_bankLowFuel[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 20000.0f);
+            }
+            writeWavFile(fbPath, m_bankLowFuel, SR);
+            attachEffect(m_sndLowFuel.get(), fbPath, false);
+        }
+    }
 }
 
 void SoundManager::playEffectSafe(QSoundEffect* effect, float volumeScale) {
@@ -921,15 +1329,29 @@ void SoundManager::setSfxVolume(float vol) {
 void SoundManager::applyVolumeScales() {
     // Dynamically adjust active loop volumes
     if (m_sndMenuMusic) m_sndMenuMusic->setVolume(m_masterVolume * m_musicVolume * m_menuMusicVol);
+    if (m_sndGarageMusic) m_sndGarageMusic->setVolume(m_masterVolume * m_musicVolume * m_garageMusicVol);
     if (m_sndRaceMusic) m_sndRaceMusic->setVolume(m_masterVolume * m_musicVolume * m_raceMusicVol);
-    if (m_menuAudioOut) m_menuAudioOut->setVolume(std::clamp(m_masterVolume * m_musicVolume * m_menuMusicVol, 0.0f, 1.0f));
-    if (m_raceAudioOut) m_raceAudioOut->setVolume(std::clamp(m_masterVolume * m_musicVolume * m_raceMusicVol, 0.0f, 1.0f));
+    if (m_sndRaceDesert) m_sndRaceDesert->setVolume(m_masterVolume * m_musicVolume * m_raceDesertVol);
+    if (m_sndRaceMountain) m_sndRaceMountain->setVolume(m_masterVolume * m_musicVolume * m_raceMountainVol);
+    if (m_sndRaceMoon) m_sndRaceMoon->setVolume(m_masterVolume * m_musicVolume * m_raceMoonVol);
+    if (m_sndGameOverMusic) m_sndGameOverMusic->setVolume(m_masterVolume * m_musicVolume * m_gameOverMusicVol);
+
+    float effMenuMax = std::max(m_menuMusicVol, m_garageMusicVol);
+    if (m_menuAudioOut) m_menuAudioOut->setVolume(std::clamp(m_masterVolume * m_musicVolume * effMenuMax, 0.0f, 1.0f));
+    float effRaceMax = std::max({m_raceMusicVol, m_raceDesertVol, m_raceMountainVol, m_raceMoonVol});
+    if (m_raceAudioOut) m_raceAudioOut->setVolume(std::clamp(m_masterVolume * m_musicVolume * effRaceMax, 0.0f, 1.0f));
 
     if (m_sndTyreRoll) m_sndTyreRoll->setVolume(m_masterVolume * m_sfxVolume * m_tyreRollVolume);
     if (m_sndWind) m_sndWind->setVolume(m_masterVolume * m_sfxVolume * m_windVolume);
     if (m_sndTyreSkidAsphalt) m_sndTyreSkidAsphalt->setVolume(m_masterVolume * m_sfxVolume * m_tyreSkidVolume);
     if (m_sndTyreSkidDirt) m_sndTyreSkidDirt->setVolume(m_masterVolume * m_sfxVolume * m_tyreSkidVolume);
     if (m_sndTyreSkidSand) m_sndTyreSkidSand->setVolume(m_masterVolume * m_sfxVolume * m_tyreSkidVolume);
+
+    if (m_sndMenuAmbience) m_sndMenuAmbience->setVolume(m_masterVolume * m_sfxVolume * m_menuAmbienceVol);
+    if (m_sndGarageAmbience) m_sndGarageAmbience->setVolume(m_masterVolume * m_sfxVolume * m_garageAmbienceVol);
+    if (m_sndRaceAmbience) m_sndRaceAmbience->setVolume(m_masterVolume * m_sfxVolume * m_raceAmbienceVol);
+    if (m_sndSuspension) m_sndSuspension->setVolume(m_masterVolume * m_sfxVolume * m_suspensionVol);
+    if (m_sndTurbo) m_sndTurbo->setVolume(m_masterVolume * m_sfxVolume * m_turboSpoolVol);
 
     for (int k = 0; k < ENGINE_TIER_COUNT; ++k) {
         if (m_sndEngine[k]) {
@@ -945,12 +1367,28 @@ void SoundManager::setTargetMusic(MusicTrack track) {
 void SoundManager::stopAllMusic() {
     m_targetMusicTrack = MusicTrack::NONE;
     m_activeMusicTrack = MusicTrack::NONE;
+    m_musicCurrentVol = 0.0f;
     m_menuMusicVol = 0.0f;
+    m_garageMusicVol = 0.0f;
     m_raceMusicVol = 0.0f;
+    m_raceDesertVol = 0.0f;
+    m_raceMountainVol = 0.0f;
+    m_raceMoonVol = 0.0f;
+    m_gameOverMusicVol = 0.0f;
     if (m_sndMenuMusic) m_sndMenuMusic->stop();
+    if (m_sndGarageMusic) m_sndGarageMusic->stop();
     if (m_sndRaceMusic) m_sndRaceMusic->stop();
+    if (m_sndRaceDesert) m_sndRaceDesert->stop();
+    if (m_sndRaceMountain) m_sndRaceMountain->stop();
+    if (m_sndRaceMoon) m_sndRaceMoon->stop();
+    if (m_sndGameOverMusic) m_sndGameOverMusic->stop();
     if (m_menuMusicPlayer) m_menuMusicPlayer->stop();
     if (m_raceMusicPlayer) m_raceMusicPlayer->stop();
+}
+
+void SoundManager::playGameOverJingle() {
+    playEffectSafe(m_sndGameOverMusic.get(), 0.90f);
+    queueOneShot(&m_bankGameOverMusic, 0.90f);
 }
 
 void SoundManager::playButtonClick() {
@@ -1024,6 +1462,18 @@ void SoundManager::playJumpTakeoff() {
     queueOneShot(&m_bankJump, 0.65f);
 }
 
+void SoundManager::playTurboBlowOff(float intensity) {
+    float vol = std::clamp(intensity * 0.75f, 0.20f, 0.85f);
+    playEffectSafe(m_sndBlowOff.get(), vol);
+    queueOneShot(&m_bankBlowOff, vol);
+}
+
+void SoundManager::playLowFuelChime(float intensity) {
+    float vol = std::clamp(intensity * 0.60f, 0.20f, 0.70f);
+    playEffectSafe(m_sndLowFuel.get(), vol);
+    queueOneShot(&m_bankLowFuel, vol);
+}
+
 void SoundManager::updateEngineRpm(float rpm, float throttle, Physics::VehicleType type) {
     m_engineRpm = std::clamp(rpm, 1000.0f, 8500.0f);
     m_engineThrottle = std::clamp(throttle, 0.0f, 1.0f);
@@ -1081,30 +1531,64 @@ void SoundManager::update(float dt, const Physics::Vehicle& vehicle, const Physi
     m_currentBiome = terrain.getBiome();
 
     // 2. Music State Automation & Crossfading
-    if (state == Core::StateType::MAIN_MENU || state == Core::StateType::GARAGE || state == Core::StateType::STAGE_SELECT) {
+    if (state == Core::StateType::MAIN_MENU || state == Core::StateType::STAGE_SELECT) {
         setTargetMusic(MusicTrack::MENU);
+    } else if (state == Core::StateType::GARAGE) {
+        setTargetMusic(MusicTrack::GARAGE);
     } else if (state == Core::StateType::GAMEPLAY || state == Core::StateType::PAUSED) {
-        setTargetMusic(MusicTrack::RACE);
+        MusicTrack desiredRaceTrack = MusicTrack::RACE;
+        if (m_currentBiome == "desert") {
+            desiredRaceTrack = MusicTrack::RACE_DESERT;
+        } else if (m_currentBiome == "mountain" || m_currentBiome == "volcano") {
+            desiredRaceTrack = MusicTrack::RACE_MOUNTAIN;
+        } else if (m_currentBiome == "moon") {
+            desiredRaceTrack = MusicTrack::RACE_MOON;
+        }
+
+        if (m_targetMusicTrack != desiredRaceTrack) {
+            setTargetMusic(desiredRaceTrack);
+        }
     } else if (state == Core::StateType::GAME_OVER) {
         setTargetMusic(MusicTrack::NONE);
     }
 
     float crossfadeRate = 4.0f * dt;
     float targetMenuVol = (m_targetMusicTrack == MusicTrack::MENU) ? 1.0f : 0.0f;
-    float targetRaceVol = (m_targetMusicTrack == MusicTrack::RACE) ? ((state == Core::StateType::PAUSED) ? 0.35f : 1.0f) : 0.0f;
+    float targetGarageVol = (m_targetMusicTrack == MusicTrack::GARAGE) ? 1.0f : 0.0f;
+    float raceMult = (state == Core::StateType::PAUSED) ? 0.35f : 1.0f;
+    float targetRaceVol = (m_targetMusicTrack == MusicTrack::RACE) ? raceMult : 0.0f;
+    float targetDesertVol = (m_targetMusicTrack == MusicTrack::RACE_DESERT) ? raceMult : 0.0f;
+    float targetMountainVol = (m_targetMusicTrack == MusicTrack::RACE_MOUNTAIN) ? raceMult : 0.0f;
+    float targetMoonVol = (m_targetMusicTrack == MusicTrack::RACE_MOON) ? raceMult : 0.0f;
 
     m_menuMusicVol += (targetMenuVol - m_menuMusicVol) * std::min(1.0f, crossfadeRate);
+    m_garageMusicVol += (targetGarageVol - m_garageMusicVol) * std::min(1.0f, crossfadeRate);
     m_raceMusicVol += (targetRaceVol - m_raceMusicVol) * std::min(1.0f, crossfadeRate);
+    m_raceDesertVol += (targetDesertVol - m_raceDesertVol) * std::min(1.0f, crossfadeRate);
+    m_raceMountainVol += (targetMountainVol - m_raceMountainVol) * std::min(1.0f, crossfadeRate);
+    m_raceMoonVol += (targetMoonVol - m_raceMoonVol) * std::min(1.0f, crossfadeRate);
 
-    m_activeMusicTrack = (m_raceMusicVol > m_menuMusicVol && m_raceMusicVol > 0.05f) ? MusicTrack::RACE :
-                         (m_menuMusicVol > 0.05f) ? MusicTrack::MENU : MusicTrack::NONE;
-    m_musicCurrentVol = std::max(m_menuMusicVol, m_raceMusicVol);
+    // Determine currently dominant active music track
+    float maxVol = 0.05f;
+    MusicTrack dominant = MusicTrack::NONE;
+    if (m_menuMusicVol > maxVol) { maxVol = m_menuMusicVol; dominant = MusicTrack::MENU; }
+    if (m_garageMusicVol > maxVol) { maxVol = m_garageMusicVol; dominant = MusicTrack::GARAGE; }
+    if (m_raceMusicVol > maxVol) { maxVol = m_raceMusicVol; dominant = MusicTrack::RACE; }
+    if (m_raceDesertVol > maxVol) { maxVol = m_raceDesertVol; dominant = MusicTrack::RACE_DESERT; }
+    if (m_raceMountainVol > maxVol) { maxVol = m_raceMountainVol; dominant = MusicTrack::RACE_MOUNTAIN; }
+    if (m_raceMoonVol > maxVol) { maxVol = m_raceMoonVol; dominant = MusicTrack::RACE_MOON; }
+    m_activeMusicTrack = dominant;
+    m_musicCurrentVol = (dominant != MusicTrack::NONE) ? maxVol : 0.0f;
 
     updateLoopSafe(m_sndMenuMusic.get(), m_musicVolume * m_menuMusicVol, m_menuMusicVol > 0.01f);
+    updateLoopSafe(m_sndGarageMusic.get(), m_musicVolume * m_garageMusicVol, m_garageMusicVol > 0.01f);
     updateLoopSafe(m_sndRaceMusic.get(), m_musicVolume * m_raceMusicVol, m_raceMusicVol > 0.01f);
+    updateLoopSafe(m_sndRaceDesert.get(), m_musicVolume * m_raceDesertVol, m_raceDesertVol > 0.01f);
+    updateLoopSafe(m_sndRaceMountain.get(), m_musicVolume * m_raceMountainVol, m_raceMountainVol > 0.01f);
+    updateLoopSafe(m_sndRaceMoon.get(), m_musicVolume * m_raceMoonVol, m_raceMoonVol > 0.01f);
 
-    float effMenuVol = std::clamp(m_masterVolume * m_musicVolume * m_menuMusicVol, 0.0f, 1.0f);
-    float effRaceVol = std::clamp(m_masterVolume * m_musicVolume * m_raceMusicVol, 0.0f, 1.0f);
+    float effMenuVol = std::clamp(m_masterVolume * m_musicVolume * std::max(m_menuMusicVol, m_garageMusicVol), 0.0f, 1.0f);
+    float effRaceVol = std::clamp(m_masterVolume * m_musicVolume * std::max({m_raceMusicVol, m_raceDesertVol, m_raceMountainVol, m_raceMoonVol}), 0.0f, 1.0f);
 
     if (m_menuAudioOut) m_menuAudioOut->setVolume(effMenuVol);
     if (m_raceAudioOut) m_raceAudioOut->setVolume(effRaceVol);
@@ -1129,17 +1613,50 @@ void SoundManager::update(float dt, const Physics::Vehicle& vehicle, const Physi
         }
     }
 
+    // 2b. State-Aware Atmospheric Ambience Automation & Seamless Crossfading
+    float targetMenuAmb = 0.0f;
+    float targetGarageAmb = 0.0f;
+    float targetRaceAmb = 0.0f;
+
+    if (state == Core::StateType::MAIN_MENU || state == Core::StateType::STAGE_SELECT) {
+        targetMenuAmb = 0.35f;
+    } else if (state == Core::StateType::GARAGE) {
+        targetGarageAmb = 0.35f;
+    } else if (state == Core::StateType::GAMEPLAY) {
+        targetRaceAmb = 0.28f;
+    } else if (state == Core::StateType::PAUSED) {
+        targetRaceAmb = 0.12f; // Smoothly ducked when paused
+    } else if (state == Core::StateType::GAME_OVER) {
+        targetRaceAmb = 0.08f; // Quiet ambient tail during wreck sequence
+    }
+
+    // Slew rate 3.5f * dt gives a completely click-free ~0.3s exponential crossfade
+    float ambSlew = std::min(1.0f, 3.5f * dt);
+    m_menuAmbienceVol += (targetMenuAmb - m_menuAmbienceVol) * ambSlew;
+    m_garageAmbienceVol += (targetGarageAmb - m_garageAmbienceVol) * ambSlew;
+    m_raceAmbienceVol += (targetRaceAmb - m_raceAmbienceVol) * ambSlew;
+
+    updateLoopSafe(m_sndMenuAmbience.get(), m_sfxVolume * m_menuAmbienceVol, m_menuAmbienceVol > 0.01f);
+    updateLoopSafe(m_sndGarageAmbience.get(), m_sfxVolume * m_garageAmbienceVol, m_garageAmbienceVol > 0.01f);
+    updateLoopSafe(m_sndRaceAmbience.get(), m_sfxVolume * m_raceAmbienceVol, m_raceAmbienceVol > 0.01f);
+
     // If not in active gameplay or wreck simulation, silence vehicle audio
     if (state != Core::StateType::GAMEPLAY && state != Core::StateType::GAME_OVER) {
         m_tyreRollVolume = 0.0f;
         m_tyreSkidVolume = 0.0f;
         m_windVolume = 0.0f;
         m_engineVolume = 0.0f;
+        m_suspensionVol = 0.0f;
+        m_turboSpoolVol = 0.0f;
+        m_prevVehicleThrottle = 0.0f;
+        m_lowFuelChimeVol = 0.0f;
         updateLoopSafe(m_sndTyreRoll.get(), 0.0f, false);
         updateLoopSafe(m_sndTyreSkidAsphalt.get(), 0.0f, false);
         updateLoopSafe(m_sndTyreSkidDirt.get(), 0.0f, false);
         updateLoopSafe(m_sndTyreSkidSand.get(), 0.0f, false);
         updateLoopSafe(m_sndWind.get(), 0.0f, false);
+        updateLoopSafe(m_sndSuspension.get(), 0.0f, false);
+        updateLoopSafe(m_sndTurbo.get(), 0.0f, false);
         for (int k = 0; k < ENGINE_TIER_COUNT; ++k) updateLoopSafe(m_sndEngine[k].get(), 0.0f, false);
         return;
     }
@@ -1192,6 +1709,49 @@ void SoundManager::update(float dt, const Physics::Vehicle& vehicle, const Physi
     m_windVolume += (targetWind - m_windVolume) * std::min(1.0f, 8.0f * dt);
     updateLoopSafe(m_sndWind.get(), m_sfxVolume * m_windVolume, m_windVolume > 0.02f);
 
+    // 6b. Suspension Damper Hydraulic Breathing Audio (Smooth, organic bump response)
+    float suspMotion = std::abs(vehicle.rearSuspVel()) + std::abs(vehicle.frontSuspVel());
+    float targetSusp = 0.0f;
+    if (onGround && suspMotion > 0.35f) {
+        targetSusp = std::clamp((suspMotion - 0.35f) / 3.0f, 0.0f, 1.0f) * 0.35f;
+    }
+    float suspSlew = (targetSusp > m_suspensionVol) ? std::min(1.0f, 18.0f * dt) : std::min(1.0f, 9.0f * dt);
+    m_suspensionVol += (targetSusp - m_suspensionVol) * suspSlew;
+    updateLoopSafe(m_sndSuspension.get(), m_sfxVolume * m_suspensionVol, m_suspensionVol > 0.02f);
+
+    // 6c. Turbocharger Whine & Blow-Off Flutter
+    float curThrottle = vehicle.gasInput();
+    float curRpm = vehicle.getEngineRpm();
+    float targetTurbo = 0.0f;
+    if (curThrottle > 0.30f && curRpm > 3200.0f && onGround) {
+        float rpmRatio = std::clamp((curRpm - 3200.0f) / 4800.0f, 0.0f, 1.0f);
+        targetTurbo = rpmRatio * curThrottle * 0.26f;
+        m_turboSpoolPitch = 1.0f + 1.25f * rpmRatio;
+    }
+    m_turboSpoolVol += (targetTurbo - m_turboSpoolVol) * std::min(1.0f, 7.0f * dt);
+    updateLoopSafe(m_sndTurbo.get(), m_sfxVolume * m_turboSpoolVol, m_turboSpoolVol > 0.02f);
+
+    if (m_prevVehicleThrottle > 0.65f && curThrottle < 0.15f && m_turboSpoolVol > 0.10f) {
+        playTurboBlowOff(std::clamp(m_turboSpoolVol * 2.8f, 0.35f, 0.85f));
+    }
+    m_prevVehicleThrottle = curThrottle;
+
+    // 6d. Low Fuel Warning Chime (pulsing alert when fuel drops below 20%)
+    float fuelPct = vehicle.fuel();
+    if (fuelPct > 0.0f && fuelPct < 20.0f && !vehicle.isDriverDown()) {
+        m_lowFuelTimer += dt;
+        float interval = (fuelPct < 8.0f) ? 0.90f : 1.60f;
+        if (m_lowFuelTimer >= interval) {
+            m_lowFuelTimer = 0.0f;
+            float intensity = std::clamp((20.0f - fuelPct) / 20.0f, 0.35f, 0.85f);
+            playLowFuelChime(intensity);
+        }
+        m_lowFuelChimeVol = std::clamp((20.0f - fuelPct) / 20.0f, 0.0f, 1.0f);
+    } else {
+        m_lowFuelTimer = 0.0f;
+        m_lowFuelChimeVol = 0.0f;
+    }
+
     // 7. Jump Liftoff & Airborne Unweighting
     if (!m_wasAirborne && m_isAirborne) {
         // Transition to airborne
@@ -1238,15 +1798,36 @@ void SoundManager::renderMixedAudio(int16_t* buffer, int numSamples, int sampleR
     for (int i = 0; i < numSamples; ++i) {
         float sum = 0.0f;
 
-        // A. Music Subsystem Mixing
-        if (m_activeMusicTrack == MusicTrack::MENU && !m_bankMenuMusic.empty()) {
+        // A. Music Subsystem Mixing (Supports all background music tracks)
+        if (m_menuMusicVol > 0.005f && !m_bankMenuMusic.empty()) {
             float s = static_cast<float>(m_bankMenuMusic[m_synthMenuMusicPos]) / 32767.0f;
             sum += s * m_musicVolume * m_menuMusicVol * 0.70f;
             m_synthMenuMusicPos = (m_synthMenuMusicPos + 1) % m_bankMenuMusic.size();
-        } else if (m_activeMusicTrack == MusicTrack::RACE && !m_bankRaceMusic.empty()) {
+        }
+        if (m_garageMusicVol > 0.005f && !m_bankGarageMusic.empty()) {
+            float s = static_cast<float>(m_bankGarageMusic[m_synthGarageMusicPos]) / 32767.0f;
+            sum += s * m_musicVolume * m_garageMusicVol * 0.70f;
+            m_synthGarageMusicPos = (m_synthGarageMusicPos + 1) % m_bankGarageMusic.size();
+        }
+        if (m_raceMusicVol > 0.005f && !m_bankRaceMusic.empty()) {
             float s = static_cast<float>(m_bankRaceMusic[m_synthRaceMusicPos]) / 32767.0f;
             sum += s * m_musicVolume * m_raceMusicVol * 0.70f;
             m_synthRaceMusicPos = (m_synthRaceMusicPos + 1) % m_bankRaceMusic.size();
+        }
+        if (m_raceDesertVol > 0.005f && !m_bankRaceDesert.empty()) {
+            float s = static_cast<float>(m_bankRaceDesert[m_synthRaceDesertPos]) / 32767.0f;
+            sum += s * m_musicVolume * m_raceDesertVol * 0.70f;
+            m_synthRaceDesertPos = (m_synthRaceDesertPos + 1) % m_bankRaceDesert.size();
+        }
+        if (m_raceMountainVol > 0.005f && !m_bankRaceMountain.empty()) {
+            float s = static_cast<float>(m_bankRaceMountain[m_synthRaceMountainPos]) / 32767.0f;
+            sum += s * m_musicVolume * m_raceMountainVol * 0.70f;
+            m_synthRaceMountainPos = (m_synthRaceMountainPos + 1) % m_bankRaceMountain.size();
+        }
+        if (m_raceMoonVol > 0.005f && !m_bankRaceMoon.empty()) {
+            float s = static_cast<float>(m_bankRaceMoon[m_synthRaceMoonPos]) / 32767.0f;
+            sum += s * m_musicVolume * m_raceMoonVol * 0.70f;
+            m_synthRaceMoonPos = (m_synthRaceMoonPos + 1) % m_bankRaceMoon.size();
         }
 
         // B. Continuous Engine Synthesis
@@ -1282,6 +1863,41 @@ void SoundManager::renderMixedAudio(int16_t* buffer, int numSamples, int sampleR
             int idx = i % m_bankWind.size();
             float s = static_cast<float>(m_bankWind[idx]) / 32767.0f;
             sum += s * m_sfxVolume * m_windVolume * 0.35f;
+        }
+
+        // G. Menu & Garage Background Ambience (while not racing)
+        if (m_menuAmbienceVol > 0.005f && !m_bankMenuAmbience.empty()) {
+            float s = static_cast<float>(m_bankMenuAmbience[m_synthMenuAmbiencePos]) / 32767.0f;
+            sum += s * m_sfxVolume * m_menuAmbienceVol * 0.38f;
+            m_synthMenuAmbiencePos = (m_synthMenuAmbiencePos + 1) % m_bankMenuAmbience.size();
+        }
+        if (m_garageAmbienceVol > 0.005f && !m_bankGarageAmbience.empty()) {
+            float s = static_cast<float>(m_bankGarageAmbience[m_synthGarageAmbiencePos]) / 32767.0f;
+            sum += s * m_sfxVolume * m_garageAmbienceVol * 0.38f;
+            m_synthGarageAmbiencePos = (m_synthGarageAmbiencePos + 1) % m_bankGarageAmbience.size();
+        }
+
+        // H. Racing Environment Ambience (while racing)
+        if (m_raceAmbienceVol > 0.005f && !m_bankRaceAmbience.empty()) {
+            float s = static_cast<float>(m_bankRaceAmbience[m_synthRaceAmbiencePos]) / 32767.0f;
+            sum += s * m_sfxVolume * m_raceAmbienceVol * 0.32f;
+            m_synthRaceAmbiencePos = (m_synthRaceAmbiencePos + 1) % m_bankRaceAmbience.size();
+        }
+
+        // I. Suspension Hydraulic Damper Breath
+        if (m_suspensionVol > 0.01f && !m_bankSuspension.empty()) {
+            int idx = (i * 2) % m_bankSuspension.size();
+            float s = static_cast<float>(m_bankSuspension[idx]) / 32767.0f;
+            sum += s * m_sfxVolume * m_suspensionVol * 0.28f;
+        }
+
+        // J. Turbocharger Whine
+        if (m_turboSpoolVol > 0.01f) {
+            float turboFreq = 2200.0f * m_turboSpoolPitch;
+            m_synthTurboPhase += (turboFreq / static_cast<float>(sampleRate));
+            if (m_synthTurboPhase > 1.0f) m_synthTurboPhase -= 1.0f;
+            float turboS = std::sin(2.0f * M_PI * m_synthTurboPhase);
+            sum += turboS * m_sfxVolume * m_turboSpoolVol * 0.22f;
         }
 
         // F. Event One-Shots (polyphonic software mixing)

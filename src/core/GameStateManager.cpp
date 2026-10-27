@@ -10,9 +10,12 @@ GameStateManager::GameStateManager()
     , m_width(UI::Theme::VIRTUAL_WIDTH)
     , m_height(UI::Theme::VIRTUAL_HEIGHT)
     , m_gameTime(0.0f)
+    , m_levelTime(0.0f)
     , m_transitionTimer(0.0f)
     , m_smokeTimer(0.0f)
     , m_selectedBiome("countryside")
+    , m_currentLevel(1)
+    , m_levelCoinsEarned(0)
     , m_camera(m_width, m_height)
 {
     setDimensions(m_width, m_height);
@@ -35,6 +38,7 @@ void GameStateManager::setDimensions(int width, int height) {
     m_hud.setDimensions(width, height);
     m_pauseOverlay.setDimensions(width, height);
     m_gameOverScreen.setDimensions(width, height);
+    m_levelCompleteScreen.setDimensions(width, height);
 }
 
 void GameStateManager::setupUiCallbacks() {
@@ -49,6 +53,7 @@ void GameStateManager::setupUiCallbacks() {
     m_hud.setButtonSound(playClick);
     m_pauseOverlay.setButtonSound(playClick);
     m_gameOverScreen.setButtonSound(playClick);
+    m_levelCompleteScreen.setButtonSound(playClick);
 
     // 1. Main Menu
     m_mainMenu.setOnStart([this]() {
@@ -77,8 +82,8 @@ void GameStateManager::setupUiCallbacks() {
     m_stageSelect.setOnBack([this]() {
         changeState(StateType::MAIN_MENU);
     });
-    m_stageSelect.setOnSelectStage([this](const std::string& stageId) {
-        startRace(stageId);
+    m_stageSelect.setOnSelectStage([this](const std::string& stageId, int level) {
+        startRace(stageId, level);
     });
 
     // 4. HUD
@@ -93,7 +98,7 @@ void GameStateManager::setupUiCallbacks() {
         changeState(StateType::GAMEPLAY);
     });
     m_pauseOverlay.setOnRestart([this]() {
-        startRace(m_selectedBiome);
+        startRace(m_selectedBiome, m_currentLevel);
     });
     m_pauseOverlay.setOnGarage([this]() {
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
@@ -105,7 +110,7 @@ void GameStateManager::setupUiCallbacks() {
 
     // 6. Game Over Screen
     m_gameOverScreen.setOnRetry([this]() {
-        startRace(m_selectedBiome);
+        startRace(m_selectedBiome, m_currentLevel);
     });
     m_gameOverScreen.setOnGarage([this]() {
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
@@ -115,7 +120,29 @@ void GameStateManager::setupUiCallbacks() {
         changeState(StateType::MAIN_MENU);
     });
 
-    // 7. Physics Event Callbacks
+    // 7. Level Complete Screen
+    m_levelCompleteScreen.setOnNextLevel([this]() {
+        const auto& spec = Physics::BiomeRegistry::getBiome(m_selectedBiome);
+        if (m_currentLevel < 5) {
+            startRace(m_selectedBiome, m_currentLevel + 1);
+        } else if (!spec.nextBiomeId.empty()) {
+            startRace(spec.nextBiomeId, 1);
+        } else {
+            changeState(StateType::STAGE_SELECT);
+        }
+    });
+    m_levelCompleteScreen.setOnRetry([this]() {
+        startRace(m_selectedBiome, m_currentLevel);
+    });
+    m_levelCompleteScreen.setOnGarage([this]() {
+        m_garage.setViewedVehicle(m_profile.selectedVehicle());
+        changeState(StateType::GARAGE);
+    });
+    m_levelCompleteScreen.setOnMenu([this]() {
+        changeState(StateType::STAGE_SELECT);
+    });
+
+    // 8. Physics Event Callbacks
     m_physics.setOnStunt([this](const std::string& title, int bonusCoins) {
         m_hud.triggerStunt(title, bonusCoins);
         m_profile.addCoins(bonusCoins);
@@ -133,6 +160,7 @@ void GameStateManager::setupUiCallbacks() {
             m_particleSystem.emitSparkles(carPos, UI::Theme::GREEN_GAS);
         } else {
             m_audio.playCoinPickup();
+            m_levelCoinsEarned += val;
             uint32_t sparkCol = (type == Physics::ItemType::COIN_GOLD) ? UI::Theme::GOLD :
                                 (type == Physics::ItemType::COIN_SILVER) ? 0xFFCFD8DC : 0xFFCD7F32;
             m_particleSystem.emitSparkles(carPos, sparkCol);
@@ -140,19 +168,49 @@ void GameStateManager::setupUiCallbacks() {
         }
     });
 
-    // 8. Checkpoint Crossings
+    // 9. Checkpoint Crossings
     m_physics.setOnCheckpoint([this](const Physics::CheckpointInfo& cp) {
         m_profile.addCoins(cp.coinReward);
         m_profile.recordStageCheckpoint(m_selectedBiome, cp.index);
         m_audio.playStuntCheer();
 
         if (cp.isFinishLine) {
-            std::string msg = "STAGE CLEARED! +" + std::to_string(cp.coinReward);
-            m_hud.triggerStunt(msg, cp.coinReward, UI::Theme::GOLD);
+            // Stop vehicle immediately so racing halts
+            m_physics.vehicle().applyInput(0.0f, 1.0f, 0.0f);
+
             const auto& spec = Physics::BiomeRegistry::getBiome(m_selectedBiome);
-            if (!spec.nextBiomeId.empty()) {
+            const auto& lvlSpec = spec.getLevel(m_currentLevel);
+
+            // Record progress & unlock next
+            m_profile.addCoins(lvlSpec.completionRewardCoins);
+            m_profile.recordStageLevelCompleted(m_selectedBiome, m_currentLevel);
+
+            bool unlockedNextStage = false;
+            if (m_currentLevel >= 5 && !spec.nextBiomeId.empty()) {
                 m_profile.unlockStage(spec.nextBiomeId);
+                unlockedNextStage = true;
             }
+
+            float dist = m_physics.distanceReached();
+            float prevRec = m_profile.getRecordDistance(m_selectedBiome);
+            if (dist > prevRec) {
+                m_profile.recordDistance(m_selectedBiome, dist);
+            }
+
+            m_levelCompleteScreen.setLevelStats(
+                spec.name,
+                m_currentLevel,
+                lvlSpec.name,
+                dist,
+                m_levelTime,
+                m_physics.coinsCollected(),
+                lvlSpec.completionRewardCoins,
+                m_physics.flipsCompleted(),
+                m_physics.totalAirTime(),
+                unlockedNextStage
+            );
+
+            changeState(StateType::LEVEL_COMPLETE);
         } else {
             std::string msg = "CHECKPOINT " + std::to_string(cp.index) + ": " + cp.name + "!";
             m_hud.triggerStunt(msg, cp.coinReward, UI::Theme::GREEN_GAS);
@@ -171,12 +229,15 @@ void GameStateManager::changeState(StateType newState) {
     }
 }
 
-void GameStateManager::startRace(const std::string& biomeId) {
+void GameStateManager::startRace(const std::string& biomeId, int level) {
     m_selectedBiome = biomeId;
-    m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver());
+    m_currentLevel = std::clamp(level, 1, 5);
+    m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver(), m_currentLevel);
     m_camera.reset(m_physics.vehicle().chassisPos());
     m_particleSystem.clear();
     m_gameTime = 0.0f;
+    m_levelTime = 0.0f;
+    m_levelCoinsEarned = 0;
     changeState(StateType::GAMEPLAY);
 }
 
@@ -186,7 +247,7 @@ void GameStateManager::handleInput(const InputController::State& input) {
 
     if (m_currentState == StateType::MAIN_MENU) {
         if (input.enter) {
-            startRace(m_selectedBiome);
+            startRace(m_selectedBiome, 1);
             return;
         }
         if (input.mouseMoved) m_mainMenu.onMouseMove(mx, my);
@@ -198,7 +259,7 @@ void GameStateManager::handleInput(const InputController::State& input) {
         if (input.mouseJustReleased) m_garage.onMouseUp(mx, my, m_profile);
     } else if (m_currentState == StateType::STAGE_SELECT) {
         if (input.enter) {
-            startRace(m_selectedBiome);
+            startRace(m_selectedBiome, 1);
             return;
         }
         if (input.mouseMoved) m_stageSelect.onMouseMove(mx, my);
@@ -210,7 +271,7 @@ void GameStateManager::handleInput(const InputController::State& input) {
             return;
         }
         if (input.restart) {
-            startRace(m_selectedBiome);
+            startRace(m_selectedBiome, m_currentLevel);
             return;
         }
 
@@ -236,7 +297,7 @@ void GameStateManager::handleInput(const InputController::State& input) {
             return;
         }
         if (input.restart) {
-            startRace(m_selectedBiome);
+            startRace(m_selectedBiome, m_currentLevel);
             return;
         }
         if (input.mouseMoved) m_pauseOverlay.onMouseMove(mx, my);
@@ -244,12 +305,35 @@ void GameStateManager::handleInput(const InputController::State& input) {
         if (input.mouseJustReleased) m_pauseOverlay.onMouseUp(mx, my);
     } else if (m_currentState == StateType::GAME_OVER) {
         if (input.restart || input.enter) {
-            startRace(m_selectedBiome);
+            startRace(m_selectedBiome, m_currentLevel);
             return;
         }
         if (input.mouseMoved) m_gameOverScreen.onMouseMove(mx, my);
         if (input.mouseJustPressed) m_gameOverScreen.onMouseDown(mx, my);
         if (input.mouseJustReleased) m_gameOverScreen.onMouseUp(mx, my);
+    } else if (m_currentState == StateType::LEVEL_COMPLETE) {
+        if (input.enter) {
+            const auto& spec = Physics::BiomeRegistry::getBiome(m_selectedBiome);
+            if (m_currentLevel < 5) {
+                startRace(m_selectedBiome, m_currentLevel + 1);
+            } else if (!spec.nextBiomeId.empty()) {
+                startRace(spec.nextBiomeId, 1);
+            } else {
+                changeState(StateType::STAGE_SELECT);
+            }
+            return;
+        }
+        if (input.restart) {
+            startRace(m_selectedBiome, m_currentLevel);
+            return;
+        }
+        if (input.pause) {
+            changeState(StateType::STAGE_SELECT);
+            return;
+        }
+        if (input.mouseMoved) m_levelCompleteScreen.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_levelCompleteScreen.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_levelCompleteScreen.onMouseUp(mx, my);
     }
 }
 
@@ -259,7 +343,8 @@ void GameStateManager::fixedUpdate(float dt) {
     }
 
     bool isPaused = (m_currentState == StateType::PAUSED);
-    if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::PAUSED || m_currentState == StateType::GAME_OVER) {
+    if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::PAUSED ||
+        m_currentState == StateType::GAME_OVER || m_currentState == StateType::LEVEL_COMPLETE) {
         m_terrainRasterizer.dayNightCycle().update(dt, isPaused);
     }
 
@@ -275,10 +360,18 @@ void GameStateManager::fixedUpdate(float dt) {
         const auto& car = m_physics.vehicle();
         m_camera.update(dt, car.chassisPos(), car.chassisVel().x);
         m_particleSystem.update(dt);
+    } else if (m_currentState == StateType::LEVEL_COMPLETE) {
+        m_levelCompleteScreen.update(dt);
+        m_physics.vehicle().applyInput(0.0f, 1.0f, 0.0f);
+        m_physics.step(dt, m_profile);
+        const auto& car = m_physics.vehicle();
+        m_camera.update(dt, car.chassisPos(), car.chassisVel().x);
+        m_particleSystem.update(dt);
     } else if (m_currentState == StateType::PAUSED) {
         m_pauseOverlay.update(dt);
     } else if (m_currentState == StateType::GAMEPLAY) {
         m_gameTime += dt;
+        m_levelTime += dt;
 
         // Step physics simulation
         m_physics.step(dt, m_profile);
@@ -329,7 +422,7 @@ void GameStateManager::fixedUpdate(float dt) {
         m_hud.setDistance(m_physics.distanceReached());
         m_hud.setRecord(m_profile.getRecordDistance(m_selectedBiome));
         m_hud.setCoins(m_profile.coins() + m_physics.coinsCollected());
-        m_hud.setCheckpointProgress(m_physics.currentCheckpoint(), 5);
+        m_hud.setCheckpointProgress(m_physics.currentCheckpoint(), 3);
         const auto* nextCp = m_physics.terrain().getNextCheckpoint(m_physics.distanceReached());
         if (nextCp) {
             m_hud.setNextCheckpoint(nextCp->name, nextCp->distance);
@@ -351,6 +444,7 @@ void GameStateManager::fixedUpdate(float dt) {
 
             m_camera.addTrauma(0.9f);
             m_audio.playCrash();
+            m_audio.playGameOverJingle();
             changeState(StateType::GAME_OVER);
         }
     }
@@ -366,7 +460,8 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
         m_garage.render(fb, m_profile);
     } else if (m_currentState == StateType::STAGE_SELECT) {
         m_stageSelect.render(fb, m_profile);
-    } else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::PAUSED || m_currentState == StateType::GAME_OVER) {
+    } else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::PAUSED ||
+               m_currentState == StateType::GAME_OVER || m_currentState == StateType::LEVEL_COMPLETE) {
         // Set camera interpolation fraction for synchronized sub-tick world coordinates
         m_camera.setRenderAlpha(alpha);
 
@@ -387,6 +482,8 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
             m_pauseOverlay.render(fb);
         } else if (m_currentState == StateType::GAME_OVER) {
             m_gameOverScreen.render(fb);
+        } else if (m_currentState == StateType::LEVEL_COMPLETE) {
+            m_levelCompleteScreen.render(fb);
         }
     }
 

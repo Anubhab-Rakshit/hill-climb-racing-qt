@@ -40,6 +40,7 @@ set(SOURCES
     src/graphics/PixelCanvas.cpp
     src/graphics/RasterFont.cpp
     src/graphics/Sprite.cpp
+    src/graphics/ItemRenderer.cpp
     src/graphics/ScanlineRasterizer.cpp
     src/graphics/DayNightCycle.cpp
     src/graphics/EnvironmentRenderer.cpp
@@ -62,6 +63,7 @@ set(SOURCES
     src/ui/StageSelectScreen.cpp
     src/ui/PauseOverlay.cpp
     src/ui/GameOverScreen.cpp
+    src/ui/LevelCompleteScreen.cpp
     src/ui/UIComponents.cpp
     # Audio
     src/audio/SoundManager.cpp
@@ -116,3 +118,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Multimedia
 )
+
+# add_subdirectory(tests)

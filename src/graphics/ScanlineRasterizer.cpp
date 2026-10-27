@@ -3,6 +3,10 @@
 #include "UITheme.h"
 #include <cmath>
 #include <algorithm>
+#include <execution>
+#include <mutex>
+#include "Palette.h"
+#include "ItemRenderer.h"
 
 namespace Graphics {
 
@@ -13,156 +17,19 @@ ScanlineRasterizer::ScanlineRasterizer() {
 
 void ScanlineRasterizer::renderItems(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime) {
     const auto& items = terrain.getItems();
-
-    for (const auto& item : items) {
-        if (item.collected) continue;
-
+    static std::mutex fbMutex;
+    std::for_each(std::execution::par, items.begin(), items.end(), [&](const Physics::WorldItem& item) {
+        if (item.collected) return;
+        // Quick frustum culling before acquiring lock
         Physics::Vec2 scr = cam.worldToScreen(item.position);
         int sx = static_cast<int>(scr.x);
         int sy = static_cast<int>(scr.y);
-
-        if (sx < -35 || sx > fb.width() + 35 || sy < -35 || sy > fb.height() + 35) continue;
-
-        // Gentle floating bob
-        int bobY = sy + static_cast<int>(std::sin(gameTime * 4.2f + item.position.x * 0.8f) * 3.5f);
-
-        if (item.type == Physics::ItemType::FUEL_CANISTER) {
-            // Professional Pixel-Art Jerry Can (20 x 26 px)
-            int cw = 20;
-            int ch = 26;
-            int cx = sx - cw / 2;
-            int cy = bobY - ch / 2;
-
-            // Ground shadow
-            float groundY = terrain.getHeight(item.position.x);
-            Physics::Vec2 gScr = cam.worldToScreen({item.position.x, groundY});
-            if (gScr.x >= 0 && gScr.x < fb.width() && gScr.y >= 0 && gScr.y < fb.height()) {
-                fb.fillCircle(static_cast<int>(gScr.x), static_cast<int>(gScr.y), 9, 0x44000000);
-            }
-
-            // Top handles (3-bar tubular carry handle)
-            fb.fillRect(cx + 3, cy - 4, cw - 6, 4, 0xFFB71C1C);
-            fb.fillRect(cx + 6, cy - 3, cw - 12, 3, 0x00000000); // Hollow grip cutout
-            fb.drawRect(cx + 3, cy - 4, cw - 6, 4, 0xFF8E0000);
-
-            // Angled filler spout on right shoulder
-            fb.fillRect(cx + cw - 6, cy - 6, 5, 4, 0xFFCFD8DC);
-            fb.drawRect(cx + cw - 6, cy - 6, 5, 4, 0xFF78909C);
-            fb.fillRect(cx + cw - 5, cy - 7, 3, 2, 0xFFFFB300); // Brass fuel cap
-
-            // Main Steel Canister Body
-            fb.fillRect(cx, cy, cw, ch, 0xFFD32F2F); // Vibrant Jerry-can red
-            fb.drawRect(cx, cy, cw, ch, 0xFF8E0000); // Dark pressed-steel border
-            // Top-left metallic specular bevel
-            fb.drawLine(cx + 1, cy + 1, cx + cw - 2, cy + 1, 0xFFFF5252);
-            fb.drawLine(cx + 1, cy + 1, cx + 1, cy + ch - 2, 0xFFFF5252);
-
-            // Stamped Recessed Stiffener 'X' indentation
-            fb.drawLine(cx + 3, cy + 3, cx + cw - 4, cy + ch - 4, 0xFF8E0000);
-            fb.drawLine(cx + 4, cy + 3, cx + cw - 3, cy + ch - 4, 0xFFEF5350);
-            fb.drawLine(cx + cw - 4, cy + 3, cx + 3, cy + ch - 4, 0xFF8E0000);
-            fb.drawLine(cx + cw - 3, cy + 3, cx + 4, cy + ch - 4, 0xFFEF5350);
-
-            // High-Contrast White Jerry-Can Badge
-            int badgeW = cw - 6;
-            int badgeH = 9;
-            int bx = cx + 3;
-            int by = cy + (ch - badgeH) / 2;
-            fb.fillRect(bx, by, badgeW, badgeH, 0xFFECEFF1);
-            fb.drawRect(bx, by, badgeW, badgeH, 0xFFB0BEC5);
-            Graphics::RasterFont::drawStringCentered(fb, sx, by + 1, "GAS", 0xFFD32F2F, 1);
-
-            // Pulsing Ambient Beacon Halo
-            float pulse = 0.5f + 0.5f * std::sin(gameTime * 5.0f + item.position.x);
-            uint32_t haloA = static_cast<uint32_t>(pulse * 45.0f);
-            fb.drawRect(cx - 1, cy - 1, cw + 2, ch + 2, (haloA << 24) | 0x00FF5252);
-        } else {
-            // Arcade Pseudo-3D Rotating Coin (Gold, Silver, Bronze)
-            // Coin spins horizontally around vertical axis
-            float spinAngle = gameTime * 4.5f + item.position.x * 0.7f;
-            float cosSpin = std::cos(spinAngle);
-            float absCos = std::abs(cosSpin);
-
-            const int baseR = 10;
-            // Half-width rx: clamped to minimum 4px to preserve coin disc character and avoid single-pixel needle artifacts
-            int rx = std::max(4, static_cast<int>(absCos * baseR));
-            int ry = baseR;
-
-            // Ground shadow: realistic horizontal flattened oval disc beneath floating coin
-            float groundY = terrain.getHeight(item.position.x);
-            Physics::Vec2 gScr = cam.worldToScreen({item.position.x, groundY});
-            int gX = static_cast<int>(gScr.x);
-            int gY = static_cast<int>(gScr.y);
-            if (gX >= 0 && gX < fb.width() && gY >= 0 && gY < fb.height()) {
-                for (int dy = -2; dy <= 2; ++dy) {
-                    int sw = (dy == 0) ? 7 : (std::abs(dy) == 1 ? 5 : 3);
-                    for (int dx = -sw; dx <= sw; ++dx) {
-                        fb.blendPixelFast(gX + dx, gY + dy, 0x38000000);
-                    }
-                }
-            }
-
-            // Color palettes for 3 tiers
-            uint32_t rimCol, bodyCol, hiCol, textCol;
-            if (item.type == Physics::ItemType::COIN_GOLD) {
-                rimCol = 0xFFB27D00;
-                bodyCol = 0xFFFFD700;
-                hiCol = 0xFFFFF59D;
-                textCol = 0xFF3E2723;
-            } else if (item.type == Physics::ItemType::COIN_SILVER) {
-                rimCol = 0xFF607D8B;
-                bodyCol = 0xFFCFD8DC;
-                hiCol = 0xFFECEFF1;
-                textCol = 0xFF263238;
-            } else { // BRONZE
-                rimCol = 0xFF795548;
-                bodyCol = 0xFFCD7F32;
-                hiCol = 0xFFD7CCC8;
-                textCol = 0xFF3E2723;
-            }
-
-            // Draw Pseudo-3D Rotated Ellipse
-            for (int dy = -ry; dy <= ry; ++dy) {
-                float yFrac = static_cast<float>(dy) / ry;
-                float xBound = std::sqrt(std::max(0.0f, 1.0f - yFrac * yFrac)) * rx;
-                int minX = static_cast<int>(-xBound);
-                int maxX = static_cast<int>(xBound);
-
-                for (int dx = minX; dx <= maxX; ++dx) {
-                    int px = sx + dx;
-                    int py = bobY + dy;
-                    if (px < 0 || px >= fb.width() || py < 0 || py >= fb.height()) continue;
-
-                    bool isEdge = (dx == minX || dx == maxX || dy == -ry || dy == ry);
-                    if (isEdge) {
-                        fb.setPixelFast(px, py, rimCol);
-                    } else if (dx < 0 && dy < 0) {
-                        fb.setPixelFast(px, py, hiCol); // Upper-left specular gleam
-                    } else {
-                        fb.setPixelFast(px, py, bodyCol);
-                    }
-                }
-            }
-
-            // Embossed Currency Symbol ($) or Edge-on Cylindrical Rim Flare
-            if (rx >= 6) {
-                Graphics::RasterFont::drawStringCentered(fb, sx, bobY - 3, "$", textCol, 1);
-            } else {
-                // Edge-on view: authentic metallic cylindrical rim flare and edge seam
-                fb.drawLine(sx - 1, bobY - ry + 2, sx - 1, bobY + ry - 2, hiCol);
-                fb.drawLine(sx + 1, bobY - ry + 2, sx + 1, bobY + ry - 2, rimCol);
-            }
-
-            // Specular diamond twinkle glint on Gold coins periodically
-            if (item.type == Physics::ItemType::COIN_GOLD && (static_cast<int>(gameTime * 3.0f + item.position.x) % 5 == 0)) {
-                fb.blendPixelFast(sx - rx / 2, bobY - ry / 2, 0xFFFFFFFF);
-                fb.blendPixelFast(sx - rx / 2 + 1, bobY - ry / 2, 0x88FFFFFF);
-                fb.blendPixelFast(sx - rx / 2 - 1, bobY - ry / 2, 0x88FFFFFF);
-                fb.blendPixelFast(sx - rx / 2, bobY - ry / 2 + 1, 0x88FFFFFF);
-                fb.blendPixelFast(sx - rx / 2, bobY - ry / 2 - 1, 0x88FFFFFF);
-            }
+        if (sx < -35 || sx > fb.width() + 35 || sy < -35 || sy > fb.height() + 35) return;
+        {
+            std::lock_guard<std::mutex> lock(fbMutex);
+            ItemRenderer::drawItem(fb, cam, terrain, item, gameTime);
         }
-    }
+    });
 }
 
 void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime) {
@@ -389,21 +256,37 @@ void ScanlineRasterizer::renderMilestones(Framebuffer& fb, const Camera& cam, co
             int archW = 240;
             int p1x = sx - archW / 2;
             int p2x = sx + archW / 2 - 10;
-            int topY = sy - archH;
 
-            // Two Heavy Steel Lattice Gantry Towers
-            auto drawTower = [&](int tx) {
-                fb.fillRect(tx, topY, 10, archH, 0xFF37474F);
-                fb.drawRect(tx, topY, 10, archH, 0xFF263238);
+            // Sample terrain height independently at each tower's world X position
+            // so both poles are rooted to the actual ground on slopes
+            Physics::Vec2 leftWorld = cam.screenToWorld(Physics::Vec2(static_cast<float>(p1x + 5), 0.0f));
+            float leftGroundY = terrain.getHeight(leftWorld.x);
+            Physics::Vec2 leftGroundScr = cam.worldToScreen(Physics::Vec2(leftWorld.x, leftGroundY));
+            int leftBaseY = static_cast<int>(leftGroundScr.y);
+
+            Physics::Vec2 rightWorld = cam.screenToWorld(Physics::Vec2(static_cast<float>(p2x + 5), 0.0f));
+            float rightGroundY = terrain.getHeight(rightWorld.x);
+            Physics::Vec2 rightGroundScr = cam.worldToScreen(Physics::Vec2(rightWorld.x, rightGroundY));
+            int rightBaseY = static_cast<int>(rightGroundScr.y);
+
+            // The overhead beam sits at a fixed height above the higher pole base
+            int topY = std::min(leftBaseY, rightBaseY) - archH;
+            int leftTowerH = leftBaseY - topY;
+            int rightTowerH = rightBaseY - topY;
+
+            // Two Heavy Steel Lattice Gantry Towers (each rooted to its own ground height)
+            auto drawTower = [&](int tx, int baseY, int towerH) {
+                fb.fillRect(tx, topY, 10, towerH, 0xFF37474F);
+                fb.drawRect(tx, topY, 10, towerH, 0xFF263238);
                 // Heavy truss cross braces
-                for (int b = topY + 6; b < sy - 12; b += 18) {
+                for (int b = topY + 6; b < baseY - 12; b += 18) {
                     fb.drawLine(tx, b, tx + 9, b + 14, 0xFF78909C);
                     fb.drawLine(tx + 9, b, tx, b + 14, 0xFF78909C);
                     fb.drawLine(tx, b, tx + 9, b, 0xFF90A4AE); // Horizontal tie
                 }
             };
-            drawTower(p1x);
-            drawTower(p2x);
+            drawTower(p1x, leftBaseY, leftTowerH);
+            drawTower(p2x, rightBaseY, rightTowerH);
 
             // Grand Overhead Banner Box
             int bannerW = archW + 24;
@@ -461,15 +344,29 @@ void ScanlineRasterizer::renderMilestones(Framebuffer& fb, const Camera& cam, co
 
         // 1. Two Wooden Support Stakes Planted in the Ground
         int postW = 5;
-        int postH = 55;
         int p1x = sx - 22;
         int p2x = sx + 18;
-        int postTopY = sy - postH;
 
-        fb.fillRect(p1x, postTopY, postW, postH, postCol);
-        fb.fillRect(p1x + 1, postTopY, 1, postH, postHiCol); // Wood grain highlight
-        fb.fillRect(p2x, postTopY, postW, postH, postCol);
-        fb.fillRect(p2x + 1, postTopY, 1, postH, postHiCol);
+        // Sample terrain height independently at each stake's world X position
+        Physics::Vec2 leftWorld = cam.screenToWorld(Physics::Vec2(static_cast<float>(p1x + 2), 0.0f));
+        float leftGroundY = terrain.getHeight(leftWorld.x);
+        Physics::Vec2 leftGroundScr = cam.worldToScreen(Physics::Vec2(leftWorld.x, leftGroundY));
+        int leftBaseY = static_cast<int>(leftGroundScr.y);
+
+        Physics::Vec2 rightWorld = cam.screenToWorld(Physics::Vec2(static_cast<float>(p2x + 2), 0.0f));
+        float rightGroundY = terrain.getHeight(rightWorld.x);
+        Physics::Vec2 rightGroundScr = cam.worldToScreen(Physics::Vec2(rightWorld.x, rightGroundY));
+        int rightBaseY = static_cast<int>(rightGroundScr.y);
+
+        // Both stakes share a common top line; the board sits above the higher ground
+        int postTopY = std::min(leftBaseY, rightBaseY) - 55;
+        int leftPostH = leftBaseY - postTopY;
+        int rightPostH = rightBaseY - postTopY;
+
+        fb.fillRect(p1x, postTopY, postW, leftPostH, postCol);
+        fb.fillRect(p1x + 1, postTopY, 1, leftPostH, postHiCol); // Wood grain highlight
+        fb.fillRect(p2x, postTopY, postW, rightPostH, postCol);
+        fb.fillRect(p2x + 1, postTopY, 1, rightPostH, postHiCol);
 
         // 2. Wooden Signboard Plank
         int boardW = 68;

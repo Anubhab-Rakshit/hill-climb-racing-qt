@@ -276,12 +276,38 @@ void ProfileManager::setStageCompleted(const std::string& stageId, bool complete
     m_stageCompleted[stageId] = completed;
     if (completed) {
         m_stageCheckpoints[stageId] = 5;
+        m_stageLevelProgress[stageId] = 5;
         const auto& spec = Physics::BiomeRegistry::getBiome(stageId);
         if (!spec.nextBiomeId.empty()) {
             m_stageUnlocked[spec.nextBiomeId] = true;
         }
     }
     save();
+}
+
+int ProfileManager::getStageLevelProgress(const std::string& stageId) const {
+    auto it = m_stageLevelProgress.find(stageId);
+    if (it != m_stageLevelProgress.end()) return it->second;
+    if (isStageCompleted(stageId)) return 5;
+    return 0;
+}
+
+void ProfileManager::recordStageLevelCompleted(const std::string& stageId, int level) {
+    int cur = getStageLevelProgress(stageId);
+    if (level > cur) {
+        m_stageLevelProgress[stageId] = level;
+    }
+    if (level >= 5) {
+        setStageCompleted(stageId, true);
+    } else {
+        save();
+    }
+}
+
+bool ProfileManager::isStageLevelUnlocked(const std::string& stageId, int level) const {
+    if (!isStageUnlocked(stageId)) return false;
+    if (level <= 1) return true;
+    return getStageLevelProgress(stageId) >= (level - 1);
 }
 
 void ProfileManager::load() {
@@ -340,6 +366,10 @@ void ProfileManager::load() {
             if (settings.contains(compKey)) {
                 m_stageCompleted[sId] = settings.value(compKey, false).toBool();
             }
+            QString lvlKey = QString::fromStdString("lvl_prog_" + sId);
+            if (settings.contains(lvlKey)) {
+                m_stageLevelProgress[sId] = settings.value(lvlKey, 0).toInt();
+            }
         }
     }
 
@@ -385,6 +415,9 @@ void ProfileManager::save() const {
     }
     for (const auto& pair : m_stageCompleted) {
         settings.setValue(QString::fromStdString("completed_" + pair.first), pair.second);
+    }
+    for (const auto& pair : m_stageLevelProgress) {
+        settings.setValue(QString::fromStdString("lvl_prog_" + pair.first), pair.second);
     }
 }
 
