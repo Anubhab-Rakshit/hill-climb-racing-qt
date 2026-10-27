@@ -33,6 +33,15 @@ public:
     Physics::VehicleType viewedVehicle() const { return m_viewedVehicle; }
     void setViewedVehicle(Physics::VehicleType type) { m_viewedVehicle = type; }
 
+    bool isMultiplayerMode() const { return m_isMultiplayer; }
+    void setMultiplayerMode(bool mp);
+    int activeRacer() const { return m_activeRacer; }
+    void setActiveRacer(int racer) { m_activeRacer = racer; }
+    Physics::VehicleType p2Vehicle() const { return m_p2Vehicle; }
+    void setP2Vehicle(Physics::VehicleType type) { m_p2Vehicle = type; }
+    Physics::DriverType p2Driver() const { return m_p2Driver; }
+    void setP2Driver(Physics::DriverType type) { m_p2Driver = type; }
+
 private:
     int m_width;
     int m_height;
@@ -44,6 +53,12 @@ private:
 
     Physics::VehicleType m_viewedVehicle;
     int m_activeTab; // 0 = Powertrain & Traction, 1 = Handling & Chassis
+
+    bool m_isMultiplayer = false;
+    int m_activeRacer = 0; // 0 = Player 1, 1 = Player 2
+    Physics::VehicleType m_p2Vehicle = Physics::VehicleType::OFFROADER;
+    Physics::DriverType m_p2Driver = Physics::DriverType::SARAH;
+    RetroButton m_btnRacerToggle;
 
     // Navigation & Actions
     RetroButton m_btnBack;

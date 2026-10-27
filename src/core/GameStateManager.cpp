@@ -21,6 +21,12 @@ GameStateManager::GameStateManager()
     , m_camera2(m_width, 266)
     , m_fbP1(m_width, 266)
     , m_fbP2(m_width, 266)
+    , m_mpSpeedoP1(0, 0, 24, 0.0f, 140.0f, "SPD", "KM/H", 0.85f)
+    , m_mpSpeedoP2(0, 0, 24, 0.0f, 140.0f, "SPD", "KM/H", 0.85f)
+    , m_mpTachoP1(0, 0, 24, 0.0f, 8.5f, "RPM", "x1000", 0.78f)
+    , m_mpTachoP2(0, 0, 24, 0.0f, 8.5f, "RPM", "x1000", 0.78f)
+    , m_mpFuelBarP1(14, 40, 130, 14)
+    , m_mpFuelBarP2(14, 40, 130, 14)
 {
     setDimensions(m_width, m_height);
     setupUiCallbacks();
@@ -39,6 +45,14 @@ void GameStateManager::setDimensions(int width, int height) {
     m_camera2.setScreenSize(width, 266);
     m_fbP1.resize(width, 266);
     m_fbP2.resize(width, 266);
+
+    // Dynamic dual analog instrument cluster positioning in 960x266 split-screens
+    m_mpSpeedoP1.setCenter(width - 88, 230);
+    m_mpTachoP1.setCenter(width - 32, 230);
+    m_mpSpeedoP2.setCenter(width - 88, 230);
+    m_mpTachoP2.setCenter(width - 32, 230);
+    m_mpFuelBarP1.setPosition(14, 40);
+    m_mpFuelBarP2.setPosition(14, 40);
 
     m_mainMenu.setDimensions(width, height);
     m_garage.setDimensions(width, height);
@@ -63,16 +77,27 @@ void GameStateManager::setupUiCallbacks() {
 
     // 1. Main Menu
     m_mainMenu.setOnStart([this]() {
+        m_isMultiplayerFlow = false;
+        m_stageSelect.setMultiplayerMode(false);
         changeState(StateType::STAGE_SELECT);
     });
     m_mainMenu.setOnMultiplayer([this]() {
-        startMultiplayerRace();
+        m_isMultiplayerFlow = true;
+        m_garage.setMultiplayerMode(true);
+        m_garage.setViewedVehicle(m_profile.selectedVehicle());
+        m_garage.setP2Vehicle(m_profile.selectedVehicle());
+        m_garage.setP2Driver(Physics::DriverType::SARAH);
+        changeState(StateType::GARAGE);
     });
     m_mainMenu.setOnGarage([this]() {
+        m_isMultiplayerFlow = false;
+        m_garage.setMultiplayerMode(false);
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_mainMenu.setOnStages([this]() {
+        m_isMultiplayerFlow = false;
+        m_stageSelect.setMultiplayerMode(false);
         changeState(StateType::STAGE_SELECT);
     });
     m_mainMenu.setOnQuit([]() {
@@ -81,18 +106,37 @@ void GameStateManager::setupUiCallbacks() {
 
     // 2. Garage
     m_garage.setOnBack([this]() {
+        m_isMultiplayerFlow = false;
         changeState(StateType::MAIN_MENU);
     });
     m_garage.setOnDrive([this]() {
+        if (m_isMultiplayerFlow) {
+            m_mpVehicleP1 = m_profile.selectedVehicle();
+            m_mpVehicleP2 = m_garage.p2Vehicle();
+            m_mpDriverP1 = m_profile.selectedDriver();
+            m_mpDriverP2 = m_garage.p2Driver();
+            m_stageSelect.setMultiplayerMode(true);
+        } else {
+            m_stageSelect.setMultiplayerMode(false);
+        }
         changeState(StateType::STAGE_SELECT);
     });
 
     // 3. Stage Select
     m_stageSelect.setOnBack([this]() {
-        changeState(StateType::MAIN_MENU);
+        if (m_isMultiplayerFlow) {
+            m_garage.setMultiplayerMode(true);
+            changeState(StateType::GARAGE);
+        } else {
+            changeState(StateType::MAIN_MENU);
+        }
     });
     m_stageSelect.setOnSelectStage([this](const std::string& stageId) {
-        startRace(stageId);
+        if (m_isMultiplayerFlow) {
+            startMultiplayerRace(stageId);
+        } else {
+            startRace(stageId);
+        }
     });
 
     // 4. HUD
@@ -112,32 +156,52 @@ void GameStateManager::setupUiCallbacks() {
     });
     m_pauseOverlay.setOnRestart([this]() {
         if (m_physics.isMultiplayer()) {
-            startMultiplayerRace();
+            startMultiplayerRace(m_selectedMpBiome);
         } else {
             startRace(m_selectedBiome);
         }
     });
     m_pauseOverlay.setOnGarage([this]() {
+        if (m_physics.isMultiplayer()) {
+            m_isMultiplayerFlow = true;
+            m_garage.setMultiplayerMode(true);
+            m_garage.setP2Vehicle(m_mpVehicleP2);
+            m_garage.setP2Driver(m_mpDriverP2);
+        } else {
+            m_isMultiplayerFlow = false;
+            m_garage.setMultiplayerMode(false);
+        }
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_pauseOverlay.setOnMenu([this]() {
+        m_isMultiplayerFlow = false;
         changeState(StateType::MAIN_MENU);
     });
 
     // 6. Game Over Screen
     m_gameOverScreen.setOnRetry([this]() {
         if (m_physics.isMultiplayer()) {
-            startMultiplayerRace();
+            startMultiplayerRace(m_selectedMpBiome);
         } else {
             startRace(m_selectedBiome);
         }
     });
     m_gameOverScreen.setOnGarage([this]() {
+        if (m_physics.isMultiplayer()) {
+            m_isMultiplayerFlow = true;
+            m_garage.setMultiplayerMode(true);
+            m_garage.setP2Vehicle(m_mpVehicleP2);
+            m_garage.setP2Driver(m_mpDriverP2);
+        } else {
+            m_isMultiplayerFlow = false;
+            m_garage.setMultiplayerMode(false);
+        }
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_gameOverScreen.setOnMenu([this]() {
+        m_isMultiplayerFlow = false;
         changeState(StateType::MAIN_MENU);
     });
 
@@ -148,21 +212,28 @@ void GameStateManager::setupUiCallbacks() {
         m_audio.playStuntCheer();
     });
 
-    m_physics.setOnItemCollected([this](Physics::ItemType type, int val) {
-        Physics::Vec2 carPos = m_physics.vehicle().chassisPos();
-        Physics::Vec2 scr = m_camera.worldToScreen(carPos);
+    m_physics.setOnItemCollected([this](Physics::ItemType type, int val, bool isP1) {
+        Physics::Vec2 carPos = isP1 ? m_physics.vehicle().chassisPos() : m_physics.vehicle2().chassisPos();
+        Physics::Vec2 scr = isP1 ? m_camera.worldToScreen(carPos) : m_camera2.worldToScreen(carPos);
         if (type == Physics::ItemType::FUEL_CANISTER) {
             m_audio.playFuelPickup();
-            m_hud.triggerStunt("+100% FUEL!", 0, UI::Theme::GREEN_GAS);
-            m_hud.addFloatingText("+100% FUEL!", scr.x, scr.y - 25.0f, UI::Theme::GREEN_GAS);
-            m_hud.triggerFuelFlash();
+            if (isP1) {
+                m_hud.triggerStunt("+45% FUEL!", 0, UI::Theme::GREEN_GAS);
+                m_hud.addFloatingText("+45% FUEL!", scr.x, scr.y - 25.0f, UI::Theme::GREEN_GAS);
+                m_hud.triggerFuelFlash();
+                m_mpFuelBarP1.triggerPickupFlash();
+            } else {
+                m_mpFuelBarP2.triggerPickupFlash();
+            }
             m_particleSystem.emitSparkles(carPos, UI::Theme::GREEN_GAS);
         } else {
             m_audio.playCoinPickup();
             uint32_t sparkCol = (type == Physics::ItemType::COIN_GOLD) ? UI::Theme::GOLD :
                                 (type == Physics::ItemType::COIN_SILVER) ? 0xFFCFD8DC : 0xFFCD7F32;
             m_particleSystem.emitSparkles(carPos, sparkCol);
-            m_hud.addFloatingText("+$" + std::to_string(val), scr.x, scr.y - 25.0f, sparkCol);
+            if (isP1) {
+                m_hud.addFloatingText("+$" + std::to_string(val), scr.x, scr.y - 25.0f, sparkCol);
+            }
         }
     });
 
@@ -207,26 +278,34 @@ void GameStateManager::startRace(const std::string& biomeId) {
     changeState(StateType::GAMEPLAY);
 }
 
-void GameStateManager::startMultiplayerRace() {
-    m_selectedBiome = "countryside";
+void GameStateManager::startMultiplayerRace(const std::string& biomeId) {
+    m_selectedMpBiome = biomeId;
     m_camera.setScreenSize(m_width, 266);
     m_camera2.setScreenSize(m_width, 266);
 
-    // Both players race with matching vehicle archetype for 100% fair, synchronized physics
-    Physics::VehicleType vType = m_profile.selectedVehicle();
-    Physics::DriverType dTypeP1 = m_profile.selectedDriver();
-    Physics::DriverType dTypeP2 = (dTypeP1 == Physics::DriverType::BILL) ? Physics::DriverType::SARAH : Physics::DriverType::BILL;
+    Physics::VehicleType vType1 = m_mpVehicleP1;
+    Physics::VehicleType vType2 = m_mpVehicleP2;
+    Physics::DriverType dTypeP1 = m_mpDriverP1;
+    Physics::DriverType dTypeP2 = m_mpDriverP2;
 
-    m_physics.reset("countryside",
-                    vType, dTypeP1,
+    m_physics.reset(biomeId,
+                    vType1, dTypeP1,
                     true,
-                    vType, dTypeP2);
+                    vType2, dTypeP2);
     m_camera.reset(m_physics.vehicle().chassisPos());
     m_camera2.reset(m_physics.vehicle2().chassisPos());
     m_particleSystem.clear();
     m_gameTime = 0.0f;
     m_smokeTimer = 0.0f;
     m_smokeTimer2 = 0.0f;
+
+    m_mpSpeedoP1.setValue(0.0f);
+    m_mpSpeedoP2.setValue(0.0f);
+    m_mpTachoP1.setValue(1.0f);
+    m_mpTachoP2.setValue(1.0f);
+    m_mpFuelBarP1.setFuel(100.0f);
+    m_mpFuelBarP2.setFuel(100.0f);
+
     changeState(StateType::MULTIPLAYER_RACE);
 }
 
@@ -236,7 +315,12 @@ void GameStateManager::handleInput(const InputController::State& input) {
 
     if (m_currentState == StateType::MAIN_MENU) {
         if (input.multiplayer) {
-            startMultiplayerRace();
+            m_isMultiplayerFlow = true;
+            m_garage.setMultiplayerMode(true);
+            m_garage.setViewedVehicle(m_profile.selectedVehicle());
+            m_garage.setP2Vehicle(m_profile.selectedVehicle());
+            m_garage.setP2Driver(Physics::DriverType::SARAH);
+            changeState(StateType::GARAGE);
             return;
         }
         if (input.enter) {
@@ -487,14 +571,31 @@ void GameStateManager::fixedUpdate(float dt) {
         }
 
         m_particleSystem.update(dt);
+
+        // Dynamic instrument cluster & fuel gauge simulation for split screens
+        m_mpSpeedoP1.setValue(car1.getSpeedKmh());
+        m_mpSpeedoP1.update(dt);
+        m_mpTachoP1.setValue(car1.getEngineRpm() / 1000.0f);
+        m_mpTachoP1.update(dt);
+        m_mpFuelBarP1.setFuel(car1.fuel());
+        m_mpFuelBarP1.update(dt);
+
+        m_mpSpeedoP2.setValue(car2.getSpeedKmh());
+        m_mpSpeedoP2.update(dt);
+        m_mpTachoP2.setValue(car2.getEngineRpm() / 1000.0f);
+        m_mpTachoP2.update(dt);
+        m_mpFuelBarP2.setFuel(car2.fuel());
+        m_mpFuelBarP2.update(dt);
     }
 
     m_audio.update(dt, m_physics.vehicle(), m_physics.terrain(), m_currentState);
 }
 
 void GameStateManager::renderCompactHud(Graphics::Framebuffer& fb, const Physics::Vehicle& veh, float dist,
-                                        const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint) {
+                                        const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint,
+                                        UI::AnalogGauge& speedo, UI::AnalogGauge& tacho, UI::FuelBar& fuelBar) {
     int W = fb.width();
+    int H = fb.height();
 
     // 1. Racer Identity Pill (Top-Left)
     int labelW = Graphics::RasterFont::getTextWidth(pLabel, 1);
@@ -504,45 +605,57 @@ void GameStateManager::renderCompactHud(Graphics::Framebuffer& fb, const Physics
     fb.fillCircle(24, 23, 5, tagCol);
     Graphics::RasterFont::drawString(fb, 36, 17, pLabel, UI::Theme::TEXT_WHITE, 1);
 
-    // Controls hint
-    Graphics::RasterFont::drawString(fb, 14, 40, ctrlHint, 0xBBFFFFFF, 1);
+    // 2. Dynamic Segmented LED Fuel Gauge & Live Readout (Under Identity)
+    fuelBar.render(fb);
+    std::string fuelPctStr = "FUEL " + std::to_string(static_cast<int>(veh.fuel())) + "%";
+    uint32_t fuelTextCol = veh.isLowFuel() ? 0xFFFF1744 : (veh.fuel() > 50.0f) ? UI::Theme::GREEN_GAS : UI::Theme::GOLD;
+    Graphics::RasterFont::drawString(fb, 150, 43, fuelPctStr, fuelTextCol, 1);
 
-    // 2. Speedometer
+    // Controls hint
+    Graphics::RasterFont::drawString(fb, 14, 62, ctrlHint, 0xBBFFFFFF, 1);
+
+    // Flashing Low Fuel Alert / Out of Fuel Banner
+    if (veh.isOutOfFuel()) {
+        UI::UIComponents::drawArcadePanel(fb, W / 2 - 90, 40, 180, 22, 0xEE1E0508, 0xFFFF1744, 0xFFFF1744, 1, false, false);
+        Graphics::RasterFont::drawStringCentered(fb, W / 2, 45, "! OUT OF FUEL !", 0xFFFF1744, 1);
+    } else if (veh.isLowFuel()) {
+        float blink = std::sin(m_gameTime * 14.0f);
+        if (blink > 0.0f) {
+            UI::UIComponents::drawArcadePanel(fb, W / 2 - 105, 40, 210, 22, 0xEE1E0508, 0xFFFF1744, 0xFFFF1744, 1, false, false);
+            Graphics::RasterFont::drawStringCentered(fb, W / 2, 45, "! LOW FUEL WARNING !", 0xFFFF1744, 1);
+        }
+    }
+
+    // 3. Distance Odometer & Progress (Top-Center)
+    int distInt = static_cast<int>(dist);
+    char distBuf[32];
+    std::snprintf(distBuf, sizeof(distBuf), "%05dm", distInt);
+    int distBoxW = 140;
+    int distBoxH = 26;
+    int distBoxX = W / 2 - distBoxW / 2;
+    UI::UIComponents::drawArcadePanel(fb, distBoxX, 10, distBoxW, distBoxH, 0xDD090F1A, UI::Theme::CARD_BORDER, UI::Theme::GOLD, 2, true, true);
+    Graphics::RasterFont::drawStringCentered(fb, W / 2, 16, distBuf, UI::Theme::GOLD, 2);
+
+    // 4. Dynamic Dual Circular Analog Instrument Cluster (Bottom-Right Cockpit Binnacle)
+    int binnacleW = 120;
+    int binnacleH = 62;
+    int binnacleX = W - binnacleW - 12;
+    int binnacleY = H - binnacleH - 8;
+
+    fb.fillRect(binnacleX, binnacleY, binnacleW, binnacleH, 0xEE090E18);
+    fb.drawRect(binnacleX, binnacleY, binnacleW, binnacleH, UI::Theme::CARD_BORDER);
+    fb.fillRect(binnacleX + 1, binnacleY + 1, binnacleW - 2, 1, 0x44FFFFFF);
+
+    speedo.render(fb);
+    tacho.render(fb);
+
+    // Digital Speedometer Readout above gauges
     int speedKmh = static_cast<int>(veh.getSpeedKmh());
     std::string speedStr = std::to_string(speedKmh) + " KM/H";
-    int spdW = Graphics::RasterFont::getTextWidth(speedStr, 2);
-    int spdX = W / 2 - spdW / 2;
-    Graphics::RasterFont::drawString(fb, spdX, 12, speedStr, UI::Theme::TEXT_WHITE, 2);
-
-    // 3. Distance Odometer (Top-Right)
-    std::string distStr = UI::UIComponents::formatNumber(static_cast<int>(dist)) + "m";
-    int distW = Graphics::RasterFont::getTextWidth(distStr, 2);
-    int distBoxW = std::max(120, distW + 28);
-    int distBoxX = W - distBoxW - 14;
-    UI::UIComponents::drawArcadePanel(fb, distBoxX, 10, distBoxW, 26, 0xDD090F1A, UI::Theme::CARD_BORDER, UI::Theme::GOLD, 2, true, true);
-    Graphics::RasterFont::drawString(fb, distBoxX + 14, 15, distStr, UI::Theme::GOLD, 2);
-
-    // 4. Fuel Bar (Right below Distance)
-    int fuelBarW = 120;
-    int fuelBarH = 10;
-    int fuelBarX = W - fuelBarW - 14;
-    int fuelBarY = 40;
-    fb.fillRect(fuelBarX - 1, fuelBarY - 1, fuelBarW + 2, fuelBarH + 2, 0xFF1B2433);
-    fb.fillRect(fuelBarX, fuelBarY, fuelBarW, fuelBarH, 0xFF0E1520);
-
-    float fuelFrac = std::clamp(veh.fuel() / 100.0f, 0.0f, 1.0f);
-    int fillW = static_cast<int>(fuelBarW * fuelFrac);
-    uint32_t fuelCol = (veh.fuel() > 50.0f) ? UI::Theme::GREEN_GAS :
-                       (veh.fuel() > 25.0f) ? UI::Theme::GOLD : UI::Theme::RED_BRAKE;
-
-    if (veh.isLowFuel()) {
-        float blink = std::sin(m_gameTime * 12.0f);
-        if (blink > 0.0f) fuelCol = 0xFFFF1744;
-    }
-    if (fillW > 0) {
-        fb.fillRect(fuelBarX, fuelBarY, fillW, fuelBarH, fuelCol);
-    }
-    Graphics::RasterFont::drawString(fb, fuelBarX - 34, fuelBarY + 1, "FUEL", UI::Theme::TEXT_MUTED, 1);
+    Graphics::RasterFont::drawStringCentered(fb, binnacleX + 32, binnacleY + 4, speedStr, UI::Theme::TEXT_WHITE, 1);
+    int rpmVal = static_cast<int>(veh.getEngineRpm());
+    std::string rpmStr = std::to_string(rpmVal) + " RPM";
+    Graphics::RasterFont::drawStringCentered(fb, binnacleX + 88, binnacleY + 4, rpmStr, (rpmVal > 7000) ? 0xFFFF1744 : UI::Theme::CYAN_UPGRADE, 1);
 }
 
 void GameStateManager::renderMultiplayer(Graphics::Framebuffer& fb, float alpha) {
@@ -579,7 +692,7 @@ void GameStateManager::renderMultiplayer(Graphics::Framebuffer& fb, float alpha)
         }
     }
     std::string vehName1 = m_physics.vehicle().config().name;
-    renderCompactHud(m_fbP1, m_physics.vehicle(), m_physics.distanceReached(), "P1 - " + vehName1, 0xFFFF3D00, "P1: [W/D] GAS  [S/A] BRK/REV");
+    renderCompactHud(m_fbP1, m_physics.vehicle(), m_physics.distanceReached(), "P1 - " + vehName1, 0xFFFF3D00, "P1: [W/D] GAS  [S/A] BRK/REV", m_mpSpeedoP1, m_mpTachoP1, m_mpFuelBarP1);
 
     // --- BOTTOM VIEWPORT: PLAYER 2 ---
     m_terrainRasterizer.render(m_fbP2, m_camera2, m_physics.terrain(), m_gameTime, &m_physics.itemsCollectedP2());
@@ -611,7 +724,7 @@ void GameStateManager::renderMultiplayer(Graphics::Framebuffer& fb, float alpha)
         }
     }
     std::string vehName2 = m_physics.vehicle2().config().name;
-    renderCompactHud(m_fbP2, m_physics.vehicle2(), m_physics.distanceReached2(), "P2 - " + vehName2, 0xFF00E5FF, "P2: [ARROWS] UP/RT=GAS  DN/LT=BRK/REV");
+    renderCompactHud(m_fbP2, m_physics.vehicle2(), m_physics.distanceReached2(), "P2 - " + vehName2, 0xFF00E5FF, "P2: [ARROWS] UP/RT=GAS  DN/LT=BRK/REV", m_mpSpeedoP2, m_mpTachoP2, m_mpFuelBarP2);
 
     // Compose split-screen viewports onto master framebuffer
     fb.blit(0, 0, m_fbP1);

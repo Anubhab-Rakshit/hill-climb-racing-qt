@@ -35,11 +35,15 @@ public:
     int currentPage() const { return m_page; }
     void setPage(int p) { m_page = (p < 0) ? 0 : (p > 1) ? 1 : p; }
 
+    bool isMultiplayerMode() const { return m_isMultiplayer; }
+    void setMultiplayerMode(bool mp);
+
 private:
     int m_width;
     int m_height;
     float m_animTime;
     int m_page; // 0 = stages 0..2, 1 = stages 3..5
+    bool m_isMultiplayer = false;
 
     RetroButton m_btnBack;
     RetroButton m_btnPrevPage;

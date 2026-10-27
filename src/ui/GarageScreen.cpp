@@ -46,6 +46,7 @@ GarageScreen::GarageScreen()
     , m_btnNextDriver(0, 0, 30, 26, ">", 0xFF2A394A)
     , m_btnTabPowertrain(0, 0, 220, 30, "1. POWERTRAIN & TRACTION", Theme::GOLD)
     , m_btnTabChassis(0, 0, 220, 30, "2. HANDLING & CHASSIS", 0xFF263238)
+    , m_btnRacerToggle(480, 14, 210, 36, "RACER 1 [WASD]", 0xFFFF3D00)
 {
     m_btnBack.setKeyHint("ESC");
     m_btnDrive.setKeyHint("ENTER");
@@ -55,9 +56,20 @@ GarageScreen::GarageScreen()
     setDimensions(m_width, m_height);
 }
 
+void GarageScreen::setMultiplayerMode(bool mp) {
+    m_isMultiplayer = mp;
+    m_activeRacer = 0;
+    m_btnDrive.setText(mp ? "CHOOSE 2P STAGE >" : "DRIVE >");
+    m_btnDrive.setSize(mp ? 200 : 160, 36);
+    m_btnDrive.setPosition(m_width - (mp ? 210 : 170), 14);
+    m_btnRacerToggle.setText("RACER 1 [WASD]");
+    m_btnRacerToggle.setBaseColor(0xFFFF3D00);
+}
+
 void GarageScreen::setButtonSound(std::function<void()> cb) {
     m_btnBack.setOnSound(cb);
     m_btnDrive.setOnSound(cb);
+    m_btnRacerToggle.setOnSound(cb);
     m_btnPrevVeh.setOnSound(cb);
     m_btnNextVeh.setOnSound(cb);
     m_btnUnlockVeh.setOnSound(cb);
@@ -76,6 +88,8 @@ void GarageScreen::setDimensions(int width, int height) {
 
     m_btnBack.setPosition(20, 14);
     m_btnDrive.setPosition(m_width - 170, 14);
+    m_btnRacerToggle.setPosition(m_width - 410, 14);
+    m_btnRacerToggle.setSize(220, 36);
 
     int cx = m_width / 2;
 
@@ -123,6 +137,7 @@ void GarageScreen::setDimensions(int width, int height) {
 void GarageScreen::onMouseMove(int px, int py) {
     m_btnBack.onMouseMove(px, py);
     m_btnDrive.onMouseMove(px, py);
+    if (m_isMultiplayer) m_btnRacerToggle.onMouseMove(px, py);
     m_btnPrevVeh.onMouseMove(px, py);
     m_btnNextVeh.onMouseMove(px, py);
     m_btnUnlockVeh.onMouseMove(px, py);
@@ -140,6 +155,7 @@ void GarageScreen::onMouseMove(int px, int py) {
 bool GarageScreen::onMouseDown(int px, int py, Core::ProfileManager& profile) {
     if (m_btnBack.onMouseDown(px, py)) return true;
     if (m_btnDrive.onMouseDown(px, py)) return true;
+    if (m_isMultiplayer && m_btnRacerToggle.onMouseDown(px, py)) return true;
 
     // Check click on vehicle preview to trigger suspension bounce
     int cx = m_width / 2;
@@ -171,13 +187,35 @@ void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
     m_btnBack.onMouseUp(px, py);
     m_btnDrive.onMouseUp(px, py);
 
+    if (m_isMultiplayer && m_btnRacerToggle.isPressed() && m_btnRacerToggle.contains(px, py)) {
+        m_activeRacer = (m_activeRacer == 0) ? 1 : 0;
+        if (m_activeRacer == 0) {
+            m_btnRacerToggle.setText("RACER 1 [WASD]");
+            m_btnRacerToggle.setBaseColor(0xFFFF3D00);
+            m_viewedVehicle = profile.selectedVehicle();
+        } else {
+            m_btnRacerToggle.setText("RACER 2 [ARROWS]");
+            m_btnRacerToggle.setBaseColor(0xFF00E5FF);
+            m_viewedVehicle = m_p2Vehicle;
+        }
+        m_carBounceVel = -100.0f;
+    }
+    m_btnRacerToggle.onMouseUp(px, py);
+
     // Vehicle Carousel
     if (m_btnPrevVeh.isPressed() && m_btnPrevVeh.contains(px, py)) {
         int cur = static_cast<int>(m_viewedVehicle);
         int total = static_cast<int>(Physics::VehicleType::COUNT);
         m_viewedVehicle = static_cast<Physics::VehicleType>((cur + total - 1) % total);
-        if (profile.isVehicleUnlocked(m_viewedVehicle)) {
-            profile.setSelectedVehicle(m_viewedVehicle);
+        if (m_isMultiplayer && m_activeRacer == 1) {
+            m_p2Vehicle = m_viewedVehicle;
+        } else {
+            if (profile.isVehicleUnlocked(m_viewedVehicle)) {
+                profile.setSelectedVehicle(m_viewedVehicle);
+            }
+            if (m_isMultiplayer) {
+                m_p2Vehicle = m_viewedVehicle;
+            }
         }
         m_carBounceVel = -130.0f;
     }
@@ -187,8 +225,15 @@ void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
         int cur = static_cast<int>(m_viewedVehicle);
         int total = static_cast<int>(Physics::VehicleType::COUNT);
         m_viewedVehicle = static_cast<Physics::VehicleType>((cur + 1) % total);
-        if (profile.isVehicleUnlocked(m_viewedVehicle)) {
-            profile.setSelectedVehicle(m_viewedVehicle);
+        if (m_isMultiplayer && m_activeRacer == 1) {
+            m_p2Vehicle = m_viewedVehicle;
+        } else {
+            if (profile.isVehicleUnlocked(m_viewedVehicle)) {
+                profile.setSelectedVehicle(m_viewedVehicle);
+            }
+            if (m_isMultiplayer) {
+                m_p2Vehicle = m_viewedVehicle;
+            }
         }
         m_carBounceVel = -130.0f;
     }
@@ -206,17 +251,27 @@ void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
 
     // Driver Carousel
     if (m_btnPrevDriver.isPressed() && m_btnPrevDriver.contains(px, py)) {
-        int cur = static_cast<int>(profile.selectedDriver());
+        int cur = static_cast<int>((m_isMultiplayer && m_activeRacer == 1) ? m_p2Driver : profile.selectedDriver());
         int total = static_cast<int>(Physics::DriverType::COUNT);
-        profile.setSelectedDriver(static_cast<Physics::DriverType>((cur + total - 1) % total));
+        auto newDriver = static_cast<Physics::DriverType>((cur + total - 1) % total);
+        if (m_isMultiplayer && m_activeRacer == 1) {
+            m_p2Driver = newDriver;
+        } else {
+            profile.setSelectedDriver(newDriver);
+        }
         m_carBounceVel = -70.0f;
     }
     m_btnPrevDriver.onMouseUp(px, py);
 
     if (m_btnNextDriver.isPressed() && m_btnNextDriver.contains(px, py)) {
-        int cur = static_cast<int>(profile.selectedDriver());
+        int cur = static_cast<int>((m_isMultiplayer && m_activeRacer == 1) ? m_p2Driver : profile.selectedDriver());
         int total = static_cast<int>(Physics::DriverType::COUNT);
-        profile.setSelectedDriver(static_cast<Physics::DriverType>((cur + 1) % total));
+        auto newDriver = static_cast<Physics::DriverType>((cur + 1) % total);
+        if (m_isMultiplayer && m_activeRacer == 1) {
+            m_p2Driver = newDriver;
+        } else {
+            profile.setSelectedDriver(newDriver);
+        }
         m_carBounceVel = -70.0f;
     }
     m_btnNextDriver.onMouseUp(px, py);
@@ -291,7 +346,8 @@ void GarageScreen::drawVehiclePreview(Graphics::Framebuffer& fb, int cx, int cy,
     fb.fillRect(0, liftY + 24, m_width, 2, 0xFF142030);
 
     // 2. Render Authentic Pixel Vehicle Sprite & Selected Driver
-    Graphics::SpriteRenderer::renderGarageVehicle(fb, cx, cy, m_carBounceY, profile, m_viewedVehicle, profile.selectedDriver());
+    Physics::DriverType activePreviewDriver = (m_isMultiplayer && m_activeRacer == 1) ? m_p2Driver : profile.selectedDriver();
+    Graphics::SpriteRenderer::renderGarageVehicle(fb, cx, cy, m_carBounceY, profile, m_viewedVehicle, activePreviewDriver);
 
     const auto& cfg = Physics::VehicleRegistry::getConfig(m_viewedVehicle);
 
@@ -365,13 +421,18 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     m_btnDrive.render(fb, 2);
 
     int cx = m_width / 2;
-    int headW = 350;
-    int headX = cx - headW / 2;
+    int headW = m_isMultiplayer ? 310 : 350;
+    int headX = m_isMultiplayer ? (cx - 240) : (cx - headW / 2);
     UIComponents::drawArcadePanel(fb, headX, 12, headW, 34, 0xEE0B121C, 0xFF37474F, Theme::GOLD, 2, true, true);
-    Graphics::RasterFont::drawString(fb, headX + 16, 21, "GARAGE & TUNING", Theme::GOLD, 2);
+    std::string headStr = m_isMultiplayer ? "2P MULTI GARAGE" : "GARAGE & TUNING";
+    Graphics::RasterFont::drawString(fb, headX + 16, 21, headStr, Theme::GOLD, 2);
 
     std::string vIdxStr = "[" + std::to_string(static_cast<int>(m_viewedVehicle) + 1) + "/10]";
     Graphics::RasterFont::drawString(fb, headX + headW - 65, 23, vIdxStr, Theme::CYAN_UPGRADE, 1);
+
+    if (m_isMultiplayer) {
+        m_btnRacerToggle.render(fb, 2);
+    }
 
     // Master Currency Pill
     int coinBoxW = 155;
@@ -386,7 +447,7 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
 
     const auto& vehCfg = Physics::VehicleRegistry::getConfig(m_viewedVehicle);
     bool isUnlocked = profile.isVehicleUnlocked(m_viewedVehicle);
-    bool isSelected = (profile.selectedVehicle() == m_viewedVehicle);
+    bool isSelected = (m_isMultiplayer && m_activeRacer == 1) ? (m_p2Vehicle == m_viewedVehicle) : (profile.selectedVehicle() == m_viewedVehicle);
 
     // Vehicle Name Banner
     int vBannerX = cx - 200;
@@ -422,8 +483,15 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
                                                  isSelected ? Theme::GREEN_GAS : Theme::TEXT_MUTED, 1);
 
         // If clicked on active badge when unlocked, select it
-        if (!isSelected && m_viewedVehicle != profile.selectedVehicle()) {
-            profile.setSelectedVehicle(m_viewedVehicle);
+        if (!isSelected) {
+            if (m_isMultiplayer && m_activeRacer == 1) {
+                m_p2Vehicle = m_viewedVehicle;
+            } else {
+                profile.setSelectedVehicle(m_viewedVehicle);
+                if (m_isMultiplayer) {
+                    m_p2Vehicle = m_viewedVehicle;
+                }
+            }
         }
     }
 
@@ -431,7 +499,8 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     m_btnPrevDriver.render(fb, 2);
     m_btnNextDriver.render(fb, 2);
 
-    const auto& driverCfg = Physics::VehicleRegistry::getDriver(profile.selectedDriver());
+    Physics::DriverType activeDriver = (m_isMultiplayer && m_activeRacer == 1) ? m_p2Driver : profile.selectedDriver();
+    const auto& driverCfg = Physics::VehicleRegistry::getDriver(activeDriver);
     int dBoxX = cx - 126;
     int dBoxY = 88;
     int dBoxW = 252;
@@ -439,7 +508,7 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     UIComponents::drawArcadePanel(fb, dBoxX, dBoxY, dBoxW, dBoxH, 0xFF121B27, 0xFF2A3A52, 0, 0, true, true);
 
     // Mini Driver Portrait Icon (cleanly centered 20x20)
-    const QImage& portrait = Graphics::VehicleSprites::getDriverPortrait(profile.selectedDriver());
+    const QImage& portrait = Graphics::VehicleSprites::getDriverPortrait(activeDriver);
     if (!portrait.isNull()) {
         int pyOff = dBoxY + (dBoxH - portrait.height()) / 2;
         int pxOff = dBoxX + 6;

@@ -29,7 +29,7 @@ public:
     void changeState(StateType newState);
     StateType currentState() const { return m_currentState; }
     void startRace(const std::string& biomeId);
-    void startMultiplayerRace();
+    void startMultiplayerRace(const std::string& biomeId = "countryside");
 
     void handleInput(const InputController::State& input);
     void fixedUpdate(float dt);
@@ -71,6 +71,21 @@ private:
     Graphics::Framebuffer m_fbP1;
     Graphics::Framebuffer m_fbP2;
 
+    bool m_isMultiplayerFlow = false;
+    std::string m_selectedMpBiome = "countryside";
+    Physics::VehicleType m_mpVehicleP1 = Physics::VehicleType::OFFROADER;
+    Physics::VehicleType m_mpVehicleP2 = Physics::VehicleType::OFFROADER;
+    Physics::DriverType m_mpDriverP1 = Physics::DriverType::BILL;
+    Physics::DriverType m_mpDriverP2 = Physics::DriverType::SARAH;
+
+    // Multiplayer Instrumentation & Dynamic Gauges
+    UI::AnalogGauge m_mpSpeedoP1;
+    UI::AnalogGauge m_mpSpeedoP2;
+    UI::AnalogGauge m_mpTachoP1;
+    UI::AnalogGauge m_mpTachoP2;
+    UI::FuelBar m_mpFuelBarP1;
+    UI::FuelBar m_mpFuelBarP2;
+
     // UI Screens
     UI::MainMenuScreen m_mainMenu;
     UI::GarageScreen m_garage;
@@ -82,7 +97,8 @@ private:
     void setupUiCallbacks();
     void renderMultiplayer(Graphics::Framebuffer& fb, float alpha);
     void renderCompactHud(Graphics::Framebuffer& fb, const Physics::Vehicle& veh, float dist,
-                          const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint);
+                          const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint,
+                          UI::AnalogGauge& speedo, UI::AnalogGauge& tacho, UI::FuelBar& fuelBar);
 };
 
 } // namespace Core

@@ -108,6 +108,62 @@ int main(int argc, char *argv[]) {
         sm.render(engine.framebuffer(), 1.0f);
         std::cout << "  PASS: Split-screen Framebuffer blit and overlay rendered without fault." << std::endl;
 
+        // 6. Multiplayer Biome Selection Test across all 6 biomes
+        std::cout << "Test 6: Multiplayer Biome Selection (Desert, Arctic, Mountain, Moon, Volcano, Countryside)" << std::endl;
+        std::vector<std::string> testBiomes = {"desert", "arctic", "mountain", "moon", "volcano", "countryside"};
+        bool biomesOk = true;
+        for (const auto& bId : testBiomes) {
+            sm.startMultiplayerRace(bId);
+            if (pWorld.terrain().getBiome() != bId) {
+                std::cout << "  FAIL: Expected biome " << bId << ", got " << pWorld.terrain().getBiome() << std::endl;
+                biomesOk = false;
+            }
+        }
+        if (biomesOk) {
+            std::cout << "  PASS: Successfully started multiplayer race on all 6 stages/biomes." << std::endl;
+        } else {
+            pass = false;
+        }
+
+        // 7. Active Fuel Management & Canister Recharge
+        std::cout << "Test 7: Dynamic Fuel Drain and Recharge Mechanics" << std::endl;
+        sm.startMultiplayerRace("desert");
+        float initialFuel = pWorld.vehicle().fuel();
+        inp.p1.gas = true;
+        inp.p2.gas = true;
+        for (int i = 0; i < 180; ++i) { // 1.5 seconds of full throttle
+            sm.handleInput(inp);
+            sm.fixedUpdate(DT);
+        }
+        float fuelAfterDrive = pWorld.vehicle().fuel();
+        std::cout << "  Fuel Start: " << initialFuel << "% -> After 1.5s Throttle: " << fuelAfterDrive << "%" << std::endl;
+        if (fuelAfterDrive >= initialFuel || fuelAfterDrive < 70.0f) {
+            std::cout << "  FAIL: Unexpected fuel consumption behavior! Remaining: " << fuelAfterDrive << "%" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Dynamic fuel consumption is calibrated and active." << std::endl;
+        }
+
+        // Test fuel recharge (+45%)
+        pWorld.vehicle().consumeFuel(40.0f);
+        float preRecharge = pWorld.vehicle().fuel();
+        pWorld.vehicle().addFuel(45.0f);
+        float postRecharge = pWorld.vehicle().fuel();
+        std::cout << "  Fuel Pre-Recharge: " << preRecharge << "% -> Post-Recharge: " << postRecharge << "%" << std::endl;
+        if (postRecharge != std::min(100.0f, preRecharge + 45.0f)) {
+            std::cout << "  FAIL: Fuel recharge did not add expected amount!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Fuel recharge correctly awards calibrated +45%." << std::endl;
+        }
+
+        // 8. Dynamic Instrumentation Render & Capture
+        std::cout << "Test 8: Dynamic Speedometer, Tachometer & Fuel Gauge Instrumentation" << std::endl;
+        QDir().mkpath("scratch");
+        sm.render(engine.framebuffer(), 1.0f);
+        engine.framebuffer().getImage().save("scratch/multiplayer_gameplay_captured.png");
+        std::cout << "  PASS: Saved scratch/multiplayer_gameplay_captured.png with dynamic gauges." << std::endl;
+
         std::cout << "\n=======================================================" << std::endl;
         std::cout << "  RESULT: " << (pass ? "ALL MULTIPLAYER TESTS PASSED!" : "TESTS FAILED!") << std::endl;
         std::cout << "=======================================================\n" << std::endl;

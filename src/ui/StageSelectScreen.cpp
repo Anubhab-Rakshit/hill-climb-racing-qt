@@ -49,6 +49,14 @@ StageSelectScreen::StageSelectScreen()
     setDimensions(m_width, m_height);
 }
 
+void StageSelectScreen::setMultiplayerMode(bool mp) {
+    m_isMultiplayer = mp;
+    for (int i = 0; i < 6; ++i) {
+        m_btnStageAction[i].setText(mp ? "RACE 2P" : "PLAY");
+        m_btnStageAction[i].setBaseColor(mp ? 0xFF00E5FF : Theme::GREEN_GAS);
+    }
+}
+
 void StageSelectScreen::setButtonSound(std::function<void()> cb) {
     m_btnBack.setOnSound(cb);
     m_btnPrevPage.setOnSound(cb);
@@ -260,9 +268,10 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
     m_btnBack.render(fb, 2);
 
     int cx = m_width / 2;
-    int headW = 300;
+    int headW = m_isMultiplayer ? 460 : 300;
     UIComponents::drawArcadePanel(fb, cx - headW / 2, 12, headW, 36, 0xEE0B121C, 0xFF37474F, Theme::GOLD, 2, true, true);
-    Graphics::RasterFont::drawStringCentered(fb, cx, 22, "SELECT STAGE TRACK", Theme::GOLD, 2);
+    std::string headTitle = m_isMultiplayer ? "2P MULTIPLAYER - SELECT STAGE" : "SELECT STAGE TRACK";
+    Graphics::RasterFont::drawStringCentered(fb, cx, 22, headTitle, Theme::GOLD, 2);
 
     // Master Currency Pill
     int coinBoxW = 155;

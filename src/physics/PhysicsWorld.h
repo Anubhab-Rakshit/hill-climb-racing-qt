@@ -63,7 +63,7 @@ public:
 
     // Event callbacks for UI
     void setOnStunt(std::function<void(const std::string& title, int coins)> cb) { m_onStunt = cb; }
-    void setOnItemCollected(std::function<void(ItemType type, int value)> cb) { m_onItem = cb; }
+    void setOnItemCollected(std::function<void(ItemType type, int value, bool isP1)> cb) { m_onItem = cb; }
     void setOnCheckpoint(std::function<void(const CheckpointInfo& cp)> cb) { m_onCheckpoint = cb; }
 
 private:
@@ -105,7 +105,7 @@ private:
     std::vector<bool> m_itemsCollectedP2;
 
     std::function<void(const std::string&, int)> m_onStunt;
-    std::function<void(ItemType, int)> m_onItem;
+    std::function<void(ItemType, int, bool)> m_onItem;
     std::function<void(const CheckpointInfo&)> m_onCheckpoint;
 
     void checkItemCollisions();

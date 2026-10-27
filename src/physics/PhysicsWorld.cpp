@@ -316,14 +316,14 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
             }
 
             if (items[i].type == ItemType::FUEL_CANISTER) {
-                veh.addFuel(100.0f);
+                veh.addFuel(45.0f); // Calibrated +45% fuel recharge (not an easy 100% full-pass)
             } else {
                 if (isP1) {
                     m_coinsCollected += items[i].value;
                 }
             }
-            if (m_onItem && isP1) {
-                m_onItem(items[i].type, items[i].value);
+            if (m_onItem) {
+                m_onItem(items[i].type, items[i].value, isP1);
             }
         }
     }

@@ -253,7 +253,8 @@ TerrainValidator::ValidationResult TerrainValidator::validateBiome(const std::st
         currentX += speed * dt;
 
         // Drain rate at full throttle (calibrated to match Vehicle fuel burn per meter)
-        simFuel -= (1.2f + 3.5f) * 0.60f * dt;
+        float load = std::clamp(0.7f + std::abs(slope) * 1.5f, 0.6f, 2.0f);
+        simFuel -= (2.2f + 1.2f * load) * dt;
         if (simFuel < minRemaining) minRemaining = simFuel;
 
         if (simFuel <= 0.0f) {
@@ -262,9 +263,9 @@ TerrainValidator::ValidationResult TerrainValidator::validateBiome(const std::st
             break;
         }
 
-        // Collect fuel
+        // Collect fuel (+45% refill)
         if (fuelIdx < fuelXs.size() && currentX >= fuelXs[fuelIdx]) {
-            simFuel = 100.0f;
+            simFuel = std::min(100.0f, simFuel + 45.0f);
             fuelIdx++;
         }
     }

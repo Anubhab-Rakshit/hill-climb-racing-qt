@@ -188,8 +188,8 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     if (!m_driverDown && m_fuel > 0.0f && activeThrottle > 0.0f) {
         float speedRatio = std::clamp(getSpeedKmh() / (m_config.baseTopSpeedKmh * transMult), 0.0f, 1.2f);
         float slope = terrain.getSlope(m_chassisPos.x);
-        float load = std::clamp(0.6f + std::abs(slope) * 1.5f + (1.0f - speedRatio * 0.35f), 0.5f, 1.5f);
-        float drainRate = activeThrottle * (3.3f + 0.9f * load) * 0.60f;
+        float load = std::clamp(0.7f + std::abs(slope) * 1.6f + (1.0f - speedRatio * 0.35f), 0.6f, 2.0f);
+        float drainRate = activeThrottle * (3.6f + 1.4f * load);
         m_fuel = std::max(0.0f, m_fuel - drainRate * dt);
     }
 

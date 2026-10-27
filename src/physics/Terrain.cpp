@@ -171,51 +171,52 @@ float Terrain::computeRawBaseHeight(float x) const {
         return (m1 + m2 + crag + summit + ridgeWall) * ramp;
     } else if (m_biomeId == "moon") {
         // Wide deep impact craters and massive parabolic low-gravity launch mounds
-        float c1 = std::sin(lx * 0.013f) * (11.0f * ampMult);
-        float c2 = std::cos(lx * 0.028f) * (4.2f + 2.0f * std::min(diff, 2.5f));
+        float c1 = std::sin(lx * 0.013f) * (8.5f * (1.0f + 0.65f * std::min(diff, 2.5f)));
+        float c2 = std::cos(lx * 0.028f) * (3.8f + 1.6f * std::min(diff, 2.5f));
         float c3 = std::sin(lx * 0.065f) * (1.2f + 0.6f * std::min(diff, 2.5f));
         float crater = 0.0f;
         if (lx > 700.0f && lx < 1150.0f) {
             float ct = (lx - 700.0f) / 450.0f;
-            crater = -smoothWindow(ct) * (6.0f * std::min(diff, 2.0f));
+            crater = -smoothWindow(ct) * (5.5f * std::min(diff, 2.0f));
         }
         float superCrater = 0.0f;
         if (lx > 1700.0f && lx < 2300.0f) {
             float st = (lx - 1700.0f) / 600.0f;
-            superCrater = -smoothWindow(st) * 8.5f;
+            superCrater = -smoothWindow(st) * 7.5f;
         }
         return (c1 + c2 + c3 + crater + superCrater) * ramp;
     } else if (m_biomeId == "volcano") {
         // Basalt ridges, thermal vent steps and caldera rims
-        float pV = lx * 0.016f + 0.26f * std::sin(lx * 0.0040f);
-        float v1 = std::sin(pV) * (9.5f * ampMult);
-        float v2 = std::sin(lx * 0.042f) * (3.2f + 1.8f * std::min(diff, 2.5f));
+        float pV = lx * 0.0155f + 0.25f * std::sin(lx * 0.0039f);
+        float v1 = std::sin(pV) * (9.1f * ampMult);
+        float v2 = std::sin(lx * 0.040f) * (2.9f + 1.6f * std::min(diff, 2.5f));
         float basalt = std::sin(lx * 0.088f) * (0.8f + 0.4f * std::min(diff, 2.5f));
         // Caldera wall ascent at 850m - 1350m
         float caldera = 0.0f;
         if (lx > 850.0f && lx < 1350.0f) {
             float vt = (lx - 850.0f) / 500.0f;
-            caldera = smoothWindow(vt) * (6.5f * std::min(diff, 2.0f));
+            caldera = smoothWindow(vt) * (6.2f * std::min(diff, 2.0f));
         }
         float magmaPeak = 0.0f;
         if (lx > 1850.0f && lx < 2550.0f) {
             float mt = (lx - 1850.0f) / 700.0f;
-            magmaPeak = smoothWindow(mt) * 8.5f;
+            magmaPeak = smoothWindow(mt) * 8.0f;
         }
         return (v1 + v2 + basalt + caldera + magmaPeak) * ramp;
     }
 
-    // Default Countryside: Signature progressive Hill Climb course with increasing slopes and technical humps
-    float basePhase = (lx < 125.0f) ? (lx * 0.015f) : (lx * 0.015f + 0.28f * std::sin((lx - 125.0f) * 0.0042f));
-    float baseHills = std::sin(basePhase) * (8.5f * ampMult);
-    float rhythmBumps = std::sin(lx * 0.042f) * (2.0f + 1.2f * std::min(diff, 2.5f));
-    float microRelief = std::sin(lx * 0.090f) * 0.35f;
+    // Default Countryside: Signature progressive Hill Climb course with steep slopes and technical humps
+    float basePhase = (lx < 125.0f) ? (lx * 0.019f) : (lx * 0.019f + 0.28f * std::sin((lx - 125.0f) * 0.0050f));
+    float baseHills = std::sin(basePhase) * (9.2f * ampMult);
+    float rhythmBumps = std::sin(lx * 0.044f) * (2.4f + 1.1f * std::min(diff, 2.0f));
+    float steepRollers = std::sin(lx * 0.080f) * (0.8f + 0.4f * std::min(diff, 2.0f));
+    float microRelief = std::sin(lx * 0.110f) * 0.30f;
 
-    // Feature 1: Ski Jump Launch Ramp (lx ~ 65 - 125m)
+    // Feature 1: Ski Jump Launch Ramp & Steep Crest (lx ~ 65 - 130m)
     float jumpRamp = 0.0f;
-    if (lx > 65.0f && lx < 125.0f) {
-        float jt = (lx - 65.0f) / 60.0f;
-        jumpRamp = smoothWindow(jt) * 3.4f;
+    if (lx > 65.0f && lx < 130.0f) {
+        float jt = (lx - 65.0f) / 65.0f;
+        jumpRamp = smoothWindow(jt) * 3.6f;
     }
 
     // Feature 2: Technical Moguls & Washboards (lx ~ 550 - 850m)
@@ -226,18 +227,18 @@ float Terrain::computeRawBaseHeight(float x) const {
         moguls = std::sin(lx * 0.16f) * (0.50f + 0.35f * std::min(diff, 2.0f)) * envelope;
     }
 
-    // Feature 3: Mountain Wall Ascent (lx ~ 950 - 1300m) - Steep 40-degree incline
+    // Feature 3: Mountain Wall Ascent (lx ~ 950 - 1300m) - Steep technical climb
     float mountainWall = 0.0f;
     if (lx > 950.0f && lx < 1300.0f) {
         float mt = (lx - 950.0f) / 350.0f;
-        mountainWall = smoothWindow(mt) * (5.5f + 2.5f * std::min(diff, 2.0f));
+        mountainWall = smoothWindow(mt) * (5.0f + 2.0f * std::min(diff, 2.0f));
     }
 
     // Feature 4: Canyon Dip (lx ~ 1350 - 1680m) - Rapid drop with uphill exit
     float canyon = 0.0f;
     if (lx > 1350.0f && lx < 1680.0f) {
         float ct = (lx - 1350.0f) / 330.0f;
-        canyon = -smoothWindow(ct) * (4.5f + 1.8f * std::min(diff, 2.0f));
+        canyon = -smoothWindow(ct) * (4.2f + 1.6f * std::min(diff, 2.0f));
     }
 
     // Feature 5: The Alpine Ascent & Technical Crests (lx ~ 1700 - 2250m)
@@ -245,14 +246,14 @@ float Terrain::computeRawBaseHeight(float x) const {
     if (lx > 1700.0f && lx < 2250.0f) {
         float at = (lx - 1700.0f) / 550.0f;
         float env = smoothWindow(at);
-        alpine = (smoothWindow(at) * 7.5f + std::sin(lx * 0.065f) * 2.8f) * env;
+        alpine = (smoothWindow(at) * 6.5f + std::sin(lx * 0.065f) * 2.4f) * env;
     }
 
-    // Feature 6: The Great Wall / Ridge Climb (lx ~ 2300 - 2950m) - Extreme 45+ degree climb
+    // Feature 6: The Great Wall / Ridge Climb (lx ~ 2300 - 2950m) - Extreme climb
     float monsterRidge = 0.0f;
     if (lx > 2300.0f && lx < 2950.0f) {
         float rt = (lx - 2300.0f) / 650.0f;
-        monsterRidge = smoothWindow(rt) * 9.5f;
+        monsterRidge = smoothWindow(rt) * 7.5f;
     }
 
     // Feature 7: High-Altitude Mogul Field & Rolling Peaks (lx > 2950m)
@@ -261,7 +262,7 @@ float Terrain::computeRawBaseHeight(float x) const {
         extremeField = std::sin(lx * 0.035f) * 4.5f + std::sin(lx * 0.095f) * 1.8f;
     }
 
-    return (baseHills + rhythmBumps + microRelief + jumpRamp + moguls + mountainWall + canyon + alpine + monsterRidge + extremeField) * ramp;
+    return (baseHills + rhythmBumps + steepRollers + microRelief + jumpRamp + moguls + mountainWall + canyon + alpine + monsterRidge + extremeField) * ramp;
 }
 
 float Terrain::getHeight(float x) const {
@@ -436,33 +437,34 @@ void Terrain::spawnItems() {
     }
 
     // 2. Progressive Fuel Spawning with Reachability Validation
-    // In early game: friendly ~85m spacing on gentle crests
-    // In mid/late game: progressive spacing up to ~200m+ near steeper summits
-    float fuelTargetX = 85.0f;
+    // Calibrated spacing: ~90m at start, scaling up to ~150m near steep summits (safe <= 165m)
+    float fuelTargetX = 90.0f;
     float prevFuelX = 0.0f;
     while (fuelTargetX < 5000.0f) {
         float diff = getDifficultyFactor(fuelTargetX);
-        float maxAllowedSpacing = 110.0f + std::min(diff, 2.5f) * 40.0f; // 110m at start -> ~210m
+        float maxAllowedSpacing = 95.0f + std::min(diff, 2.0f) * 28.0f; // 95m at start -> ~151m
 
-        // Find best stable location (closest crest or flat saddle where |slope| <= 0.38)
-        float bestX = fuelTargetX;
+        float searchMin = (prevFuelX > 0.0f) ? std::max(prevFuelX + 55.0f, fuelTargetX - 16.0f) : 25.0f;
+        float searchMax = (prevFuelX > 0.0f) ? (prevFuelX + maxAllowedSpacing - 2.0f) : 115.0f;
+        if (searchMin >= searchMax) {
+            searchMin = (prevFuelX > 0.0f) ? (prevFuelX + 50.0f) : 25.0f;
+        }
+
+        float bestX = (searchMin + searchMax) * 0.5f;
         float minSlopeMag = 999.0f;
 
-        // Primary search window around target
-        for (float searchX = fuelTargetX - 14.0f; searchX <= fuelTargetX + 14.0f; searchX += 0.25f) {
-            if (searchX < 25.0f) continue;
-            float slopeMag = std::abs(getSlope(searchX));
-            if (slopeMag < minSlopeMag) {
-                minSlopeMag = slopeMag;
-                bestX = searchX;
+        // Search for crest or trough (minimum slope) within safe spacing
+        for (float sx = searchMin; sx <= searchMax; sx += 0.25f) {
+            float sm = std::abs(getSlope(sx));
+            if (sm < minSlopeMag) {
+                minSlopeMag = sm;
+                bestX = sx;
             }
         }
 
-        // Secondary search if minSlopeMag is still steep
-        if (minSlopeMag > 0.30f) {
-            float minX = std::max(25.0f, prevFuelX + 65.0f);
-            float maxX = (prevFuelX > 0.0f) ? (prevFuelX + maxAllowedSpacing) : 120.0f;
-            for (float sx = minX; sx <= maxX; sx += 0.25f) {
+        // Broaden search backwards if still on slope > 0.30
+        if (minSlopeMag > 0.30f && prevFuelX > 0.0f) {
+            for (float sx = prevFuelX + 50.0f; sx <= searchMax; sx += 0.25f) {
                 float sm = std::abs(getSlope(sx));
                 if (sm < minSlopeMag) {
                     minSlopeMag = sm;
@@ -471,21 +473,16 @@ void Terrain::spawnItems() {
             }
         }
 
-        // Safety clamp on max interval to ensure reachable spacing
-        if (prevFuelX > 0.0f && (bestX - prevFuelX) > maxAllowedSpacing) {
-            bestX = prevFuelX + maxAllowedSpacing;
-        }
-
         WorldItem fuel;
         fuel.position = {bestX, getHeight(bestX) + 1.25f};
         fuel.type = ItemType::FUEL_CANISTER;
-        fuel.value = 100;
+        fuel.value = 45;
         fuel.collected = false;
         m_items.push_back(fuel);
 
         prevFuelX = bestX;
-        // Progressive interval: grows from 85m at start to 200m+
-        float nextInterval = 85.0f + std::min(diff, 2.5f) * 46.0f;
+        // Progressive interval: grows from 90m at start to 150m
+        float nextInterval = 90.0f + std::min(diff, 2.0f) * 28.0f;
         fuelTargetX = bestX + nextInterval;
     }
 
