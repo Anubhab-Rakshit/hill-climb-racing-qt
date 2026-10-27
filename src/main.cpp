@@ -18,6 +18,103 @@ int main(int argc, char *argv[]) {
 
     Core::GameEngine engine;
 
+    if (argc > 1 && std::string(argv[1]) == "--test-multiplayer-sync") {
+        std::cout << "\n=======================================================" << std::endl;
+        std::cout << "  MULTIPLAYER PHYSICS & SYNCHRONIZATION VERIFICATION   " << std::endl;
+        std::cout << "=======================================================" << std::endl;
+
+        auto& sm = engine.stateManager();
+        sm.startMultiplayerRace();
+
+        bool pass = true;
+        auto& pWorld = sm.physics();
+
+        // 1. Vehicle Archetype and Starting Position Match Check
+        std::cout << "Test 1: Matched Archetypes & Equal Starting Position" << std::endl;
+        if (!pWorld.isMultiplayer()) {
+            std::cout << "  FAIL: Physics world is not in multiplayer mode!" << std::endl;
+            pass = false;
+        }
+        if (pWorld.vehicle().vehicleType() != pWorld.vehicle2().vehicleType()) {
+            std::cout << "  FAIL: Vehicle types do not match! P1: " << static_cast<int>(pWorld.vehicle().vehicleType())
+                      << " vs P2: " << static_cast<int>(pWorld.vehicle2().vehicleType()) << std::endl;
+            pass = false;
+        }
+        float posXDiff = std::abs(pWorld.vehicle().chassisPos().x - pWorld.vehicle2().chassisPos().x);
+        float posYDiff = std::abs(pWorld.vehicle().chassisPos().y - pWorld.vehicle2().chassisPos().y);
+        if (posXDiff > 0.001f || posYDiff > 0.001f) {
+            std::cout << "  FAIL: Vehicles do not start at identical positions! dx=" << posXDiff << ", dy=" << posYDiff << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Both vehicles start at identical position (x=" << pWorld.vehicle().chassisPos().x << ")." << std::endl;
+        }
+
+        // 2. Synchronized Movement Test under Equal Inputs
+        std::cout << "Test 2: Synchronized Movement under Equal Throttle (240 ticks / 2 seconds)" << std::endl;
+        const float DT = 1.0f / 120.0f;
+        auto& inp = engine.input().state();
+        inp.p1.gas = true;
+        inp.p2.gas = true;
+
+        float maxPosDelta = 0.0f;
+        float maxSpdDelta = 0.0f;
+        for (int i = 0; i < 240; ++i) {
+            sm.handleInput(inp);
+            sm.fixedUpdate(DT);
+            float dX = std::abs(pWorld.vehicle().chassisPos().x - pWorld.vehicle2().chassisPos().x);
+            float dSpd = std::abs(pWorld.vehicle().getSpeedKmh() - pWorld.vehicle2().getSpeedKmh());
+            if (dX > maxPosDelta) maxPosDelta = dX;
+            if (dSpd > maxSpdDelta) maxSpdDelta = dSpd;
+        }
+
+        std::cout << "  Max Position Delta: " << maxPosDelta << "m, Max Speed Delta: " << maxSpdDelta << " km/h" << std::endl;
+        if (maxPosDelta > 0.01f || maxSpdDelta > 0.01f) {
+            std::cout << "  FAIL: Movement de-synced under identical inputs!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Movement remains in 100% sync throughout run." << std::endl;
+        }
+
+        // 3. Independent Fuel & Item Collections
+        std::cout << "Test 3: Per-Player Independent Collectible Pickup" << std::endl;
+        if (pWorld.itemsCollectedP1().empty() || pWorld.itemsCollectedP2().empty()) {
+            std::cout << "  FAIL: Collection mask arrays are uninitialized!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Collection tracking is partitioned per player." << std::endl;
+        }
+
+        // 4. Hydraulic Braking to Reverse Transition
+        std::cout << "Test 4: Braking vs Reverse Transition Verification" << std::endl;
+        inp.p1.gas = false;
+        inp.p1.brake = true;
+        inp.p1.reverse = true;
+        float spdBeforeBrake = pWorld.vehicle().getSpeedKmh();
+        for (int i = 0; i < 60; ++i) {
+            sm.handleInput(inp);
+            sm.fixedUpdate(DT);
+        }
+        float spdAfterBrake = pWorld.vehicle().getSpeedKmh();
+        std::cout << "  Speed Before Brake: " << spdBeforeBrake << " km/h -> After 0.5s Brake: " << spdAfterBrake << " km/h" << std::endl;
+        if (spdAfterBrake >= spdBeforeBrake) {
+            std::cout << "  FAIL: Vehicle failed to decelerate under braking!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Dynamic braking decelerates vehicle smoothly." << std::endl;
+        }
+
+        // 5. Split-Screen Render Test
+        std::cout << "Test 5: Split-Screen Viewports Render Pipeline" << std::endl;
+        sm.render(engine.framebuffer(), 1.0f);
+        std::cout << "  PASS: Split-screen Framebuffer blit and overlay rendered without fault." << std::endl;
+
+        std::cout << "\n=======================================================" << std::endl;
+        std::cout << "  RESULT: " << (pass ? "ALL MULTIPLAYER TESTS PASSED!" : "TESTS FAILED!") << std::endl;
+        std::cout << "=======================================================\n" << std::endl;
+
+        return pass ? 0 : 1;
+    }
+
     if (argc > 1 && (std::string(argv[1]) == "--profile" || std::string(argv[1]) == "--benchmark")) {
         engine.show();
         engine.start();

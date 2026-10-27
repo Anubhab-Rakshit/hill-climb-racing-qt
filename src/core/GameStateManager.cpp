@@ -211,10 +211,16 @@ void GameStateManager::startMultiplayerRace() {
     m_selectedBiome = "countryside";
     m_camera.setScreenSize(m_width, 266);
     m_camera2.setScreenSize(m_width, 266);
+
+    // Both players race with matching vehicle archetype for 100% fair, synchronized physics
+    Physics::VehicleType vType = m_profile.selectedVehicle();
+    Physics::DriverType dTypeP1 = m_profile.selectedDriver();
+    Physics::DriverType dTypeP2 = (dTypeP1 == Physics::DriverType::BILL) ? Physics::DriverType::SARAH : Physics::DriverType::BILL;
+
     m_physics.reset("countryside",
-                    Physics::VehicleType::MONSTER_TRUCK, Physics::DriverType::BILL,
+                    vType, dTypeP1,
                     true,
-                    Physics::VehicleType::PICKUP_TRUCK, Physics::DriverType::SARAH);
+                    vType, dTypeP2);
     m_camera.reset(m_physics.vehicle().chassisPos());
     m_camera2.reset(m_physics.vehicle2().chassisPos());
     m_particleSystem.clear();
@@ -491,7 +497,8 @@ void GameStateManager::renderCompactHud(Graphics::Framebuffer& fb, const Physics
     int W = fb.width();
 
     // 1. Racer Identity Pill (Top-Left)
-    int pillW = 210;
+    int labelW = Graphics::RasterFont::getTextWidth(pLabel, 1);
+    int pillW = std::max(220, labelW + 48);
     int pillH = 26;
     UI::UIComponents::drawArcadePanel(fb, 12, 10, pillW, pillH, 0xDD090F1A, UI::Theme::CARD_BORDER, tagCol, 2, true, true);
     fb.fillCircle(24, 23, 5, tagCol);
@@ -542,31 +549,69 @@ void GameStateManager::renderMultiplayer(Graphics::Framebuffer& fb, float alpha)
     m_camera.setRenderAlpha(alpha);
     m_camera2.setRenderAlpha(alpha);
 
-    // --- TOP VIEWPORT: PLAYER 1 (MONSTER TRUCK) ---
-    m_terrainRasterizer.render(m_fbP1, m_camera, m_physics.terrain(), m_gameTime);
+    // --- TOP VIEWPORT: PLAYER 1 ---
+    m_terrainRasterizer.render(m_fbP1, m_camera, m_physics.terrain(), m_gameTime, &m_physics.itemsCollectedP1());
     m_particleSystem.render(m_fbP1, m_camera);
-    Graphics::SpriteRenderer::renderVehicle(m_fbP1, m_camera, m_physics.vehicle(), alpha);
-    Graphics::SpriteRenderer::renderVehicle(m_fbP1, m_camera, m_physics.vehicle2(), alpha);
 
-    // Draw P2 tag in Viewport 1 if nearby
+    // 1. Render Opponent (P2) behind Player 1 with translucent competitor ghost styling (0.55 opacity)
+    Graphics::SpriteRenderer::renderVehicle(m_fbP1, m_camera, m_physics.vehicle2(), alpha, 0.55f);
+
+    // 2. Render Player 1 (primary) crisp, solid and fully opaque ON TOP
+    Graphics::SpriteRenderer::renderVehicle(m_fbP1, m_camera, m_physics.vehicle(), alpha, 1.0f);
+
+    // Draw P2 tag in Viewport 1 if nearby or radar arrow if off-screen
     Physics::Vec2 p2Scr = m_camera.worldToScreen(m_physics.vehicle2().chassisPos());
-    if (p2Scr.x >= 20 && p2Scr.x <= m_fbP1.width() - 20 && p2Scr.y >= 20 && p2Scr.y <= m_fbP1.height() - 20) {
+    float relDistP2 = m_physics.vehicle2().chassisPos().x - m_physics.vehicle().chassisPos().x;
+    if (p2Scr.x >= 20 && p2Scr.x <= m_fbP1.width() - 20 && p2Scr.y >= 15 && p2Scr.y <= m_fbP1.height() - 15) {
         Graphics::RasterFont::drawStringCentered(m_fbP1, static_cast<int>(p2Scr.x), static_cast<int>(p2Scr.y - 34), "[P2]", 0xFF00E5FF, 1);
+    } else {
+        int indY = m_fbP1.height() / 2;
+        if (relDistP2 > 0.0f) {
+            std::string indStr = "P2 +" + std::to_string(static_cast<int>(relDistP2)) + "m >";
+            int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+            UI::UIComponents::drawArcadePanel(m_fbP1, m_fbP1.width() - tw - 18, indY - 10, tw + 14, 20, 0xDD090F1A, UI::Theme::CARD_BORDER, 0xFF00E5FF, 0, false, true);
+            Graphics::RasterFont::drawString(m_fbP1, m_fbP1.width() - tw - 11, indY - 5, indStr, 0xFF00E5FF, 1);
+        } else {
+            std::string indStr = "< P2 " + std::to_string(static_cast<int>(relDistP2)) + "m";
+            int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+            UI::UIComponents::drawArcadePanel(m_fbP1, 10, indY - 10, tw + 14, 20, 0xDD090F1A, UI::Theme::CARD_BORDER, 0xFF00E5FF, 0, false, true);
+            Graphics::RasterFont::drawString(m_fbP1, 17, indY - 5, indStr, 0xFF00E5FF, 1);
+        }
     }
-    renderCompactHud(m_fbP1, m_physics.vehicle(), m_physics.distanceReached(), "P1 - MONSTER TRUCK", 0xFFFF3D00, "WASD: W=GAS S=BRK A/D=TILT");
+    std::string vehName1 = m_physics.vehicle().config().name;
+    renderCompactHud(m_fbP1, m_physics.vehicle(), m_physics.distanceReached(), "P1 - " + vehName1, 0xFFFF3D00, "P1: [W/D] GAS  [S/A] BRK/REV");
 
-    // --- BOTTOM VIEWPORT: PLAYER 2 (PICKUP TRUCK) ---
-    m_terrainRasterizer.render(m_fbP2, m_camera2, m_physics.terrain(), m_gameTime);
+    // --- BOTTOM VIEWPORT: PLAYER 2 ---
+    m_terrainRasterizer.render(m_fbP2, m_camera2, m_physics.terrain(), m_gameTime, &m_physics.itemsCollectedP2());
     m_particleSystem.render(m_fbP2, m_camera2);
-    Graphics::SpriteRenderer::renderVehicle(m_fbP2, m_camera2, m_physics.vehicle(), alpha);
-    Graphics::SpriteRenderer::renderVehicle(m_fbP2, m_camera2, m_physics.vehicle2(), alpha);
 
-    // Draw P1 tag in Viewport 2 if nearby
+    // 1. Render Opponent (P1) behind Player 2 with translucent competitor ghost styling (0.55 opacity)
+    Graphics::SpriteRenderer::renderVehicle(m_fbP2, m_camera2, m_physics.vehicle(), alpha, 0.55f);
+
+    // 2. Render Player 2 (primary) crisp, solid and fully opaque ON TOP
+    Graphics::SpriteRenderer::renderVehicle(m_fbP2, m_camera2, m_physics.vehicle2(), alpha, 1.0f);
+
+    // Draw P1 tag in Viewport 2 if nearby or radar arrow if off-screen
     Physics::Vec2 p1Scr = m_camera2.worldToScreen(m_physics.vehicle().chassisPos());
-    if (p1Scr.x >= 20 && p1Scr.x <= m_fbP2.width() - 20 && p1Scr.y >= 20 && p1Scr.y <= m_fbP2.height() - 20) {
+    float relDistP1 = m_physics.vehicle().chassisPos().x - m_physics.vehicle2().chassisPos().x;
+    if (p1Scr.x >= 20 && p1Scr.x <= m_fbP2.width() - 20 && p1Scr.y >= 15 && p1Scr.y <= m_fbP2.height() - 15) {
         Graphics::RasterFont::drawStringCentered(m_fbP2, static_cast<int>(p1Scr.x), static_cast<int>(p1Scr.y - 34), "[P1]", 0xFFFF3D00, 1);
+    } else {
+        int indY = m_fbP2.height() / 2;
+        if (relDistP1 > 0.0f) {
+            std::string indStr = "P1 +" + std::to_string(static_cast<int>(relDistP1)) + "m >";
+            int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+            UI::UIComponents::drawArcadePanel(m_fbP2, m_fbP2.width() - tw - 18, indY - 10, tw + 14, 20, 0xDD090F1A, UI::Theme::CARD_BORDER, 0xFFFF3D00, 0, false, true);
+            Graphics::RasterFont::drawString(m_fbP2, m_fbP2.width() - tw - 11, indY - 5, indStr, 0xFFFF3D00, 1);
+        } else {
+            std::string indStr = "< P1 " + std::to_string(static_cast<int>(relDistP1)) + "m";
+            int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+            UI::UIComponents::drawArcadePanel(m_fbP2, 10, indY - 10, tw + 14, 20, 0xDD090F1A, UI::Theme::CARD_BORDER, 0xFFFF3D00, 0, false, true);
+            Graphics::RasterFont::drawString(m_fbP2, 17, indY - 5, indStr, 0xFFFF3D00, 1);
+        }
     }
-    renderCompactHud(m_fbP2, m_physics.vehicle2(), m_physics.distanceReached2(), "P2 - PICKUP TRUCK", 0xFF00E5FF, "ARROWS: UP=GAS DN=BRK L/R=TILT");
+    std::string vehName2 = m_physics.vehicle2().config().name;
+    renderCompactHud(m_fbP2, m_physics.vehicle2(), m_physics.distanceReached2(), "P2 - " + vehName2, 0xFF00E5FF, "P2: [ARROWS] UP/RT=GAS  DN/LT=BRK/REV");
 
     // Compose split-screen viewports onto master framebuffer
     fb.blit(0, 0, m_fbP1);

@@ -13,13 +13,14 @@ namespace Graphics {
  */
 class SpriteRenderer {
 public:
-    static void renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle, float alpha = 1.0f);
+    static void renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle,
+                              float alpha = 1.0f, float opacity = 1.0f);
     static void renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile);
     static void renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile,
                                     Physics::VehicleType vType, Physics::DriverType dType, bool drawLift = true);
 
     static void blitRotated(Framebuffer& fb, const QImage& img, float targetX, float targetY,
-                            float anchorX, float anchorY, float angleRad, float scale);
+                            float anchorX, float anchorY, float angleRad, float scale, float opacity = 1.0f);
 
 private:
     static void ensureLoaded();

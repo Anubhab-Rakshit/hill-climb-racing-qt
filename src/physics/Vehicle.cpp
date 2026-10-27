@@ -1,4 +1,4 @@
-﻿#define _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
 #include "Vehicle.h"
 #include <cmath>
 #include <algorithm>
@@ -184,7 +184,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     // Airborne with throttle released: no fuel consumption.
     // Braking with throttle released: no fuel consumption.
     // Throttle / Reverse pressed: consume fuel at a calibrated rate matching distance traveled per tank.
-    float activeThrottle = std::max(effectiveGas, effectiveReverse);
+    float activeThrottle = std::max(effectiveGas, (!m_driverDown && (m_chassisVel.x <= 0.35f)) ? effectiveReverse : 0.0f);
     if (!m_driverDown && m_fuel > 0.0f && activeThrottle > 0.0f) {
         float speedRatio = std::clamp(getSpeedKmh() / (m_config.baseTopSpeedKmh * transMult), 0.0f, 1.2f);
         float slope = terrain.getSlope(m_chassisPos.x);
@@ -323,8 +323,20 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
                 }
             }
 
-            // Dedicated Reverse Engine Drive
-            if (effectiveReverse > 0.0f) {
+            // Surface velocity relative to ground tangent and slope pull
+            float surfSpeed = Vec2::dot(wheelVel, tangent);
+            float downslopePull = 0.5f * m_chassisMass * gravity * (-tangent.y);
+            // Determine dynamic state: braking vs reverse drive
+            // When traveling forward, the left pedal acts as hydraulic braking
+            // Once stationary or moving backward, holding reverse engages reverse propulsion
+            bool isMovingForward = (surfSpeed > 0.30f || m_chassisVel.x > 0.30f);
+            bool wantBrake = (m_brakePressure > 0.001f && effectiveGas < 0.01f);
+            bool isBraking = wantBrake && (isMovingForward || effectiveReverse < 0.01f);
+            bool isReversing = (!isMovingForward) && (effectiveReverse > 0.01f && effectiveGas < 0.01f);
+            const bool braking = isBraking;
+
+            // Dedicated Reverse Engine Drive (active when stopped or rolling backward)
+            if (isReversing) {
                 float maxRevOmega = maxDriveOmega * 0.45f;
                 float currentRevOmega = std::max(0.0f, -wheelAngVel);
                 float revSpeedRatio = std::clamp(currentRevOmega / maxRevOmega, 0.0f, 1.0f);
@@ -335,11 +347,6 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
                     wheelAngVel = -maxRevOmega;
                 }
             }
-
-            // Surface velocity relative to ground tangent and slope pull
-            float surfSpeed = Vec2::dot(wheelVel, tangent);
-            float downslopePull = 0.5f * m_chassisMass * gravity * (-tangent.y);
-            const bool braking = (m_brakePressure > 0.001f && effectiveGas < 0.01f && effectiveReverse < 0.01f);
 
             // Traction & Friction calculation (Pacejka Curve)
             float wheelLinSpeed = wheelAngVel * m_wheelRadius;
@@ -564,9 +571,11 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
 
     // 3. Stunt & In-Air Pitch Controls
     if (!m_rearContact && !m_frontContact) {
-        float airPitchTorque = 780.0f * m_config.baseAirAgility * downforceMult;
-        float pitchBack = std::max(effectiveGas, m_tiltLeftInput);
-        float pitchForward = std::max(effectiveBrake, m_tiltRightInput);
+        float airPitchTorque = 820.0f * m_config.baseAirAgility * downforceMult;
+        // Gas / Right tilts back (counter-clockwise, nose up -> backflip)
+        float pitchBack = std::max(effectiveGas, m_tiltRightInput);
+        // Brake / Left tilts forward (clockwise, nose down -> frontflip)
+        float pitchForward = std::max(effectiveBrake, m_tiltLeftInput);
         if (pitchBack > 0.0f) {
             m_chassisAngularVel += (airPitchTorque * pitchBack / m_chassisInertia) * dt;
         }

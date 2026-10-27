@@ -11,11 +11,14 @@ ScanlineRasterizer::ScanlineRasterizer() {
 
 
 
-void ScanlineRasterizer::renderItems(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime) {
+void ScanlineRasterizer::renderItems(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime,
+                                     const std::vector<bool>* collectedMask) {
     const auto& items = terrain.getItems();
 
-    for (const auto& item : items) {
-        if (item.collected) continue;
+    for (size_t i = 0; i < items.size(); ++i) {
+        const auto& item = items[i];
+        bool isCollected = collectedMask ? (i < collectedMask->size() && (*collectedMask)[i]) : item.collected;
+        if (isCollected) continue;
 
         Physics::Vec2 scr = cam.worldToScreen(item.position);
         int sx = static_cast<int>(scr.x);
@@ -165,7 +168,8 @@ void ScanlineRasterizer::renderItems(Framebuffer& fb, const Camera& cam, const P
     }
 }
 
-void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime) {
+void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physics::Terrain& terrain, float gameTime,
+                                const std::vector<bool>* collectedMask) {
     if (fb.width() <= 0 || fb.height() <= 0) return;
     const std::string& biomeId = terrain.getBiome();
 
@@ -187,10 +191,11 @@ void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physic
         s_deforms.resize(W);
     }
 
+    float centerYFrac = (H <= 300) ? 0.58f : 0.55f;
     for (int x = 0; x < W; ++x) {
         float wx = camX + (x - W * 0.5f) * invZoom;
         float wy = terrain.getHeight(wx);
-        s_surfaceY[x] = static_cast<int>(H * 0.55f - (wy - camY) * zoom);
+        s_surfaceY[x] = static_cast<int>(H * centerYFrac - (wy - camY) * zoom);
         s_worldX[x] = wx;
         s_deforms[x] = terrain.getDeformation(wx);
     }
@@ -359,7 +364,7 @@ void ScanlineRasterizer::render(Framebuffer& fb, const Camera& cam, const Physic
     renderMilestones(fb, cam, terrain, lighting);
 
     // 7. Collectibles (Coins & Fuel)
-    renderItems(fb, cam, terrain, gameTime);
+    renderItems(fb, cam, terrain, gameTime, collectedMask);
 
     // 8. Atmospheric Weather Particles (Snowflakes, Fireflies, Dust, Embers)
     m_envRenderer.renderAtmosphericParticles(fb, cam, biomeId, m_dayNightCycle, s_surfaceY.data(), gameTime);

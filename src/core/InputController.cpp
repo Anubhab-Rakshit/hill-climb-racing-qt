@@ -17,8 +17,23 @@ void InputController::resetTransientActions() {
 }
 
 void InputController::updateCombinedInputs() {
-    m_state.gas = m_state.p1.gas || m_state.p2.gas || m_state.p1.tiltRight || m_state.p2.tiltRight;
-    m_state.brake = m_state.p1.brake || m_state.p2.brake || m_state.p1.tiltLeft || m_state.p2.tiltLeft;
+    // Player 1 controls (WASD): W or D drives forward / tilts up; S or A brakes / reverses / tilts down
+    m_state.p1.gas = m_keyW || m_keyD;
+    m_state.p1.tiltRight = m_keyW || m_keyD;
+    m_state.p1.brake = m_keyS || m_keyA;
+    m_state.p1.reverse = m_keyS || m_keyA;
+    m_state.p1.tiltLeft = m_keyS || m_keyA;
+
+    // Player 2 controls (Arrow Keys): Up or Right drives forward / tilts up; Down or Left brakes / reverses / tilts down
+    m_state.p2.gas = m_keyUp || m_keyRight;
+    m_state.p2.tiltRight = m_keyUp || m_keyRight;
+    m_state.p2.brake = m_keyDown || m_keyLeft;
+    m_state.p2.reverse = m_keyDown || m_keyLeft;
+    m_state.p2.tiltLeft = m_keyDown || m_keyLeft;
+
+    // Single Player combined convenience flags
+    m_state.gas = m_state.p1.gas || m_state.p2.gas;
+    m_state.brake = m_state.p1.brake || m_state.p2.brake;
     m_state.reverse = m_state.p1.reverse || m_state.p2.reverse;
 }
 
@@ -27,29 +42,17 @@ void InputController::onKeyPress(QKeyEvent* event) {
 
     int k = event->key();
 
-    // Player 1 (WASD)
-    if (k == Qt::Key_W) {
-        m_state.p1.gas = true;
-    } else if (k == Qt::Key_S) {
-        m_state.p1.brake = true;
-        m_state.p1.reverse = true;
-    } else if (k == Qt::Key_A) {
-        m_state.p1.tiltLeft = true;
-    } else if (k == Qt::Key_D) {
-        m_state.p1.tiltRight = true;
-    }
+    // Player 1 Keys
+    if (k == Qt::Key_W) m_keyW = true;
+    else if (k == Qt::Key_S) m_keyS = true;
+    else if (k == Qt::Key_A) m_keyA = true;
+    else if (k == Qt::Key_D) m_keyD = true;
 
-    // Player 2 (Arrow Keys)
-    if (k == Qt::Key_Up) {
-        m_state.p2.gas = true;
-    } else if (k == Qt::Key_Down) {
-        m_state.p2.brake = true;
-        m_state.p2.reverse = true;
-    } else if (k == Qt::Key_Left) {
-        m_state.p2.tiltLeft = true;
-    } else if (k == Qt::Key_Right) {
-        m_state.p2.tiltRight = true;
-    }
+    // Player 2 Keys
+    else if (k == Qt::Key_Up) m_keyUp = true;
+    else if (k == Qt::Key_Down) m_keyDown = true;
+    else if (k == Qt::Key_Left) m_keyLeft = true;
+    else if (k == Qt::Key_Right) m_keyRight = true;
 
     // Navigation / Global Shortcuts
     if (k == Qt::Key_Escape || k == Qt::Key_P) {
@@ -70,29 +73,17 @@ void InputController::onKeyRelease(QKeyEvent* event) {
 
     int k = event->key();
 
-    // Player 1 (WASD)
-    if (k == Qt::Key_W) {
-        m_state.p1.gas = false;
-    } else if (k == Qt::Key_S) {
-        m_state.p1.brake = false;
-        m_state.p1.reverse = false;
-    } else if (k == Qt::Key_A) {
-        m_state.p1.tiltLeft = false;
-    } else if (k == Qt::Key_D) {
-        m_state.p1.tiltRight = false;
-    }
+    // Player 1 Keys
+    if (k == Qt::Key_W) m_keyW = false;
+    else if (k == Qt::Key_S) m_keyS = false;
+    else if (k == Qt::Key_A) m_keyA = false;
+    else if (k == Qt::Key_D) m_keyD = false;
 
-    // Player 2 (Arrow Keys)
-    if (k == Qt::Key_Up) {
-        m_state.p2.gas = false;
-    } else if (k == Qt::Key_Down) {
-        m_state.p2.brake = false;
-        m_state.p2.reverse = false;
-    } else if (k == Qt::Key_Left) {
-        m_state.p2.tiltLeft = false;
-    } else if (k == Qt::Key_Right) {
-        m_state.p2.tiltRight = false;
-    }
+    // Player 2 Keys
+    else if (k == Qt::Key_Up) m_keyUp = false;
+    else if (k == Qt::Key_Down) m_keyDown = false;
+    else if (k == Qt::Key_Left) m_keyLeft = false;
+    else if (k == Qt::Key_Right) m_keyRight = false;
 
     updateCombinedInputs();
 }

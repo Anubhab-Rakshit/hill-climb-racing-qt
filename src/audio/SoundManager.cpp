@@ -1083,7 +1083,7 @@ void SoundManager::update(float dt, const Physics::Vehicle& vehicle, const Physi
     // 2. Music State Automation & Crossfading
     if (state == Core::StateType::MAIN_MENU || state == Core::StateType::GARAGE || state == Core::StateType::STAGE_SELECT) {
         setTargetMusic(MusicTrack::MENU);
-    } else if (state == Core::StateType::GAMEPLAY || state == Core::StateType::PAUSED) {
+    } else if (state == Core::StateType::GAMEPLAY || state == Core::StateType::MULTIPLAYER_RACE || state == Core::StateType::PAUSED) {
         setTargetMusic(MusicTrack::RACE);
     } else if (state == Core::StateType::GAME_OVER) {
         setTargetMusic(MusicTrack::NONE);
@@ -1129,8 +1129,8 @@ void SoundManager::update(float dt, const Physics::Vehicle& vehicle, const Physi
         }
     }
 
-    // If not in active gameplay or wreck simulation, silence vehicle audio
-    if (state != Core::StateType::GAMEPLAY && state != Core::StateType::GAME_OVER) {
+    // If not in active gameplay, multiplayer race, or wreck simulation, silence vehicle audio
+    if (state != Core::StateType::GAMEPLAY && state != Core::StateType::MULTIPLAYER_RACE && state != Core::StateType::GAME_OVER) {
         m_tyreRollVolume = 0.0f;
         m_tyreSkidVolume = 0.0f;
         m_windVolume = 0.0f;

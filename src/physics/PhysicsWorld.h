@@ -56,6 +56,10 @@ public:
     const std::string& mpStatusMessage() const { return m_mpStatusMessage; }
 
     int currentCheckpoint() const { return m_lastClearedCheckpoint; }
+    int currentCheckpoint2() const { return m_lastClearedCheckpoint2; }
+
+    const std::vector<bool>& itemsCollectedP1() const { return m_itemsCollectedP1; }
+    const std::vector<bool>& itemsCollectedP2() const { return m_itemsCollectedP2; }
 
     // Event callbacks for UI
     void setOnStunt(std::function<void(const std::string& title, int coins)> cb) { m_onStunt = cb; }
@@ -93,8 +97,12 @@ private:
     int m_winner = 0;
     std::string m_mpStatusMessage;
 
-    int m_lastClearedCheckpoint;
+    int m_lastClearedCheckpoint = 0;
+    int m_lastClearedCheckpoint2 = 0;
     float m_deformAccum = 0.0f;
+
+    std::vector<bool> m_itemsCollectedP1;
+    std::vector<bool> m_itemsCollectedP2;
 
     std::function<void(const std::string&, int)> m_onStunt;
     std::function<void(ItemType, int)> m_onItem;
@@ -103,6 +111,7 @@ private:
     void checkItemCollisions();
     void checkItemCollisionsForVehicle(Vehicle& veh, bool isP1);
     void checkCheckpoints();
+    void checkCheckpointsForVehicle(Vehicle& veh, int& lastCp, bool isP1);
     void updateStunts(float dt);
     void updateStuntsForVehicle(Vehicle& veh, float dt, float& airTimer, float& wheelieTimer,
                                 float& totalAirTime, float& cumulativeRotation, int& flips,

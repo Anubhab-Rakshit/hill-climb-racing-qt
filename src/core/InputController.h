@@ -60,6 +60,15 @@ public:
 private:
     State m_state;
 
+    bool m_keyW = false;
+    bool m_keyS = false;
+    bool m_keyA = false;
+    bool m_keyD = false;
+    bool m_keyUp = false;
+    bool m_keyDown = false;
+    bool m_keyLeft = false;
+    bool m_keyRight = false;
+
     void updateCombinedInputs();
 };
 

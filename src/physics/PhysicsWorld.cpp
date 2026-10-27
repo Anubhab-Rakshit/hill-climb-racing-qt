@@ -28,6 +28,7 @@ PhysicsWorld::PhysicsWorld()
     , m_winner(0)
     , m_mpStatusMessage("")
     , m_lastClearedCheckpoint(0)
+    , m_lastClearedCheckpoint2(0)
 {
 }
 
@@ -41,13 +42,18 @@ void PhysicsWorld::reset(const std::string& biomeId,
     m_terrain.setBiome(biomeId);
     m_terrain.resetDeformation();
 
+    m_itemsCollectedP1.assign(m_terrain.getItems().size(), false);
+    m_itemsCollectedP2.assign(m_terrain.getItems().size(), false);
+
+    // Both players start from the exact same start line (x = 5.0m) with fair initial placement
+    const float startX = 5.0f;
+    float groundY = m_terrain.getHeight(startX);
+
     // Player 1 Vehicle
-    float startX1 = 5.0f;
-    float groundY1 = m_terrain.getHeight(startX1);
     m_vehicle.setVehicleType(vehicleType);
     m_vehicle.setDriverType(driverType);
-    float restY1 = groundY1 + m_vehicle.suspRestLength() + m_vehicle.wheelRadius() - m_vehicle.rearMountOffset().y;
-    m_vehicle.reset(startX1, restY1);
+    float restY1 = groundY + m_vehicle.suspRestLength() + m_vehicle.wheelRadius() - m_vehicle.rearMountOffset().y;
+    m_vehicle.reset(startX, restY1);
 
     m_distance = 0.0f;
     m_coinsCollected = 0;
@@ -61,18 +67,17 @@ void PhysicsWorld::reset(const std::string& biomeId,
     m_gameOverReason = "";
     m_deformAccum = 0.0f;
 
-    // Player 2 Vehicle (Multiplayer)
+    // Player 2 Vehicle (Multiplayer) - Identical start line and synchronized resting physics
     if (m_isMultiplayer) {
-        float startX2 = 8.5f;
-        float groundY2 = m_terrain.getHeight(startX2);
         m_vehicle2.setVehicleType(vehicleType2);
         m_vehicle2.setDriverType(driverType2);
-        float restY2 = groundY2 + m_vehicle2.suspRestLength() + m_vehicle2.wheelRadius() - m_vehicle2.rearMountOffset().y;
-        m_vehicle2.reset(startX2, restY2);
+        float restY2 = groundY + m_vehicle2.suspRestLength() + m_vehicle2.wheelRadius() - m_vehicle2.rearMountOffset().y;
+        m_vehicle2.reset(startX, restY2);
 
         m_distance2 = 0.0f;
         m_flips2 = 0;
         m_totalAirTime2 = 0.0f;
+        m_lastClearedCheckpoint2 = 0;
         m_airTimer2 = 0.0f;
         m_wheelieTimer2 = 0.0f;
         m_cumulativeRotation2 = 0.0f;
@@ -133,6 +138,18 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
             m_vehicle.step(dt, m_terrain, profile);
         } else {
             m_vehicle.step(dt, m_terrain, profile);
+        }
+
+        // Step Vehicle 2 (both step on identical terrain state for perfect physical parity)
+        if (m_gameOver2) {
+            m_vehicle2.applyInput(0.0f, 0.0f);
+            m_vehicle2.step(dt, m_terrain, profile);
+        } else {
+            m_vehicle2.step(dt, m_terrain, profile);
+        }
+
+        // Apply wheel deformations for both vehicles after both have evaluated contact forces
+        if (!m_gameOver) {
             if (m_vehicle.isRearOnGround()) {
                 m_terrain.applyWheelDeformation(m_vehicle.rearWheelPos().x, m_vehicle.rearWheelRadius(),
                                                 m_vehicle.rearNormalForce(), m_vehicle.rearSlipSpeed(), dt);
@@ -142,13 +159,7 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
                                                 m_vehicle.frontNormalForce(), m_vehicle.frontSlipSpeed(), dt);
             }
         }
-
-        // Step Vehicle 2
-        if (m_gameOver2) {
-            m_vehicle2.applyInput(0.0f, 0.0f);
-            m_vehicle2.step(dt, m_terrain, profile);
-        } else {
-            m_vehicle2.step(dt, m_terrain, profile);
+        if (!m_gameOver2) {
             if (m_vehicle2.isRearOnGround()) {
                 m_terrain.applyWheelDeformation(m_vehicle2.rearWheelPos().x, m_vehicle2.rearWheelRadius(),
                                                 m_vehicle2.rearNormalForce(), m_vehicle2.rearSlipSpeed(), dt);
@@ -175,6 +186,9 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
         // Pickup collisions for both vehicles
         checkItemCollisionsForVehicle(m_vehicle, true);
         checkItemCollisionsForVehicle(m_vehicle2, false);
+
+        // Checkpoints for both vehicles
+        checkCheckpoints();
 
         // Stunt evaluation for both
         updateStuntsForVehicle(m_vehicle, dt, m_airTimer, m_wheelieTimer, m_totalAirTime, m_cumulativeRotation, m_flips, true);
@@ -280,9 +294,14 @@ void PhysicsWorld::checkItemCollisions() {
 void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
     Vec2 carPos = veh.chassisPos();
     auto& items = m_terrain.getItems();
+    auto& collectedList = isP1 ? m_itemsCollectedP1 : m_itemsCollectedP2;
+
+    if (collectedList.size() != items.size()) {
+        collectedList.assign(items.size(), false);
+    }
 
     for (size_t i = 0; i < items.size(); ++i) {
-        if (items[i].collected) continue;
+        if (collectedList[i]) continue;
         if (std::abs(items[i].position.x - carPos.x) > 2.8f) continue;
 
         float dx = items[i].position.x - carPos.x;
@@ -291,7 +310,10 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
 
         // Collection radius: 2.2 meters
         if (distSq < 2.2f * 2.2f) {
-            items[i].collected = true;
+            collectedList[i] = true;
+            if (!m_isMultiplayer) {
+                items[i].collected = true;
+            }
 
             if (items[i].type == ItemType::FUEL_CANISTER) {
                 veh.addFuel(100.0f);
@@ -308,15 +330,24 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
 }
 
 void PhysicsWorld::checkCheckpoints() {
+    checkCheckpointsForVehicle(m_vehicle, m_lastClearedCheckpoint, true);
+    if (m_isMultiplayer) {
+        checkCheckpointsForVehicle(m_vehicle2, m_lastClearedCheckpoint2, false);
+    }
+}
+
+void PhysicsWorld::checkCheckpointsForVehicle(Vehicle& veh, int& lastCp, bool isP1) {
     const auto& checkpoints = m_terrain.getCheckpoints();
-    float carX = m_vehicle.chassisPos().x;
+    float carX = veh.chassisPos().x;
 
     for (const auto& cp : checkpoints) {
-        if (carX >= cp.distance && m_lastClearedCheckpoint < cp.index) {
-            m_lastClearedCheckpoint = cp.index;
-            m_coinsCollected += cp.coinReward;
-            if (m_onCheckpoint) {
-                m_onCheckpoint(cp);
+        if (carX >= cp.distance && lastCp < cp.index) {
+            lastCp = cp.index;
+            if (isP1) {
+                m_coinsCollected += cp.coinReward;
+                if (m_onCheckpoint) {
+                    m_onCheckpoint(cp);
+                }
             }
         }
     }

@@ -18,8 +18,8 @@ void SpriteRenderer::ensureLoaded() {
 }
 
 void SpriteRenderer::blitRotated(Framebuffer& fb, const QImage& img, float targetX, float targetY,
-                                float anchorX, float anchorY, float angleRad, float scale) {
-    if (img.isNull() || scale <= 0.001f) return;
+                                float anchorX, float anchorY, float angleRad, float scale, float opacity) {
+    if (img.isNull() || scale <= 0.001f || opacity <= 0.001f) return;
 
     float invScale = 1.0f / scale;
     float cosA = std::cos(angleRad);
@@ -76,6 +76,9 @@ void SpriteRenderer::blitRotated(Framebuffer& fb, const QImage& img, float targe
                 static_cast<unsigned>(v) < static_cast<unsigned>(imgH)) {
                 uint32_t pixel = srcBits[v * srcStride + u];
                 uint32_t sa = (pixel >> 24) & 0xFF;
+                if (opacity < 0.999f) {
+                    sa = static_cast<uint32_t>(sa * opacity);
+                }
                 if (sa == 255) {
                     dstLine[px] = pixel;
                 } else if (sa > 0) {
@@ -90,7 +93,7 @@ void SpriteRenderer::blitRotated(Framebuffer& fb, const QImage& img, float targe
     }
 }
 
-void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle, float alpha) {
+void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle, float alpha, float opacity) {
     ensureLoaded();
 
     const auto& config = vehicle.config();
@@ -180,8 +183,8 @@ void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Phy
     float wheelScale = (vehicle.rearWheelRadius() * zoom) / config.wheelSpriteRadius;
     float wAnchorX = wheelImg.width() * 0.5f;
     float wAnchorY = wheelImg.height() * 0.5f;
-    blitRotated(fb, wheelImg, rearWheelScr.x, rearWheelScr.y, wAnchorX, wAnchorY, vehicle.interpolatedRearWheelAngle(alpha), wheelScale);
-    blitRotated(fb, wheelImg, frontWheelScr.x, frontWheelScr.y, wAnchorX, wAnchorY, vehicle.interpolatedFrontWheelAngle(alpha), wheelScale);
+    blitRotated(fb, wheelImg, rearWheelScr.x, rearWheelScr.y, wAnchorX, wAnchorY, vehicle.interpolatedRearWheelAngle(alpha), wheelScale, opacity);
+    blitRotated(fb, wheelImg, frontWheelScr.x, frontWheelScr.y, wAnchorX, wAnchorY, vehicle.interpolatedFrontWheelAngle(alpha), wheelScale, opacity);
 
     // 5. Render Driver with Physics Inertia (if not already integrated into bespoke vehicle asset)
     if (!config.hasIntegratedDriver) {
@@ -190,11 +193,11 @@ void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Phy
         float driverScale = spriteScale * 0.52f;
         float dAnchorX = driverImg.width() * 0.5f;
         float dAnchorY = driverImg.height() * 0.88f;
-        blitRotated(fb, driverImg, driverHeadScr.x, driverHeadScr.y, dAnchorX, dAnchorY, driverHeadScreenAngle, driverScale);
+        blitRotated(fb, driverImg, driverHeadScr.x, driverHeadScr.y, dAnchorX, dAnchorY, driverHeadScreenAngle, driverScale, opacity);
     }
 
     // 6. Render Pixel-Art Chassis Body (Drawn on top so wheels sit inside wheel arches)
-    blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale);
+    blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale, opacity);
 }
 
 void SpriteRenderer::renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile) {
