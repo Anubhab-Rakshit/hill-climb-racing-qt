@@ -1,71 +1,289 @@
+#define _USE_MATH_DEFINES
 #include "PhysicsWorld.h"
 #include <cmath>
 #include <algorithm>
+#include <cstdio>
 
 namespace Physics {
 
 PhysicsWorld::PhysicsWorld()
-    : m_distance(0.0f)
+    : m_isMultiplayer(false)
+    , m_distance(0.0f)
     , m_coinsCollected(0)
     , m_flips(0)
     , m_totalAirTime(0.0f)
     , m_airTimer(0.0f)
+    , m_wheelieTimer(0.0f)
     , m_cumulativeRotation(0.0f)
     , m_gameOver(false)
     , m_gameOverReason("")
+    , m_distance2(0.0f)
+    , m_flips2(0)
+    , m_totalAirTime2(0.0f)
+    , m_airTimer2(0.0f)
+    , m_wheelieTimer2(0.0f)
+    , m_cumulativeRotation2(0.0f)
+    , m_gameOver2(false)
+    , m_gameOverReason2("")
+    , m_winner(0)
+    , m_mpStatusMessage("")
+    , m_lastClearedCheckpoint(0)
 {
 }
 
-void PhysicsWorld::reset(const std::string& biomeId) {
+void PhysicsWorld::reset(const std::string& biomeId,
+                         VehicleType vehicleType,
+                         DriverType driverType,
+                         bool isMultiplayer,
+                         VehicleType vehicleType2,
+                         DriverType driverType2) {
+    m_isMultiplayer = isMultiplayer;
     m_terrain.setBiome(biomeId);
-    float startX = 5.0f;
-    float groundY = m_terrain.getHeight(startX);
-    m_vehicle.reset(startX, groundY + 1.20f);
+    m_terrain.resetDeformation();
+
+    // Player 1 Vehicle
+    float startX1 = 5.0f;
+    float groundY1 = m_terrain.getHeight(startX1);
+    m_vehicle.setVehicleType(vehicleType);
+    m_vehicle.setDriverType(driverType);
+    float restY1 = groundY1 + m_vehicle.suspRestLength() + m_vehicle.wheelRadius() - m_vehicle.rearMountOffset().y;
+    m_vehicle.reset(startX1, restY1);
 
     m_distance = 0.0f;
     m_coinsCollected = 0;
     m_flips = 0;
     m_totalAirTime = 0.0f;
+    m_lastClearedCheckpoint = 0;
     m_airTimer = 0.0f;
+    m_wheelieTimer = 0.0f;
     m_cumulativeRotation = 0.0f;
     m_gameOver = false;
     m_gameOverReason = "";
+    m_deformAccum = 0.0f;
+
+    // Player 2 Vehicle (Multiplayer)
+    if (m_isMultiplayer) {
+        float startX2 = 8.5f;
+        float groundY2 = m_terrain.getHeight(startX2);
+        m_vehicle2.setVehicleType(vehicleType2);
+        m_vehicle2.setDriverType(driverType2);
+        float restY2 = groundY2 + m_vehicle2.suspRestLength() + m_vehicle2.wheelRadius() - m_vehicle2.rearMountOffset().y;
+        m_vehicle2.reset(startX2, restY2);
+
+        m_distance2 = 0.0f;
+        m_flips2 = 0;
+        m_totalAirTime2 = 0.0f;
+        m_airTimer2 = 0.0f;
+        m_wheelieTimer2 = 0.0f;
+        m_cumulativeRotation2 = 0.0f;
+        m_gameOver2 = false;
+        m_gameOverReason2 = "";
+        m_winner = 0;
+        m_mpStatusMessage = "RACE STARTED!";
+    }
 }
 
 void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
-    if (m_gameOver) return;
+    if (!m_isMultiplayer) {
+        // --- SINGLE PLAYER SIMULATION ---
+        if (m_gameOver) {
+            m_vehicle.applyInput(0.0f, 0.0f);
+            m_vehicle.step(dt, m_terrain, profile);
+            return;
+        }
 
-    // Step multi-body vehicle
-    m_vehicle.step(dt, m_terrain, profile);
+        m_vehicle.step(dt, m_terrain, profile);
 
-    // Update forward distance reached
-    float currentX = m_vehicle.chassisPos().x;
-    if (currentX > m_distance) {
-        m_distance = currentX;
+        if (m_vehicle.isRearOnGround()) {
+            m_terrain.applyWheelDeformation(m_vehicle.rearWheelPos().x, m_vehicle.rearWheelRadius(),
+                                            m_vehicle.rearNormalForce(), m_vehicle.rearSlipSpeed(), dt);
+        }
+        if (m_vehicle.isFrontOnGround()) {
+            m_terrain.applyWheelDeformation(m_vehicle.frontWheelPos().x, m_vehicle.frontWheelRadius(),
+                                            m_vehicle.frontNormalForce(), m_vehicle.frontSlipSpeed(), dt);
+        }
+
+        m_deformAccum += dt;
+        if (m_deformAccum >= 0.08f) {
+            m_terrain.updateDeformation(m_deformAccum, m_vehicle.chassisPos().x - 60.0f, m_vehicle.chassisPos().x + 60.0f);
+            m_deformAccum = 0.0f;
+        }
+
+        float currentX = m_vehicle.chassisPos().x;
+        if (currentX > m_distance) {
+            m_distance = currentX;
+        }
+
+        checkItemCollisions();
+        checkCheckpoints();
+        updateStunts(dt);
+
+        if (m_vehicle.isDriverDown()) {
+            m_gameOver = true;
+            m_gameOverReason = "DRIVER DOWN!";
+        } else if (m_vehicle.isOutOfFuel() && m_vehicle.getSpeedKmh() < 0.5f) {
+            m_gameOver = true;
+            m_gameOverReason = "OUT OF FUEL!";
+        }
+    } else {
+        // --- MULTIPLAYER HEAD-TO-HEAD RACE SIMULATION ---
+        // Step Vehicle 1
+        if (m_gameOver) {
+            m_vehicle.applyInput(0.0f, 0.0f);
+            m_vehicle.step(dt, m_terrain, profile);
+        } else {
+            m_vehicle.step(dt, m_terrain, profile);
+            if (m_vehicle.isRearOnGround()) {
+                m_terrain.applyWheelDeformation(m_vehicle.rearWheelPos().x, m_vehicle.rearWheelRadius(),
+                                                m_vehicle.rearNormalForce(), m_vehicle.rearSlipSpeed(), dt);
+            }
+            if (m_vehicle.isFrontOnGround()) {
+                m_terrain.applyWheelDeformation(m_vehicle.frontWheelPos().x, m_vehicle.frontWheelRadius(),
+                                                m_vehicle.frontNormalForce(), m_vehicle.frontSlipSpeed(), dt);
+            }
+        }
+
+        // Step Vehicle 2
+        if (m_gameOver2) {
+            m_vehicle2.applyInput(0.0f, 0.0f);
+            m_vehicle2.step(dt, m_terrain, profile);
+        } else {
+            m_vehicle2.step(dt, m_terrain, profile);
+            if (m_vehicle2.isRearOnGround()) {
+                m_terrain.applyWheelDeformation(m_vehicle2.rearWheelPos().x, m_vehicle2.rearWheelRadius(),
+                                                m_vehicle2.rearNormalForce(), m_vehicle2.rearSlipSpeed(), dt);
+            }
+            if (m_vehicle2.isFrontOnGround()) {
+                m_terrain.applyWheelDeformation(m_vehicle2.frontWheelPos().x, m_vehicle2.frontWheelRadius(),
+                                                m_vehicle2.frontNormalForce(), m_vehicle2.frontSlipSpeed(), dt);
+            }
+        }
+
+        // Deformations
+        m_deformAccum += dt;
+        if (m_deformAccum >= 0.08f) {
+            float minX = std::min(m_vehicle.chassisPos().x, m_vehicle2.chassisPos().x) - 40.0f;
+            float maxX = std::max(m_vehicle.chassisPos().x, m_vehicle2.chassisPos().x) + 40.0f;
+            m_terrain.updateDeformation(m_deformAccum, minX, maxX);
+            m_deformAccum = 0.0f;
+        }
+
+        // Track distances
+        if (m_vehicle.chassisPos().x > m_distance) m_distance = m_vehicle.chassisPos().x;
+        if (m_vehicle2.chassisPos().x > m_distance2) m_distance2 = m_vehicle2.chassisPos().x;
+
+        // Pickup collisions for both vehicles
+        checkItemCollisionsForVehicle(m_vehicle, true);
+        checkItemCollisionsForVehicle(m_vehicle2, false);
+
+        // Stunt evaluation for both
+        updateStuntsForVehicle(m_vehicle, dt, m_airTimer, m_wheelieTimer, m_totalAirTime, m_cumulativeRotation, m_flips, true);
+        updateStuntsForVehicle(m_vehicle2, dt, m_airTimer2, m_wheelieTimer2, m_totalAirTime2, m_cumulativeRotation2, m_flips2, false);
+
+        // Check crash and fuel conditions
+        if (!m_gameOver) {
+            if (m_vehicle.isDriverDown()) {
+                m_gameOver = true;
+                m_gameOverReason = "P1 CRASHED!";
+            } else if (m_vehicle.isOutOfFuel() && m_vehicle.getSpeedKmh() < 0.5f) {
+                m_gameOver = true;
+                m_gameOverReason = "P1 OUT OF FUEL!";
+            }
+        }
+
+        if (!m_gameOver2) {
+            if (m_vehicle2.isDriverDown()) {
+                m_gameOver2 = true;
+                m_gameOverReason2 = "P2 CRASHED!";
+            } else if (m_vehicle2.isOutOfFuel() && m_vehicle2.getSpeedKmh() < 0.5f) {
+                m_gameOver2 = true;
+                m_gameOverReason2 = "P2 OUT OF FUEL!";
+            }
+        }
+
+        // Evaluate race winner rules
+        updateMultiplayerRules();
+    }
+}
+
+void PhysicsWorld::updateMultiplayerRules() {
+    const float FINISH_DISTANCE = 1500.0f;
+
+    // Check finish line crossing
+    if (m_distance >= FINISH_DISTANCE && m_winner == 0) {
+        m_winner = 1;
+        m_mpStatusMessage = "PLAYER 1 WINS AT FINISH LINE!";
+        return;
+    }
+    if (m_distance2 >= FINISH_DISTANCE && m_winner == 0) {
+        m_winner = 2;
+        m_mpStatusMessage = "PLAYER 2 WINS AT FINISH LINE!";
+        return;
     }
 
-    // Check item pickup collisions
-    checkItemCollisions();
+    // Both stopped
+    if (m_gameOver && m_gameOver2) {
+        if (m_winner == 0) {
+            if (m_distance > m_distance2 + 1.0f) {
+                m_winner = 1;
+                m_mpStatusMessage = "PLAYER 1 WINS ON DISTANCE!";
+            } else if (m_distance2 > m_distance + 1.0f) {
+                m_winner = 2;
+                m_mpStatusMessage = "PLAYER 2 WINS ON DISTANCE!";
+            } else {
+                m_winner = 3;
+                m_mpStatusMessage = "DEAD HEAT DRAW!";
+            }
+        }
+        return;
+    }
 
-    // Check stunt flips and airtime
-    updateStunts(dt);
+    // P1 eliminated, P2 advancing
+    if (m_gameOver && !m_gameOver2) {
+        if (m_distance2 > m_distance) {
+            m_winner = 2;
+            m_mpStatusMessage = "PLAYER 2 OVERTAKES & WINS!";
+        } else {
+            int toBeat = static_cast<int>(m_distance - m_distance2);
+            m_mpStatusMessage = "P1 STOPPED | P2 NEEDS +" + std::to_string(toBeat) + "m";
+        }
+        return;
+    }
 
-    // Check game over triggers
-    if (m_vehicle.isDriverDown()) {
-        m_gameOver = true;
-        m_gameOverReason = "DRIVER DOWN!";
-    } else if (m_vehicle.isOutOfFuel() && m_vehicle.getSpeedKmh() < 0.5f) {
-        m_gameOver = true;
-        m_gameOverReason = "OUT OF FUEL!";
+    // P2 eliminated, P1 advancing
+    if (!m_gameOver && m_gameOver2) {
+        if (m_distance > m_distance2) {
+            m_winner = 1;
+            m_mpStatusMessage = "PLAYER 1 OVERTAKES & WINS!";
+        } else {
+            int toBeat = static_cast<int>(m_distance2 - m_distance);
+            m_mpStatusMessage = "P2 STOPPED | P1 NEEDS +" + std::to_string(toBeat) + "m";
+        }
+        return;
+    }
+
+    // Both active: display relative leader
+    float delta = m_distance - m_distance2;
+    if (std::abs(delta) < 2.5f) {
+        m_mpStatusMessage = "NECK AND NECK!";
+    } else if (delta > 0.0f) {
+        m_mpStatusMessage = "P1 LEADS (+" + std::to_string(static_cast<int>(delta)) + "m)";
+    } else {
+        m_mpStatusMessage = "P2 LEADS (+" + std::to_string(static_cast<int>(-delta)) + "m)";
     }
 }
 
 void PhysicsWorld::checkItemCollisions() {
-    Vec2 carPos = m_vehicle.chassisPos();
+    checkItemCollisionsForVehicle(m_vehicle, true);
+}
+
+void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
+    Vec2 carPos = veh.chassisPos();
     auto& items = m_terrain.getItems();
 
     for (size_t i = 0; i < items.size(); ++i) {
         if (items[i].collected) continue;
+        if (std::abs(items[i].position.x - carPos.x) > 2.8f) continue;
 
         float dx = items[i].position.x - carPos.x;
         float dy = items[i].position.y - carPos.y;
@@ -76,61 +294,105 @@ void PhysicsWorld::checkItemCollisions() {
             items[i].collected = true;
 
             if (items[i].type == ItemType::FUEL_CANISTER) {
-                m_vehicle.addFuel(100.0f);
-                if (m_onStunt) {
-                    m_onStunt("+100 FUEL!", 0);
-                }
+                veh.addFuel(100.0f);
             } else {
-                m_coinsCollected += items[i].value;
-                if (m_onItem) {
-                    m_onItem(items[i].type, items[i].value);
+                if (isP1) {
+                    m_coinsCollected += items[i].value;
                 }
+            }
+            if (m_onItem && isP1) {
+                m_onItem(items[i].type, items[i].value);
+            }
+        }
+    }
+}
+
+void PhysicsWorld::checkCheckpoints() {
+    const auto& checkpoints = m_terrain.getCheckpoints();
+    float carX = m_vehicle.chassisPos().x;
+
+    for (const auto& cp : checkpoints) {
+        if (carX >= cp.distance && m_lastClearedCheckpoint < cp.index) {
+            m_lastClearedCheckpoint = cp.index;
+            m_coinsCollected += cp.coinReward;
+            if (m_onCheckpoint) {
+                m_onCheckpoint(cp);
             }
         }
     }
 }
 
 void PhysicsWorld::updateStunts(float dt) {
-    bool isAirborne = m_vehicle.isAirborne();
+    updateStuntsForVehicle(m_vehicle, dt, m_airTimer, m_wheelieTimer, m_totalAirTime, m_cumulativeRotation, m_flips, true);
+}
+
+void PhysicsWorld::updateStuntsForVehicle(Vehicle& veh, float dt, float& airTimer, float& wheelieTimer,
+                                         float& totalAirTime, float& cumulativeRotation, int& flips,
+                                         bool isP1) {
+    bool isAirborne = veh.isAirborne();
 
     if (isAirborne) {
-        m_airTimer += dt;
-        m_totalAirTime += dt;
+        wheelieTimer = 0.0f;
+        airTimer += dt;
+        totalAirTime += dt;
 
-        float dTheta = m_vehicle.chassisAngularVel() * dt;
-        m_cumulativeRotation += dTheta;
+        float dTheta = veh.chassisAngularVel() * dt;
+        cumulativeRotation += dTheta;
 
         // Check for 360-degree Backflip
-        if (m_cumulativeRotation >= 2.0f * static_cast<float>(M_PI)) {
-            m_flips++;
-            m_cumulativeRotation -= 2.0f * static_cast<float>(M_PI);
-            m_coinsCollected += 1000;
-            if (m_onStunt) {
-                m_onStunt("BACKFLIP!", 1000);
+        if (cumulativeRotation >= 2.0f * static_cast<float>(M_PI)) {
+            flips++;
+            cumulativeRotation -= 2.0f * static_cast<float>(M_PI);
+            veh.addFuel(15.0f); // Bonus fuel reward for daring stunts!
+            if (isP1) {
+                m_coinsCollected += 1000;
+                if (m_onStunt) {
+                    m_onStunt("BACKFLIP! +15% FUEL", 1000);
+                }
             }
         }
         // Check for 360-degree Frontflip
-        else if (m_cumulativeRotation <= -2.0f * static_cast<float>(M_PI)) {
-            m_flips++;
-            m_cumulativeRotation += 2.0f * static_cast<float>(M_PI);
-            m_coinsCollected += 1000;
-            if (m_onStunt) {
-                m_onStunt("FRONTFLIP!", 1000);
+        else if (cumulativeRotation <= -2.0f * static_cast<float>(M_PI)) {
+            flips++;
+            cumulativeRotation += 2.0f * static_cast<float>(M_PI);
+            veh.addFuel(20.0f); // Bonus fuel reward for frontflip!
+            if (isP1) {
+                m_coinsCollected += 1500;
+                if (m_onStunt) {
+                    m_onStunt("FRONTFLIP! +20% FUEL", 1500);
+                }
             }
         }
     } else {
-        // Landing event
-        if (m_airTimer >= 1.2f) {
-            int airBonus = static_cast<int>(m_airTimer * 150.0f);
+        // Air Time landing bonus
+        if (airTimer >= 1.2f && isP1) {
+            int airBonus = static_cast<int>(airTimer * 180.0f);
             m_coinsCollected += airBonus;
             if (m_onStunt) {
                 char buf[32];
-                std::snprintf(buf, sizeof(buf), "AIR TIME: %.1fs", m_airTimer);
+                std::snprintf(buf, sizeof(buf), "AIR TIME: %.1fs", airTimer);
                 m_onStunt(buf, airBonus);
             }
         }
-        m_airTimer = 0.0f;
-        m_cumulativeRotation = 0.0f;
+        airTimer = 0.0f;
+        cumulativeRotation = 0.0f;
+
+        // Wheelie Stunt Detection: driving on rear wheel only at speed
+        if (veh.isRearOnGround() && !veh.isFrontOnGround() && veh.getSpeedKmh() > 18.0f) {
+            wheelieTimer += dt;
+            if (wheelieTimer >= 1.2f) {
+                veh.addFuel(8.0f);
+                if (isP1) {
+                    m_coinsCollected += 400;
+                    if (m_onStunt) {
+                        m_onStunt("WHEELIE! +8% FUEL", 400);
+                    }
+                }
+                wheelieTimer = 0.0f;
+            }
+        } else {
+            wheelieTimer = 0.0f;
+        }
     }
 }
 

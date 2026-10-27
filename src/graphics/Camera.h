@@ -13,13 +13,15 @@ public:
     Camera(int screenWidth = 960, int screenHeight = 540);
 
     void setScreenSize(int w, int h) { m_screenW = w; m_screenH = h; }
+    void reset(const Physics::Vec2& pos);
 
     void update(float dt, const Physics::Vec2& targetPos, float targetSpeedX);
     void addTrauma(float amount);
+    void setRenderAlpha(float alpha) { m_renderAlpha = std::clamp(alpha, 0.0f, 1.0f); }
 
-    float x() const { return m_pos.x + m_shakeOffset.x; }
-    float y() const { return m_pos.y + m_shakeOffset.y; }
-    float zoom() const { return m_zoom; }
+    float x() const;
+    float y() const;
+    float zoom() const;
 
     Physics::Vec2 worldToScreen(const Physics::Vec2& world) const;
     Physics::Vec2 screenToWorld(const Physics::Vec2& screen) const;
@@ -28,9 +30,13 @@ private:
     int m_screenW;
     int m_screenH;
     Physics::Vec2 m_pos;
+    Physics::Vec2 m_prevPos;
     Physics::Vec2 m_shakeOffset;
+    Physics::Vec2 m_prevShakeOffset;
     float m_zoom;
+    float m_prevZoom;
     float m_trauma;
+    float m_renderAlpha;
 };
 
 } // namespace Graphics

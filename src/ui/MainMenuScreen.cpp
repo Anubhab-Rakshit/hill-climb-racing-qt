@@ -1,6 +1,9 @@
 #include "MainMenuScreen.h"
 #include "RasterFont.h"
 #include "UITheme.h"
+#include "UIComponents.h"
+#include "Sprite.h"
+#include "VehicleConfig.h"
 #include <cmath>
 #include <string>
 #include <algorithm>
@@ -11,11 +14,17 @@ MainMenuScreen::MainMenuScreen()
     : m_width(Theme::VIRTUAL_WIDTH)
     , m_height(Theme::VIRTUAL_HEIGHT)
     , m_animTime(0.0f)
-    , m_btnStart(360, 230, 240, 48, "START RACE", Theme::GREEN_GAS)
-    , m_btnGarage(360, 290, 240, 48, "GARAGE & TUNING", Theme::GOLD)
-    , m_btnStages(360, 350, 240, 48, "STAGE SELECT", Theme::CYAN_UPGRADE)
-    , m_btnQuit(360, 410, 240, 44, "QUIT GAME", 0xFF37474F)
+    , m_btnStart(540, 126, 340, 46, "START SOLO RACE", Theme::GREEN_GAS)
+    , m_btnMultiplayer(540, 178, 340, 46, "2P MULTIPLAYER", 0xFFFF5722)
+    , m_btnGarage(540, 230, 340, 44, "GARAGE & TUNING", Theme::GOLD)
+    , m_btnStages(540, 280, 340, 44, "STAGE SELECT", Theme::CYAN_UPGRADE)
+    , m_btnQuit(540, 330, 340, 38, "QUIT GAME", 0xFF2A3A4E)
 {
+    m_btnStart.setKeyHint("ENTER");
+    m_btnMultiplayer.setKeyHint("M");
+    m_btnGarage.setKeyHint("G");
+    m_btnStages.setKeyHint("S");
+    m_btnQuit.setKeyHint("ESC");
     setDimensions(m_width, m_height);
 }
 
@@ -23,25 +32,29 @@ void MainMenuScreen::setDimensions(int width, int height) {
     m_width = width;
     m_height = height;
 
-    int btnW = 250;
-    int btnH = 46;
-    int cx = width / 2 - btnW / 2;
+    int btnW = 340;
+    int btnX = width - btnW - 70; // 550 on 960 canvas
+    int startY = 126;
 
-    m_btnStart.setPosition(cx, 230);
-    m_btnStart.setSize(btnW, btnH);
+    m_btnStart.setPosition(btnX, startY);
+    m_btnStart.setSize(btnW, 46);
 
-    m_btnGarage.setPosition(cx, 288);
-    m_btnGarage.setSize(btnW, btnH);
+    m_btnMultiplayer.setPosition(btnX, startY + 52);
+    m_btnMultiplayer.setSize(btnW, 46);
 
-    m_btnStages.setPosition(cx, 346);
-    m_btnStages.setSize(btnW, btnH);
+    m_btnGarage.setPosition(btnX, startY + 104);
+    m_btnGarage.setSize(btnW, 44);
 
-    m_btnQuit.setPosition(cx, 404);
-    m_btnQuit.setSize(btnW, 42);
+    m_btnStages.setPosition(btnX, startY + 154);
+    m_btnStages.setSize(btnW, 44);
+
+    m_btnQuit.setPosition(btnX, startY + 204);
+    m_btnQuit.setSize(btnW, 38);
 }
 
 void MainMenuScreen::onMouseMove(int px, int py) {
     m_btnStart.onMouseMove(px, py);
+    m_btnMultiplayer.onMouseMove(px, py);
     m_btnGarage.onMouseMove(px, py);
     m_btnStages.onMouseMove(px, py);
     m_btnQuit.onMouseMove(px, py);
@@ -49,6 +62,7 @@ void MainMenuScreen::onMouseMove(int px, int py) {
 
 bool MainMenuScreen::onMouseDown(int px, int py) {
     if (m_btnStart.onMouseDown(px, py)) return true;
+    if (m_btnMultiplayer.onMouseDown(px, py)) return true;
     if (m_btnGarage.onMouseDown(px, py)) return true;
     if (m_btnStages.onMouseDown(px, py)) return true;
     if (m_btnQuit.onMouseDown(px, py)) return true;
@@ -57,6 +71,7 @@ bool MainMenuScreen::onMouseDown(int px, int py) {
 
 void MainMenuScreen::onMouseUp(int px, int py) {
     m_btnStart.onMouseUp(px, py);
+    m_btnMultiplayer.onMouseUp(px, py);
     m_btnGarage.onMouseUp(px, py);
     m_btnStages.onMouseUp(px, py);
     m_btnQuit.onMouseUp(px, py);
@@ -67,14 +82,20 @@ void MainMenuScreen::update(float dt) {
 }
 
 void MainMenuScreen::render(Graphics::Framebuffer& fb, int totalCoins) {
-    // 1. Vibrant Bright Daylight Countryside Sky Gradient
-    fb.fillVerticalGradient(0, 0, m_width, m_height, 0xFF1E88E5, 0xFF90CAF9);
+    Core::ProfileManager dummy;
+    dummy.addCoins(totalCoins);
+    render(fb, dummy);
+}
 
-    // 2. Glowing Golden Sun in sky with rotating rays
-    int sunX = 140;
-    int sunY = 75;
+void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManager& profile) {
+    // 1. Radiant Countryside Sky Gradient (Atmospheric daylight)
+    fb.fillVerticalGradient(0, 0, m_width, m_height, 0xFF1976D2, 0xFF90CAF9);
+
+    // 2. Animated Rotating Sun with Corona & Shimmering Rays
+    int sunX = 115;
+    int sunY = 65;
     for (int a = 0; a < 8; ++a) {
-        float rayAng = a * (3.14159f / 4.0f) + m_animTime * 0.35f;
+        float rayAng = a * (3.14159f / 4.0f) + m_animTime * 0.30f;
         int r1x = static_cast<int>(sunX + std::cos(rayAng) * 22.0f);
         int r1y = static_cast<int>(sunY + std::sin(rayAng) * 22.0f);
         int r2x = static_cast<int>(sunX + std::cos(rayAng) * 36.0f);
@@ -85,15 +106,13 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, int totalCoins) {
     fb.fillCircle(sunX, sunY, 19, 0xFFFFEE58); // Sun disc
     fb.fillCircle(sunX, sunY, 13, 0xFFFFF9C4); // Core glow
 
-    // 3. Drifting Puffy Cartoon Pixel Clouds
+    // 3. Drifting Puffy Pixel Clouds
     auto drawPixelCloud = [&](int cx, int cy, int size) {
-        // Soft shaded underside
         fb.fillCircle(cx, cy + 3, size + 2, 0xFFB0BEC5);
         fb.fillCircle(cx + size, cy + 5, (size * 4) / 5 + 2, 0xFFB0BEC5);
         fb.fillCircle(cx - size, cy + 5, (size * 3) / 5 + 2, 0xFFB0BEC5);
         fb.fillRect(cx - size, cy + 2, size * 2, size / 2 + 3, 0xFFB0BEC5);
 
-        // Crisp white puffy body
         fb.fillCircle(cx, cy, size, 0xFFFFFFFF);
         fb.fillCircle(cx + size, cy + 2, (size * 4) / 5, 0xFFFFFFFF);
         fb.fillCircle(cx - size, cy + 3, (size * 3) / 5, 0xFFFFFFFF);
@@ -104,38 +123,38 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, int totalCoins) {
     float cloud2X = std::fmod(m_animTime * 7.0f + 400.0f, static_cast<float>(m_width + 200)) - 100.0f;
     float cloud3X = std::fmod(m_animTime * 18.0f + 700.0f, static_cast<float>(m_width + 200)) - 100.0f;
 
-    drawPixelCloud(static_cast<int>(cloud1X), 55, 24);
-    drawPixelCloud(static_cast<int>(cloud2X), 115, 30);
-    drawPixelCloud(static_cast<int>(cloud3X), 35, 18);
+    drawPixelCloud(static_cast<int>(cloud1X), 52, 24);
+    drawPixelCloud(static_cast<int>(cloud2X), 112, 30);
+    drawPixelCloud(static_cast<int>(cloud3X), 32, 18);
 
-    // 4. Parallax Mountain & Rolling Lush Green Hills
+    // 4. Parallax Mountain Layers & Scenic Hills
     for (int x = 0; x < m_width; ++x) {
-        // Distant Mountain Ridge
-        float h0 = std::sin(x * 0.005f + 0.5f) * 45.0f + 325.0f;
+        // Layer 1: Distant Alpine Peaks
+        float h0 = std::sin(x * 0.005f + 0.5f) * 45.0f + 295.0f;
         int y0 = static_cast<int>(h0);
         for (int y = y0; y < m_height; ++y) {
             fb.setPixelFast(x, y, 0xFF455A64);
         }
-        if (y0 < 305) {
+        if (y0 < 275) {
             fb.fillRect(x, y0, 1, 5, 0xFFECEFF1); // Snowcaps
         }
 
-        // Mid Hills (Meadow Green)
-        float h1 = std::sin(x * 0.009f + m_animTime * 0.12f) * 35.0f + 375.0f;
+        // Layer 2: Mid-ground Pine Foothills
+        float h1 = std::sin(x * 0.008f + m_animTime * 0.10f) * 32.0f + 345.0f;
         int y1 = static_cast<int>(h1);
         for (int y = y1; y < m_height; ++y) {
             fb.setPixelFast(x, y, (y - y1 < 4) ? 0xFF388E3C : 0xFF2E7D32);
         }
 
-        // Foreground Rolling Lawn (Vibrant Emerald Top with Warm Chocolate Soil)
-        float h2 = std::sin(x * 0.014f + 1.2f) * 26.0f + 435.0f;
+        // Layer 3: Foreground Emerald Lawn with Geological Strata
+        float h2 = std::sin(x * 0.011f + 0.8f) * 26.0f + 395.0f;
         int y2 = static_cast<int>(h2);
         for (int y = y2; y < m_height; ++y) {
             int depth = y - y2;
             uint32_t col;
-            if (depth == 0) col = 0xFF81C784; // Sunlit crest edge
-            else if (depth < 6) col = 0xFF4CAF50; // Lush green grass
-            else if (depth < 14) col = 0xFF2E7D32; // Deep root layer
+            if (depth == 0) col = 0xFF81C784; // Sunlit crest
+            else if (depth < 6) col = 0xFF4CAF50; // Lush emerald grass
+            else if (depth < 14) col = 0xFF2E7D32; // Root layer
             else if (depth < 45) {
                 int speck = ((x ^ y) & 7);
                 col = (speck == 0) ? 0xFF6D4C41 : 0xFF795548;
@@ -145,111 +164,254 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, int totalCoins) {
             fb.setPixelFast(x, y, col);
         }
 
-        // Grass tufts on foreground ridge
+        // Grass blade tufts on foreground ridge
         if (x % 7 == 0 && y2 > 2 && y2 < m_height) {
             fb.setPixelFast(x, y2 - 1, 0xFF81C784);
             fb.setPixelFast(x + 1, y2 - 2, 0xFFA5D6A7);
         }
     }
 
-    // 5. Animated Cartoon Jeep parked on foreground menu hill
-    int jeepX = 180;
-    float jeepHillY = std::sin(jeepX * 0.014f + 1.2f) * 26.0f + 435.0f;
-    float jeepBob = std::sin(m_animTime * 3.5f) * 2.0f;
-    int jy = static_cast<int>(jeepHillY - 32 + jeepBob);
+    // 5. ZONE A (LEFT): Hero Vehicle Showcase on Scenic Plateau
+    int vehX = 265;
+    float hillY = std::sin(vehX * 0.011f + 0.8f) * 26.0f + 395.0f;
+    float idleBob = std::sin(m_animTime * 3.5f) * 1.5f;
+    int vy = static_cast<int>(hillY - 26 + idleBob);
 
-    // Chassis Body (Glossy Racing Red)
-    fb.fillRect(jeepX - 35, jy, 70, 18, 0xFFD32F2F);
-    fb.fillRect(jeepX - 35, jy, 70, 3, 0xFFFF5252); // Top gloss
-    fb.fillRect(jeepX - 37, jy + 6, 74, 12, 0xFFC62828); // Lower fender flare
-    fb.fillRect(jeepX - 10, jy - 16, 28, 16, 0xFFB71C1C); // Cabin hood / cabin back
+    // High-tech illuminated showcase runner pad
+    int padW = 220;
+    int padH = 6;
+    int padX = vehX - padW / 2;
+    int padY = static_cast<int>(hillY + 6);
+    fb.fillRect(padX, padY, padW, padH, 0xEE142232);
+    fb.drawRect(padX, padY, padW, padH, 0xFF2A3D54);
+    fb.fillRect(padX + 2, padY, padW - 4, 1, Theme::CYAN_UPGRADE);
 
-    // Windshield & Roll Cage
-    fb.fillRect(jeepX + 5, jy - 14, 12, 14, 0xFF81D4FA); // Glass
-    fb.drawLine(jeepX - 10, jy - 16, jeepX - 10, jy, 0xFF212121); // Roll bar rear
-    fb.drawLine(jeepX - 10, jy - 16, jeepX + 18, jy - 16, 0xFF212121); // Roll bar roof
-    fb.drawLine(jeepX + 18, jy - 16, jeepX + 18, jy, 0xFF212121); // Roll bar pillar
+    // Tire ground contact shadows
+    fb.fillCircle(vehX - 35, static_cast<int>(hillY + 4), 16, 0x660B121C);
+    fb.fillCircle(vehX + 35, static_cast<int>(hillY + 4), 16, 0x660B121C);
 
-    // Driver in White/Blue Helmet
-    fb.fillCircle(jeepX - 2, jy - 10, 7, 0xFFECEFF1);
-    fb.fillRect(jeepX + 1, jy - 12, 5, 4, 0xFF1E88E5); // Visor
+    // Render player's actual customized vehicle (drawLift = false for natural meadow stance)
+    Graphics::SpriteRenderer::renderGarageVehicle(fb, vehX, vy, idleBob, profile,
+                                                  profile.selectedVehicle(), profile.selectedDriver(),
+                                                  /*drawLift=*/false);
 
-    // Front Bumper & Headlight
-    fb.fillRect(jeepX + 35, jy + 8, 6, 8, 0xFF212121);
-    fb.fillRect(jeepX + 33, jy + 2, 4, 5, 0xFFFFF59D); // Headlight glow
-
-    // Big Rugged Monster Truck Wheels with Rims
-    auto drawMenuWheel = [&](int wx, int wy) {
-        fb.fillCircle(wx, wy, 15, 0xFF212121); // Tire rubber
-        fb.drawCircle(wx, wy, 15, 0xFF424242);
-        fb.fillCircle(wx, wy, 9, 0xFFB0BEC5);  // Chrome rim
-        fb.fillCircle(wx, wy, 4, 0xFF37474F);  // Hub
-    };
-    drawMenuWheel(jeepX - 24, jy + 18);
-    drawMenuWheel(jeepX + 24, jy + 18);
-
-    // 5. Top Right: Coin Balance Box
-    int coinBoxW = 150;
-    int coinBoxH = 34;
-    int coinBoxX = m_width - coinBoxW - 24;
-    int coinBoxY = 16;
-    fb.fillRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, 0xEE0B121C);
-    fb.drawRect(coinBoxX, coinBoxY, coinBoxW, coinBoxH, Theme::CARD_BORDER);
-
-    // Spinning / Shining Gold Coin
-    int coinX = coinBoxX + 17;
-    int coinY = coinBoxY + 17;
-    int coinW = static_cast<int>(std::abs(std::cos(m_animTime * 3.5f)) * 7.0f) + 2;
-    fb.fillRect(coinX - coinW, coinY - 7, coinW * 2, 14, Theme::GOLD);
-    fb.drawRect(coinX - coinW, coinY - 7, coinW * 2, 14, 0xFFFFA000);
-    if (coinW >= 5) {
-        Graphics::RasterFont::drawStringCentered(fb, coinX, coinY - 3, "$", 0xFF4E342E, 1);
+    // Tailpipe idle exhaust puffs drifting in wind (combustion engines only)
+    if (profile.selectedVehicle() != Physics::VehicleType::ELECTRIC_OFFROADER) {
+        float puffTimer = std::fmod(m_animTime * 2.2f, 1.0f);
+        int pfx = vehX - 52 - static_cast<int>(puffTimer * 18.0f);
+        int pfy = vy + 10 - static_cast<int>(puffTimer * 8.0f);
+        int pr = std::clamp(static_cast<int>(puffTimer * 3.5f) + 1, 1, 4);
+        uint32_t pA = static_cast<uint32_t>((1.0f - puffTimer) * 60.0f);
+        fb.blendPixelFast(pfx, pfy, (pA << 24) | 0x00B0BEC5);
+        if (pr > 1) {
+            fb.blendPixelFast(pfx + 1, pfy, ((pA / 2) << 24) | 0x00B0BEC5);
+            fb.blendPixelFast(pfx, pfy - 1, ((pA / 2) << 24) | 0x00B0BEC5);
+        }
     }
 
-    char coinBuf[32];
-    std::snprintf(coinBuf, sizeof(coinBuf), "%06d", totalCoins);
-    Graphics::RasterFont::drawString(fb, coinBoxX + 36, coinBoxY + 9, coinBuf, Theme::GOLD, 2);
+    // Telemetry Showcase Card directly beneath vehicle
+    const auto& vehCfg = Physics::VehicleRegistry::getConfig(profile.selectedVehicle());
+    int cardW = 390;
+    int cardH = 88;
+    int cardX = vehX - cardW / 2;
+    int cardY = static_cast<int>(hillY + 16);
 
-    // 6. Master Animated Title Logo
-    int cx = m_width / 2;
-    float bounceY = std::sin(m_animTime * 2.8f) * 4.5f;
-    int titleY = static_cast<int>(52 + bounceY);
+    UIComponents::drawArcadePanel(fb, cardX, cardY, cardW, cardH, 0xF00B1422, Theme::CARD_BORDER, Theme::GOLD, 3, true, true);
 
-    // Deep 3D Drop Shadow Layers
-    Graphics::RasterFont::drawStringCentered(fb, cx + 4, titleY + 4, "HILL CLIMB", 0xFF05080E, 4);
-    Graphics::RasterFont::drawStringCentered(fb, cx + 4, titleY + 44, "RACING", 0xFF05080E, 4);
+    // Active Vehicle Title & Tagline
+    Graphics::RasterFont::drawString(fb, cardX + 14, cardY + 10, vehCfg.name, Theme::GOLD, 2);
+    // [ACTIVE RIG] Pill
+    int tagW = 86;
+    int tagX = cardX + cardW - tagW - 12;
+    UIComponents::drawArcadePanel(fb, tagX, cardY + 8, tagW, 18, 0xFF143820, Theme::GREEN_GAS, 0, 0, false, true);
+    Graphics::RasterFont::drawStringCentered(fb, tagX + tagW / 2, cardY + 12, "ACTIVE RIG", Theme::GREEN_GAS, 1);
 
-    Graphics::RasterFont::drawStringCentered(fb, cx + 2, titleY + 2, "HILL CLIMB", 0xFFB26A00, 4);
-    Graphics::RasterFont::drawStringCentered(fb, cx + 2, titleY + 42, "RACING", 0xFFE65100, 4);
+    Graphics::RasterFont::drawString(fb, cardX + 14, cardY + 30, vehCfg.tagline, Theme::TEXT_MUTED, 1);
 
-    // Primary Text (Metallic Gold / Sunset Amber)
-    Graphics::RasterFont::drawStringCentered(fb, cx, titleY, "HILL CLIMB", Theme::GOLD, 4);
-    Graphics::RasterFont::drawStringCentered(fb, cx, titleY + 40, "RACING", 0xFFFF9100, 4);
+    // 3 Performance Spec Chips
+    int chipY = cardY + 48;
+    auto drawMiniStat = [&](int x, const std::string& label, int level, uint32_t barCol) {
+        int w = 114;
+        fb.fillRect(x, chipY, w, 28, 0xEE111A26);
+        fb.drawRect(x, chipY, w, 28, 0xFF2A3A4E);
+        Graphics::RasterFont::drawString(fb, x + 6, chipY + 4, label, Theme::TEXT_MUTED, 1);
+        UIComponents::drawSegmentedBar(fb, x + 6, chipY + 16, w - 12, 7, level, 15, barCol);
+    };
 
-    // Highlight Shimmer on top line
-    Graphics::RasterFont::drawStringCentered(fb, cx - 1, titleY - 1, "HILL CLIMB", 0xFFFFE082, 4);
+    int engLvl = profile.getUpgradeLevel(profile.selectedVehicle(), Core::ProfileManager::UPGRADE_ENGINE);
+    int tireLvl = profile.getUpgradeLevel(profile.selectedVehicle(), Core::ProfileManager::UPGRADE_TIRES);
+    int suspLvl = profile.getUpgradeLevel(profile.selectedVehicle(), Core::ProfileManager::UPGRADE_SUSPENSION);
 
-    // Engine Badge Subtitle
-    int badgeW = 280;
-    int badgeH = 22;
-    int badgeX = cx - badgeW / 2;
-    int badgeY = titleY + 92;
-    fb.fillRect(badgeX, badgeY, badgeW, badgeH, 0xEE0B1422);
-    fb.drawRect(badgeX, badgeY, badgeW, badgeH, Theme::CYAN_UPGRADE);
-    Graphics::RasterFont::drawStringCentered(fb, cx, badgeY + 5, "* PURE RASTER C++ ENGINE *", Theme::CYAN_UPGRADE, 1);
+    drawMiniStat(cardX + 14, "ENGINE", engLvl, Theme::GOLD);
+    drawMiniStat(cardX + 138, "TIRES", tireLvl, Theme::CYAN_UPGRADE);
+    drawMiniStat(cardX + 262, "SUSPENSION", suspLvl, Theme::GREEN_GAS);
 
-    // 7. Navigation Buttons
+    // 6. ZONE B (RIGHT): Master Navigation Console & Career Ticker
+    // Breathing pulse halo on START button
+    float pulseAlpha = (std::sin(m_animTime * 4.0f) * 0.5f + 0.5f);
+    uint32_t pulseCol = UI::Theme::blend(0x0000E676, 0x6600E676, pulseAlpha);
+    fb.drawRect(m_btnStart.x() - 1, m_btnStart.y() - 1, m_btnStart.width() + 2, m_btnStart.height() + 2, pulseCol);
+
+    // Dynamic glowing accent on 2P MULTIPLAYER button
+    float mpPulse = (std::sin(m_animTime * 5.0f + 1.2f) * 0.5f + 0.5f);
+    uint32_t mpCol = UI::Theme::blend(0x00FF3D00, 0x88FF7043, mpPulse);
+    fb.drawRect(m_btnMultiplayer.x() - 1, m_btnMultiplayer.y() - 1, m_btnMultiplayer.width() + 2, m_btnMultiplayer.height() + 2, mpCol);
+
     m_btnStart.render(fb, 2);
+    m_btnMultiplayer.render(fb, 2);
     m_btnGarage.render(fb, 2);
     m_btnStages.render(fb, 2);
     m_btnQuit.render(fb, 2);
 
-    // 8. Footer Controls Hint Bar
-    fb.fillRect(0, m_height - 28, m_width, 28, 0xEE090E18);
-    fb.drawLine(0, m_height - 28, m_width, m_height - 28, 0xFF1E2B3E);
-    Graphics::RasterFont::drawStringCentered(fb, cx, m_height - 18,
-        "[A]/[LEFT] BRAKE & TILT BACK   |   [D]/[RIGHT] GAS & TILT FWD   |   [ESC] PAUSE",
-        Theme::TEXT_MUTED, 1);
+    // Career Highlights Box beneath buttons
+    int btnW = 340;
+    int btnX = m_width - btnW - 70;
+    int tickY = 376;
+    int tickH = 88;
+    UIComponents::drawArcadePanel(fb, btnX, tickY, btnW, tickH, 0xF00B1422, Theme::CARD_BORDER, Theme::CYAN_UPGRADE, 3, true, true);
+
+    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 10, "CAREER HIGHLIGHTS", Theme::CYAN_UPGRADE, 1);
+
+    // Record stats
+    int bestDist = profile.getRecordDistance("countryside");
+    std::string recStr = "COUNTRYSIDE BEST: " + UIComponents::formatNumber(bestDist) + "m";
+    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 28, recStr, Theme::TEXT_WHITE, 1);
+
+    // Vehicle collection count
+    int unlockedCount = 0;
+    for (int v = 0; v < static_cast<int>(Physics::VehicleType::COUNT); ++v) {
+        if (profile.isVehicleUnlocked(static_cast<Physics::VehicleType>(v))) unlockedCount++;
+    }
+    std::string collStr = "FLEET: " + std::to_string(unlockedCount) + "/10 VEHICLES UNLOCKED";
+    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 46, collStr, Theme::GOLD, 1);
+
+    // Checkpoints cleared
+    int cps = profile.getStageCheckpointProgress("countryside");
+    std::string cpStr = "PROGRESS: CHECKPOINT " + std::to_string(cps) + "/5 CLEARED";
+    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 64, cpStr, Theme::GREEN_GAS, 1);
+
+    // 7. TOP BAR: Driver Identity + Title Marquee + Master Coin Badge
+    // Top-Left: Pilot Profile Pill
+    const auto& drvCfg = Physics::VehicleRegistry::getDriver(profile.selectedDriver());
+    int pillW = 210;
+    int pillH = 34;
+    int pillX = 24;
+    int pillY = 16;
+    UIComponents::drawArcadePanel(fb, pillX, pillY, pillW, pillH, 0xEE0B1422, Theme::CARD_BORDER, drvCfg.themeColor, 2, true, true);
+    // Pilot helmet icon pip
+    fb.fillCircle(pillX + 18, pillY + 17, 7, drvCfg.themeColor);
+    fb.fillCircle(pillX + 18, pillY + 17, 4, 0xFFFFFFFF);
+    std::string drvTitle = "PILOT: " + drvCfg.name;
+    Graphics::RasterFont::drawString(fb, pillX + 34, pillY + 11, drvTitle, Theme::TEXT_WHITE, 1);
+
+    // Top-Right: Master Currency Badge
+    int coinBoxW = 155;
+    int coinBoxH = 34;
+    int coinBoxX = m_width - coinBoxW - 24;
+    int coinBoxY = 16;
+    UIComponents::drawCoinBadge(fb, coinBoxX, coinBoxY, coinBoxW, coinBoxH, profile.coins(), m_animTime);
+
+    // Top-Center: Master Arcade Title Marquee
+    int cx = m_width / 2;
+    float bounceY = std::sin(m_animTime * 2.5f) * 3.0f;
+    int titleY = static_cast<int>(18 + bounceY);
+
+    // Marquee Frame
+    int marqueeW = 460;
+    int marqueeH = 96;
+    int marqueeX = cx - marqueeW / 2;
+    int marqueeY = titleY;
+    UIComponents::drawArcadePanel(fb, marqueeX, marqueeY, marqueeW, marqueeH, 0xE8080E18, 0xFF37474F, Theme::GOLD, 4, true, true);
+
+    // Chrome Rivets at 4 corners
+    fb.fillCircle(marqueeX + 7, marqueeY + 7, 2, Theme::CHROME_MID);
+    fb.fillCircle(marqueeX + marqueeW - 8, marqueeY + 7, 2, Theme::CHROME_MID);
+    fb.fillCircle(marqueeX + 7, marqueeY + marqueeH - 8, 2, Theme::CHROME_MID);
+    fb.fillCircle(marqueeX + marqueeW - 8, marqueeY + marqueeH - 8, 2, Theme::CHROME_MID);
+
+    // Dual 3D Drop Shadow & Vibrant Typography
+    Graphics::RasterFont::drawStringCentered(fb, cx + 3, marqueeY + 13, "HILL CLIMB", 0xFF05080E, 4);
+    Graphics::RasterFont::drawStringCentered(fb, cx + 3, marqueeY + 45, "RACING", 0xFF05080E, 4);
+
+    Graphics::RasterFont::drawStringCentered(fb, cx + 1, marqueeY + 11, "HILL CLIMB", 0xFFB26A00, 4);
+    Graphics::RasterFont::drawStringCentered(fb, cx + 1, marqueeY + 43, "RACING", 0xFFE65100, 4);
+
+    Graphics::RasterFont::drawStringCentered(fb, cx, marqueeY + 10, "HILL CLIMB", Theme::GOLD, 4);
+    Graphics::RasterFont::drawStringCentered(fb, cx, marqueeY + 42, "RACING", 0xFFFF9100, 4);
+
+    // Top highlight specular sheen
+    Graphics::RasterFont::drawStringCentered(fb, cx - 1, marqueeY + 9, "HILL CLIMB", 0xFFFFE082, 4);
+
+    // Dynamic diagonal specular gleam across title marquee
+    float gleamFrac = std::fmod(m_animTime * 0.70f, 3.2f);
+    if (gleamFrac < 1.0f) {
+        int gleamX = marqueeX + static_cast<int>(gleamFrac * (marqueeW + 60)) - 30;
+        for (int gy = marqueeY + 6; gy < marqueeY + marqueeH - 6; ++gy) {
+            int gx = gleamX - (gy - marqueeY) / 2;
+            if (gx >= marqueeX + 6 && gx < marqueeX + marqueeW - 6) {
+                fb.blendPixelFast(gx, gy, 0x44FFFFFF);
+                fb.blendPixelFast(gx + 1, gy, 0x77FFFFFF);
+                fb.blendPixelFast(gx + 2, gy, 0x44FFFFFF);
+            }
+        }
+    }
+
+    // Arcade Subtitle Badge
+    int subW = 260;
+    int subH = 18;
+    int subX = cx - subW / 2;
+    int subY = marqueeY + 72;
+    UIComponents::drawArcadePanel(fb, subX, subY, subW, subH, 0xEE0B1422, Theme::CYAN_UPGRADE, 0, 0, false, true);
+    Graphics::RasterFont::drawStringCentered(fb, cx, subY + 3, "* RETRO ARCADE MOTORSPORT *", Theme::CYAN_UPGRADE, 1);
+
+    // 8. Footer Controls Hint Bar with 3D Keycaps
+    int footH = 28;
+    int footY = m_height - footH;
+    fb.fillRect(0, footY, m_width, footH, 0xEE090E18);
+    fb.drawLine(0, footY, m_width, footY, 0xFF1E2B3E);
+
+    int startKx = cx - 440;
+    int ky = footY + 6;
+
+    // ENTER: SOLO
+    UIComponents::drawKeycap(fb, startKx, ky, "ENTER");
+    Graphics::RasterFont::drawString(fb, startKx + 46, ky + 4, "SOLO", Theme::GREEN_GAS, 1);
+
+    // M: 2P RACE
+    int mKx = startKx + 95;
+    UIComponents::drawKeycap(fb, mKx, ky, "M");
+    Graphics::RasterFont::drawString(fb, mKx + 22, ky + 4, "2P RACE", 0xFFFF9100, 1);
+
+    // P1: WASD
+    int p1Kx = mKx + 95;
+    Graphics::RasterFont::drawString(fb, p1Kx, ky + 4, "P1:", Theme::TEXT_MUTED, 1);
+    UIComponents::drawKeycap(fb, p1Kx + 26, ky, "W");
+    UIComponents::drawKeycap(fb, p1Kx + 46, ky, "A");
+    UIComponents::drawKeycap(fb, p1Kx + 64, ky, "S");
+    UIComponents::drawKeycap(fb, p1Kx + 82, ky, "D");
+
+    // P2: ARROWS
+    int p2Kx = p1Kx + 115;
+    Graphics::RasterFont::drawString(fb, p2Kx, ky + 4, "P2:", Theme::TEXT_MUTED, 1);
+    UIComponents::drawKeycap(fb, p2Kx + 26, ky, "UP");
+    UIComponents::drawKeycap(fb, p2Kx + 50, ky, "DN");
+    UIComponents::drawKeycap(fb, p2Kx + 72, ky, "LT");
+    UIComponents::drawKeycap(fb, p2Kx + 94, ky, "RT");
+
+    // G: GARAGE
+    int gKx = p2Kx + 130;
+    UIComponents::drawKeycap(fb, gKx, ky, "G");
+    Graphics::RasterFont::drawString(fb, gKx + 20, ky + 4, "GARAGE", Theme::TEXT_MUTED, 1);
+
+    // S: STAGES
+    int sKx = gKx + 90;
+    UIComponents::drawKeycap(fb, sKx, ky, "S");
+    Graphics::RasterFont::drawString(fb, sKx + 20, ky + 4, "STAGES", Theme::TEXT_MUTED, 1);
+
+    // ESC: QUIT
+    int escKx = sKx + 90;
+    UIComponents::drawKeycap(fb, escKx, ky, "ESC");
+    Graphics::RasterFont::drawString(fb, escKx + 36, ky + 4, "QUIT", Theme::TEXT_MUTED, 1);
 }
 
 } // namespace UI

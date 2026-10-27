@@ -5,22 +5,6 @@
 
 namespace UI {
 
-static uint32_t lightenColor(uint32_t c, int amount) {
-    uint32_t a = (c >> 24) & 0xFF;
-    uint32_t r = std::min(255, static_cast<int>((c >> 16) & 0xFF) + amount);
-    uint32_t g = std::min(255, static_cast<int>((c >> 8) & 0xFF) + amount);
-    uint32_t b = std::min(255, static_cast<int>(c & 0xFF) + amount);
-    return (a << 24) | (r << 16) | (g << 8) | b;
-}
-
-static uint32_t darkenColor(uint32_t c, int amount) {
-    uint32_t a = (c >> 24) & 0xFF;
-    uint32_t r = std::max(0, static_cast<int>((c >> 16) & 0xFF) - amount);
-    uint32_t g = std::max(0, static_cast<int>((c >> 8) & 0xFF) - amount);
-    uint32_t b = std::max(0, static_cast<int>(c & 0xFF) - amount);
-    return (a << 24) | (r << 16) | (g << 8) | b;
-}
-
 RetroButton::RetroButton(int x, int y, int w, int h, const std::string& text, uint32_t baseColor)
     : m_x(x)
     , m_y(y)
@@ -72,34 +56,50 @@ void RetroButton::onMouseUp(int px, int py) {
 }
 
 void RetroButton::render(Graphics::Framebuffer& fb, int fontScale) {
+    if (m_w <= 0 || m_h <= 0) return;
+
+    // Drop shadow under button
+    fb.fillRect(m_x + 2, m_y + 2, m_w, m_h, 0x6605080E);
+
     if (!m_enabled) {
-        // Disabled / Locked appearance
-        uint32_t disBg = 0xFF212B36;
-        uint32_t disBorder = 0xFF37474F;
+        // Disabled / Locked appearance with hatched diagonal stripes
+        uint32_t disBg = 0xFF1C242E;
+        uint32_t disBorder = 0xFF2A3644;
         fb.fillRect(m_x, m_y, m_w, m_h, disBg);
         fb.drawRect(m_x, m_y, m_w, m_h, disBorder);
+
+        // Hatched diagonal scanlines
+        for (int d = -m_h; d < m_w; d += 8) {
+            for (int sy = 0; sy < m_h; ++sy) {
+                int sx = d + sy;
+                if (sx >= 0 && sx < m_w) {
+                    fb.setPixelFast(m_x + sx, m_y + sy, 0xFF151C24);
+                }
+            }
+        }
 
         int textYOffset = (m_h - Graphics::RasterFont::getTextHeight(fontScale)) / 2;
         int cx = m_x + m_w / 2;
         int cy = m_y + textYOffset;
+        Graphics::RasterFont::drawStringCentered(fb, cx + 1, cy + 1, m_text, 0xFF0A0F15, fontScale);
         Graphics::RasterFont::drawStringCentered(fb, cx, cy, m_text, 0xFF546E7A, fontScale);
         return;
     }
 
     uint32_t fillCol = m_baseColor;
     if (m_hovered && !m_pressed) {
-        fillCol = lightenColor(m_baseColor, 40);
+        fillCol = Theme::lighten(m_baseColor, 35);
     } else if (m_pressed) {
-        fillCol = darkenColor(m_baseColor, 35);
+        fillCol = Theme::darken(m_baseColor, 30);
     }
 
-    uint32_t lightBevel = lightenColor(fillCol, 70);
-    uint32_t darkBevel = darkenColor(fillCol, 80);
+    uint32_t lightBevel = Theme::lighten(fillCol, 60);
+    uint32_t darkBevel = Theme::darken(fillCol, 70);
     uint32_t blackBorder = 0xFF080C14;
 
     // Hover glow border (1px neon border if hovered)
     if (m_hovered && !m_pressed) {
-        fb.drawRect(m_x - 1, m_y - 1, m_w + 2, m_h + 2, lightenColor(m_baseColor, 90));
+        fb.drawRect(m_x - 1, m_y - 1, m_w + 2, m_h + 2, Theme::lighten(m_baseColor, 80));
     }
 
     // Outer 1px black border
@@ -121,10 +121,12 @@ void RetroButton::render(Graphics::Framebuffer& fb, int fontScale) {
     fb.fillRect(m_x + m_w - 3, m_y + 1, 2, m_h - 2, botBevel);
 
     // Corner pixel notches for arcade aesthetic
-    fb.setPixelFast(m_x + 1, m_y + 1, blackBorder);
-    fb.setPixelFast(m_x + m_w - 2, m_y + 1, blackBorder);
-    fb.setPixelFast(m_x + 1, m_y + m_h - 2, blackBorder);
-    fb.setPixelFast(m_x + m_w - 2, m_y + m_h - 2, blackBorder);
+    if (m_cornerNotches) {
+        fb.setPixelFast(m_x + 1, m_y + 1, blackBorder);
+        fb.setPixelFast(m_x + m_w - 2, m_y + 1, blackBorder);
+        fb.setPixelFast(m_x + 1, m_y + m_h - 2, blackBorder);
+        fb.setPixelFast(m_x + m_w - 2, m_y + m_h - 2, blackBorder);
+    }
 
     // Top highlight specular line (subtle arcade gloss)
     if (!m_pressed) {
@@ -142,6 +144,17 @@ void RetroButton::render(Graphics::Framebuffer& fb, int fontScale) {
     // Main text
     uint32_t textCol = (m_hovered && !m_pressed) ? 0xFFFFFFFF : m_textColor;
     Graphics::RasterFont::drawStringCentered(fb, cx, cy, m_text, textCol, fontScale);
+
+    // Optional Key Hint Badge (e.g. "[ESC]", "[R]", "[A]")
+    if (!m_keyHint.empty()) {
+        int kw = Graphics::RasterFont::getTextWidth(m_keyHint, 1) + 6;
+        int kh = 11;
+        int kx = m_x + m_w - kw - 4;
+        int ky = m_y + 3 + pressOffset;
+        fb.fillRect(kx, ky, kw, kh, 0xAA0B121C);
+        fb.drawRect(kx, ky, kw, kh, 0xFF2A3A4E);
+        Graphics::RasterFont::drawStringCentered(fb, kx + kw / 2, ky + 2, m_keyHint, Theme::CYAN_UPGRADE, 1);
+    }
 }
 
 } // namespace UI

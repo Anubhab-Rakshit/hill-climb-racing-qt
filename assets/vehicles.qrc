@@ -1,0 +1,24 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="/assets/vehicles">
+    <file alias="chassis_offroader.png">vehicles/chassis_offroader.png</file>
+    <file alias="wheel_offroader.png">vehicles/wheel_offroader.png</file>
+    <file alias="chassis_rallycar.png">vehicles/chassis_rallycar.png</file>
+    <file alias="wheel_rallycar.png">vehicles/wheel_rallycar.png</file>
+    <file alias="chassis_sportscoupe.png">vehicles/chassis_sportscoupe.png</file>
+    <file alias="wheel_sportscoupe.png">vehicles/wheel_sportscoupe.png</file>
+    <file alias="chassis_supercar.png">vehicles/chassis_supercar.png</file>
+    <file alias="wheel_supercar.png">vehicles/wheel_supercar.png</file>
+    <file alias="chassis_pickuptruck.png">vehicles/chassis_pickuptruck.png</file>
+    <file alias="wheel_pickuptruck.png">vehicles/wheel_pickuptruck.png</file>
+    <file alias="chassis_monstertruck.png">vehicles/chassis_monstertruck.png</file>
+    <file alias="wheel_monstertruck.png">vehicles/wheel_monstertruck.png</file>
+    <file alias="chassis_desertraid.png">vehicles/chassis_desertraid.png</file>
+    <file alias="wheel_desertraid.png">vehicles/wheel_desertraid.png</file>
+    <file alias="chassis_formularacer.png">vehicles/chassis_formularacer.png</file>
+    <file alias="wheel_formularacer.png">vehicles/wheel_formularacer.png</file>
+    <file alias="chassis_musclecar.png">vehicles/chassis_musclecar.png</file>
+    <file alias="wheel_musclecar.png">vehicles/wheel_musclecar.png</file>
+    <file alias="chassis_electricoffroader.png">vehicles/chassis_electricoffroader.png</file>
+    <file alias="wheel_electricoffroader.png">vehicles/wheel_electricoffroader.png</file>
+</qresource>
+</RCC>

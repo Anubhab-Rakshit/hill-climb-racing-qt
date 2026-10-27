@@ -1,5 +1,5 @@
 #include "Sprite.h"
-#include "CarSpritesData.h"
+#include "VehicleSprites.h"
 #include "UITheme.h"
 #include <cmath>
 #include <algorithm>
@@ -13,15 +13,7 @@ bool SpriteRenderer::s_loaded = false;
 
 void SpriteRenderer::ensureLoaded() {
     if (s_loaded) return;
-
-    s_chassisImg.loadFromData(Assets::s_chassisPng, Assets::s_chassisPng_len);
-    s_wheelImg.loadFromData(Assets::s_wheelPng, Assets::s_wheelPng_len);
-    s_driverHeadImg.loadFromData(Assets::s_driverHeadPng, Assets::s_driverHeadPng_len);
-
-    s_chassisImg = s_chassisImg.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    s_wheelImg = s_wheelImg.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    s_driverHeadImg = s_driverHeadImg.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-
+    VehicleSprites::init();
     s_loaded = true;
 }
 
@@ -36,167 +28,284 @@ void SpriteRenderer::blitRotated(Framebuffer& fb, const QImage& img, float targe
     int imgW = img.width();
     int imgH = img.height();
 
-    // Bounding radius from anchor to image corners
-    float d1 = std::hypot(anchorX, anchorY);
-    float d2 = std::hypot(imgW - anchorX, anchorY);
-    float d3 = std::hypot(anchorX, imgH - anchorY);
-    float d4 = std::hypot(imgW - anchorX, imgH - anchorY);
-    float maxDist = std::max({d1, d2, d3, d4}) * scale + 2.0f;
+    // 4 rotated corners relative to anchor in screen pixels
+    float c0x = -anchorX * scale;
+    float c0y = -anchorY * scale;
+    float c1x = (imgW - anchorX) * scale;
+    float c1y = -anchorY * scale;
+    float c2x = -anchorX * scale;
+    float c2y = (imgH - anchorY) * scale;
+    float c3x = (imgW - anchorX) * scale;
+    float c3y = (imgH - anchorY) * scale;
 
-    int minPx = std::max(0, static_cast<int>(targetX - maxDist));
-    int maxPx = std::min(fb.width() - 1, static_cast<int>(targetX + maxDist));
-    int minPy = std::max(0, static_cast<int>(targetY - maxDist));
-    int maxPy = std::min(fb.height() - 1, static_cast<int>(targetY + maxDist));
+    auto rotX = [&](float lx, float ly) { return targetX + (lx * cosA - ly * sinA); };
+    auto rotY = [&](float lx, float ly) { return targetY + (lx * sinA + ly * cosA); };
+
+    float r0x = rotX(c0x, c0y), r0y = rotY(c0x, c0y);
+    float r1x = rotX(c1x, c1y), r1y = rotY(c1x, c1y);
+    float r2x = rotX(c2x, c2y), r2y = rotY(c2x, c2y);
+    float r3x = rotX(c3x, c3y), r3y = rotY(c3x, c3y);
+
+    int minPx = std::max(0, static_cast<int>(std::floor(std::min({r0x, r1x, r2x, r3x}))) - 1);
+    int maxPx = std::min(fb.width() - 1, static_cast<int>(std::ceil(std::max({r0x, r1x, r2x, r3x}))) + 1);
+    int minPy = std::max(0, static_cast<int>(std::floor(std::min({r0y, r1y, r2y, r3y}))) - 1);
+    int maxPy = std::min(fb.height() - 1, static_cast<int>(std::ceil(std::max({r0y, r1y, r2y, r3y}))) + 1);
 
     if (minPx > maxPx || minPy > maxPy) return;
 
+    float drx = cosA * invScale;
+    float dry = -sinA * invScale;
+
+    const uint32_t* srcBits = reinterpret_cast<const uint32_t*>(img.constBits());
+    int srcStride = img.bytesPerLine() / static_cast<int>(sizeof(uint32_t));
+
     for (int py = minPy; py <= maxPy; ++py) {
         float dy = py - targetY;
-        for (int px = minPx; px <= maxPx; ++px) {
-            float dx = px - targetX;
+        float dx0 = minPx - targetX;
 
-            // Invert screen rotation to find source pixel in sprite space
-            float rx = (dx * cosA + dy * sinA) * invScale;
-            float ry = (-dx * sinA + dy * cosA) * invScale;
+        float rx = (dx0 * cosA + dy * sinA) * invScale + anchorX;
+        float ry = (-dx0 * sinA + dy * cosA) * invScale + anchorY;
 
-            int u = static_cast<int>(std::round(rx + anchorX));
-            int v = static_cast<int>(std::round(ry + anchorY));
+        uint32_t* dstLine = fb.scanLine(py);
 
-            if (u >= 0 && u < imgW && v >= 0 && v < imgH) {
-                const uint32_t* line = reinterpret_cast<const uint32_t*>(img.scanLine(v));
-                uint32_t pixel = line[u];
-                uint32_t alpha = (pixel >> 24) & 0xFF;
-                if (alpha > 0) {
-                    fb.blendPixelFast(px, py, pixel);
+        for (int px = minPx; px <= maxPx; ++px, rx += drx, ry += dry) {
+            int u = static_cast<int>(rx);
+            int v = static_cast<int>(ry);
+
+            if (static_cast<unsigned>(u) < static_cast<unsigned>(imgW) &&
+                static_cast<unsigned>(v) < static_cast<unsigned>(imgH)) {
+                uint32_t pixel = srcBits[v * srcStride + u];
+                uint32_t sa = (pixel >> 24) & 0xFF;
+                if (sa == 255) {
+                    dstLine[px] = pixel;
+                } else if (sa > 0) {
+                    uint32_t sr = (pixel >> 16) & 0xFF;
+                    uint32_t sg = (pixel >> 8) & 0xFF;
+                    uint32_t sb = pixel & 0xFF;
+                    uint32_t invA = 255 - sa;
+                    dstLine[px] = Framebuffer::blendOpaqueDst(dstLine[px], sr, sg, sb, sa, invA);
                 }
             }
         }
     }
 }
 
-void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle) {
+void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle, float alpha) {
     ensureLoaded();
+
+    const auto& config = vehicle.config();
+    const QImage& chassisImg = VehicleSprites::getChassisSprite(vehicle.vehicleType());
+    const QImage& wheelImg = VehicleSprites::getWheelSprite(vehicle.vehicleType());
+    const QImage& driverImg = VehicleSprites::getDriverSprite(vehicle.driverType());
 
     float zoom = cam.zoom();
     // 80.25 sprite pixels per physical meter
     float spriteScale = zoom / 80.25f;
 
-    // 1. Chassis Screen Position & Rotation
-    Physics::Vec2 chassisScr = cam.worldToScreen(vehicle.chassisPos());
-    float angle = vehicle.chassisAngle();
+    // 1. Chassis Screen Position & Rotation (Interpolated)
+    Physics::Vec2 cPos = vehicle.interpolatedChassisPos(alpha);
+    float angle = vehicle.interpolatedChassisAngle(alpha);
+    Physics::Vec2 chassisScr = cam.worldToScreen(cPos);
     float screenChassisAngle = -angle; // Screen Y is inverted
-    float cosA = std::cos(screenChassisAngle);
-    float sinA = std::sin(screenChassisAngle);
 
     // Helper: local chassis world offset (lx, ly) to world coordinates
-    auto chassisPointToWorld = [&](float lx, float ly) -> Physics::Vec2 {
+    auto chassisPointToWorld = [&](const Physics::Vec2& local) -> Physics::Vec2 {
         float cosW = std::cos(angle);
         float sinW = std::sin(angle);
-        return {vehicle.chassisPos().x + (lx * cosW - ly * sinW),
-                vehicle.chassisPos().y + (lx * sinW + ly * cosW)};
+        return {cPos.x + (local.x * cosW - local.y * sinW),
+                cPos.y + (local.x * sinW + local.y * cosW)};
     };
 
-    // 2. Suspension Mount Points on Chassis (matching wheel well centers)
-    Physics::Vec2 rearMountScr = cam.worldToScreen(chassisPointToWorld(-0.78f, -0.06f));
-    Physics::Vec2 frontMountScr = cam.worldToScreen(chassisPointToWorld(+0.78f, -0.06f));
+    // 2. Suspension Mount Points & Wheel Positions (Interpolated)
+    Physics::Vec2 rearMountScr = cam.worldToScreen(chassisPointToWorld(vehicle.rearMountOffset()));
+    Physics::Vec2 frontMountScr = cam.worldToScreen(chassisPointToWorld(vehicle.frontMountOffset()));
 
-    Physics::Vec2 rearWheelScr = cam.worldToScreen(vehicle.rearWheelPos());
-    Physics::Vec2 frontWheelScr = cam.worldToScreen(vehicle.frontWheelPos());
+    Physics::Vec2 rearWheelPos = vehicle.interpolatedRearWheelPos(alpha);
+    Physics::Vec2 frontWheelPos = vehicle.interpolatedFrontWheelPos(alpha);
+    Physics::Vec2 rearWheelScr = cam.worldToScreen(rearWheelPos);
+    Physics::Vec2 frontWheelScr = cam.worldToScreen(frontWheelPos);
 
-    // Safety fallback: ensure wheels stay strictly anchored to their struts
-    float maxStrutPx = 0.60f * zoom;
-    float minStrutPx = 0.10f * zoom;
-    if (std::isnan(rearWheelScr.x) || (rearWheelScr - rearMountScr).length() > maxStrutPx || (rearWheelScr - rearMountScr).length() < minStrutPx) {
-        rearWheelScr = rearMountScr + Physics::Vec2(-sinA, cosA) * (0.28f * zoom);
-    }
-    if (std::isnan(frontWheelScr.x) || (frontWheelScr - frontMountScr).length() > maxStrutPx || (frontWheelScr - frontMountScr).length() < minStrutPx) {
-        frontWheelScr = frontMountScr + Physics::Vec2(-sinA, cosA) * (0.28f * zoom);
-    }
-
-    // 3. Render Suspension Struts (Clean shock absorbers behind the wheels)
+    // 3. Render High-Performance Mechanical Suspension Struts with Coiled Springs & Brake Calipers
     auto drawStrut = [&](const Physics::Vec2& m, const Physics::Vec2& w) {
+        float dx = w.x - m.x;
+        float dy = w.y - m.y;
+        float len = std::hypot(dx, dy);
+        if (len < 1.0f) return;
+
+        float ux = dx / len;
+        float uy = dy / len;
+        float nx = -uy;
+        float ny = ux;
+
         int x0 = static_cast<int>(m.x);
         int y0 = static_cast<int>(m.y);
         int x1 = static_cast<int>(w.x);
         int y1 = static_cast<int>(w.y);
-        fb.drawLine(x0 - 1, y0, x1 - 1, y1, 0xFF1C252B);
-        fb.drawLine(x0, y0, x1, y1, 0xFFCFD8DC);
-        fb.drawLine(x0 + 1, y0, x1 + 1, y1, 0xFF78909C);
+
+        // A. Hydraulic Damper Shaft (Chrome center rod flanked by shadow & highlight)
+        fb.drawLine(x0 - static_cast<int>(nx), y0 - static_cast<int>(ny),
+                    x1 - static_cast<int>(nx), y1 - static_cast<int>(ny), 0xFF1C252B);
+        fb.drawLine(x0, y0, x1, y1, 0xFFECEFF1);
+        fb.drawLine(x0 + static_cast<int>(nx), y0 + static_cast<int>(ny),
+                    x1 + static_cast<int>(nx), y1 + static_cast<int>(ny), 0xFF78909C);
+
+        // B. Coiled Heavy-Duty Suspension Spring (6 coils zigzagging across middle 65% of strut)
+        const int numCoils = 6;
+        float coilWidth = 4.5f;
+        for (int c = 0; c < numCoils; ++c) {
+            float tA = 0.18f + (c / static_cast<float>(numCoils)) * 0.65f;
+            float tB = 0.18f + ((c + 0.5f) / static_cast<float>(numCoils)) * 0.65f;
+            float tC = 0.18f + ((c + 1.0f) / static_cast<float>(numCoils)) * 0.65f;
+
+            Physics::Vec2 pA = m + Physics::Vec2(ux * len * tA + nx * coilWidth, uy * len * tA + ny * coilWidth);
+            Physics::Vec2 pB = m + Physics::Vec2(ux * len * tB - nx * coilWidth, uy * len * tB - ny * coilWidth);
+            Physics::Vec2 pC = m + Physics::Vec2(ux * len * tC + nx * coilWidth, uy * len * tC + ny * coilWidth);
+
+            fb.drawLine(static_cast<int>(pA.x), static_cast<int>(pA.y),
+                        static_cast<int>(pB.x), static_cast<int>(pB.y), 0xFFFF1744); // Racing Red coil
+            fb.drawLine(static_cast<int>(pB.x), static_cast<int>(pB.y),
+                        static_cast<int>(pC.x), static_cast<int>(pC.y), 0xFFFF5252); // Coil highlight
+        }
+
+        // C. Disc Brake Rotor & Racing Caliper at Hub
+        fb.fillCircle(x1, y1, 7, 0xFF90A4AE); // Steel Brake Disc
+        fb.drawCircle(x1, y1, 7, 0xFF455A64);
+        fb.fillRect(x1 - 3, y1 - 8, 7, 5, 0xFFD50000); // Brembo Red Racing Caliper
+        fb.drawRect(x1 - 3, y1 - 8, 7, 5, 0xFFFF5252);
     };
     drawStrut(rearMountScr, rearWheelScr);
     drawStrut(frontMountScr, frontWheelScr);
 
-    // 4. Render Authentic Wheels (Inside wheel wells, rotating with physical wheel angle)
-    // Wheel sprite is 74x72, anchor at center (37, 36)
-    float wheelScale = spriteScale * (44.0f / 74.0f);
-    blitRotated(fb, s_wheelImg, rearWheelScr.x, rearWheelScr.y, 37.0f, 36.0f, vehicle.rearWheelAngle(), wheelScale);
-    blitRotated(fb, s_wheelImg, frontWheelScr.x, frontWheelScr.y, 37.0f, 36.0f, vehicle.frontWheelAngle(), wheelScale);
+    // 4. Render Wheels (Rotating with physical wheel angle, strictly anchored to struts)
+    float wheelScale = (vehicle.rearWheelRadius() * zoom) / config.wheelSpriteRadius;
+    float wAnchorX = wheelImg.width() * 0.5f;
+    float wAnchorY = wheelImg.height() * 0.5f;
+    blitRotated(fb, wheelImg, rearWheelScr.x, rearWheelScr.y, wAnchorX, wAnchorY, vehicle.interpolatedRearWheelAngle(alpha), wheelScale);
+    blitRotated(fb, wheelImg, frontWheelScr.x, frontWheelScr.y, wAnchorX, wAnchorY, vehicle.interpolatedFrontWheelAngle(alpha), wheelScale);
 
-    // 5. Render Driver (Bill Newton with his red backwards cap and scruffy chin)
-    // Driver position in cockpit: (-0.27m, +0.38m) relative to chassis center
-    Physics::Vec2 driverHeadScr = cam.worldToScreen(chassisPointToWorld(-0.27f, +0.38f));
-    // Bill's head sways with g-forces and terrain jumps
-    float driverHeadScreenAngle = screenChassisAngle + vehicle.driverHeadAngle();
-    float driverScale = spriteScale * (44.0f / 95.0f);
-    // Anchor at neck base of driver sprite: (45, 85)
-    blitRotated(fb, s_driverHeadImg, driverHeadScr.x, driverHeadScr.y, 45.0f, 85.0f, driverHeadScreenAngle, driverScale);
+    // 5. Render Driver with Physics Inertia (if not already integrated into bespoke vehicle asset)
+    if (!config.hasIntegratedDriver) {
+        Physics::Vec2 driverHeadScr = cam.worldToScreen(vehicle.interpolatedDriverHeadPos(alpha));
+        float driverHeadScreenAngle = screenChassisAngle + vehicle.interpolatedDriverHeadAngle(alpha);
+        float driverScale = spriteScale * 0.52f;
+        float dAnchorX = driverImg.width() * 0.5f;
+        float dAnchorY = driverImg.height() * 0.88f;
+        blitRotated(fb, driverImg, driverHeadScr.x, driverHeadScr.y, dAnchorX, dAnchorY, driverHeadScreenAngle, driverScale);
+    }
 
-    // 6. Render Authentic Red Jeep Chassis Body (Drawn on top so wheels sit inside wheel arches!)
-    // Anchor at chassis center: (126.4, 70.0)
-    blitRotated(fb, s_chassisImg, chassisScr.x, chassisScr.y, 126.4f, 70.0f, screenChassisAngle, spriteScale);
+    // 6. Render Pixel-Art Chassis Body (Drawn on top so wheels sit inside wheel arches)
+    blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale);
 }
 
 void SpriteRenderer::renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile) {
+    renderGarageVehicle(fb, cx, cy, bounceY, profile, profile.selectedVehicle(), profile.selectedDriver());
+}
+
+void SpriteRenderer::renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile,
+                                        Physics::VehicleType vType, Physics::DriverType dType, bool drawLift) {
     ensureLoaded();
 
-    float scale = 0.68f; // Prominent crisp garage scale
-    float liftY = cy + 45;
+    const auto& config = Physics::VehicleRegistry::getConfig(vType);
+    const QImage& chassisImg = VehicleSprites::getChassisSprite(vType);
+    const QImage& wheelImg = VehicleSprites::getWheelSprite(vType);
+    const QImage& driverImg = VehicleSprites::getDriverSprite(dType);
 
-    // 1. Hydraulic Garage Lift Platform
-    int liftW = 230;
-    int liftH = 14;
-    int liftX = cx - liftW / 2;
-    fb.fillRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF212B36);
-    fb.drawRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF455A64);
+    float garageScale = 0.72f;
+    float liftY = cy + 46.0f;
 
-    // Yellow Hazard Stripes
-    for (int s = liftX + 6; s < liftX + liftW - 12; s += 16) {
-        fb.fillRect(s, static_cast<int>(liftY + 2), 8, liftH - 4, UI::Theme::GOLD);
+    // 1. Wheelbase and Wheel Positions
+    float rearWheelX = cx + config.rearMountOffset.x * 80.25f * garageScale;
+    float frontWheelX = cx + config.frontMountOffset.x * 80.25f * garageScale;
+
+    // Hydraulic Lift Platform (Optional, only drawn in Garage)
+    if (drawLift) {
+        int liftW = static_cast<int>((frontWheelX - rearWheelX) + 110.0f);
+        int liftH = 14;
+        int liftX = cx - liftW / 2;
+        fb.fillRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF212B36);
+        fb.drawRect(liftX, static_cast<int>(liftY), liftW, liftH, 0xFF455A64);
+
+        // Yellow Hazard Stripes
+        for (int s = liftX + 6; s < liftX + liftW - 12; s += 16) {
+            fb.fillRect(s, static_cast<int>(liftY + 2), 8, liftH - 4, UI::Theme::GOLD);
+        }
+        // Lift hydraulic posts
+        fb.fillRect(cx - 75, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
+        fb.fillRect(cx + 59, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
     }
-    fb.fillRect(cx - 75, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
-    fb.fillRect(cx + 59, static_cast<int>(liftY + liftH), 16, 35, 0xFF37474F);
 
     // 2. Wheels Resting on Lift
-    int tireLvl = profile.getUpgradeLevel(Core::ProfileManager::UPGRADE_TIRES);
-    float tireUpgrMult = 1.0f + std::min(0.18f, tireLvl * 0.015f);
-    float wheelScale = scale * (44.0f / 74.0f) * tireUpgrMult;
-    float wheelRadiusPx = 22.0f * tireUpgrMult * scale;
+    int tireLvl = profile.getUpgradeLevel(vType, Core::ProfileManager::UPGRADE_TIRES);
+    float tireUpgrMult = 1.0f + std::min(0.18f, (tireLvl - 1) * 0.012f);
+    float wheelScale = garageScale * tireUpgrMult;
+    float wheelRadiusPx = config.wheelSpriteRadius * wheelScale;
     float wheelCenterY = liftY - wheelRadiusPx;
 
-    float rearWheelX = cx - 62.6f * scale;
-    float frontWheelX = cx + 62.6f * scale;
+    // 3. Chassis on Suspension (bounces playfully when clicked or upgraded!)
+    float suspHeightPx = config.suspRestLength * 80.25f * garageScale;
+    float chassisCenterY = wheelCenterY - suspHeightPx + bounceY;
 
-    // 3. Chassis on Suspension (bounces playfully when clicked!)
-    float chassisCenterY = wheelCenterY - (26.1f * scale) + bounceY;
+    // Shock struts with coil-over springs and brake discs
+    auto drawGarageStrut = [&](float mx, float my, float wx, float wy) {
+        float dx = wx - mx;
+        float dy = wy - my;
+        float len = std::hypot(dx, dy);
+        if (len < 1.0f) return;
+        float ux = dx / len, uy = dy / len;
+        float nx = -uy, ny = ux;
 
-    // Shock struts
-    fb.drawLine(static_cast<int>(rearWheelX), static_cast<int>(chassisCenterY + 26.1f * scale),
-                static_cast<int>(rearWheelX), static_cast<int>(wheelCenterY), 0xFFCFD8DC);
-    fb.drawLine(static_cast<int>(frontWheelX), static_cast<int>(chassisCenterY + 26.1f * scale),
-                static_cast<int>(frontWheelX), static_cast<int>(wheelCenterY), 0xFFCFD8DC);
+        int x0 = static_cast<int>(mx), y0 = static_cast<int>(my);
+        int x1 = static_cast<int>(wx), y1 = static_cast<int>(wy);
+
+        fb.drawLine(x0, y0, x1, y1, 0xFFECEFF1);
+        fb.drawLine(x0 - 1, y0, x1 - 1, y1, 0xFF263238);
+
+        // Coiled spring
+        for (int c = 0; c < 5; ++c) {
+            float tA = 0.20f + (c / 5.0f) * 0.60f;
+            float tB = 0.20f + ((c + 0.5f) / 5.0f) * 0.60f;
+            float tC = 0.20f + ((c + 1.0f) / 5.0f) * 0.60f;
+            float cw = 3.5f;
+
+            float pAx = mx + ux * len * tA + nx * cw;
+            float pAy = my + uy * len * tA + ny * cw;
+            float pBx = mx + ux * len * tB - nx * cw;
+            float pBy = my + uy * len * tB - ny * cw;
+            float pCx = mx + ux * len * tC + nx * cw;
+            float pCy = my + uy * len * tC + ny * cw;
+
+            fb.drawLine(static_cast<int>(pAx), static_cast<int>(pAy), static_cast<int>(pBx), static_cast<int>(pBy), 0xFFFF1744);
+            fb.drawLine(static_cast<int>(pBx), static_cast<int>(pBy), static_cast<int>(pCx), static_cast<int>(pCy), 0xFFFF5252);
+        }
+
+        // Disc brake rotor & caliper
+        fb.fillCircle(x1, y1, 6, 0xFF90A4AE);
+        fb.fillRect(x1 - 2, y1 - 7, 5, 4, 0xFFD50000);
+    };
+
+    float rearMountY = chassisCenterY - config.rearMountOffset.y * 80.25f * garageScale;
+    float frontMountY = chassisCenterY - config.frontMountOffset.y * 80.25f * garageScale;
+    drawGarageStrut(rearWheelX, rearMountY, rearWheelX, wheelCenterY);
+    drawGarageStrut(frontWheelX, frontMountY, frontWheelX, wheelCenterY);
 
     // Wheels
-    blitRotated(fb, s_wheelImg, rearWheelX, wheelCenterY, 37.0f, 36.0f, 0.0f, wheelScale);
-    blitRotated(fb, s_wheelImg, frontWheelX, wheelCenterY, 37.0f, 36.0f, 0.0f, wheelScale);
+    float wAnchorX = wheelImg.width() * 0.5f;
+    float wAnchorY = wheelImg.height() * 0.5f;
+    blitRotated(fb, wheelImg, rearWheelX, wheelCenterY, wAnchorX, wAnchorY, 0.0f, wheelScale);
+    blitRotated(fb, wheelImg, frontWheelX, wheelCenterY, wAnchorX, wAnchorY, 0.0f, wheelScale);
 
-    // Driver Bill
-    float driverScale = scale * (44.0f / 95.0f);
-    float driverX = cx - 21.4f * scale;
-    float driverY = chassisCenterY - 32.0f * scale;
-    blitRotated(fb, s_driverHeadImg, driverX, driverY, 45.0f, 85.0f, bounceY * 0.04f, driverScale);
+    // Driver in Cockpit (if not already integrated into bespoke vehicle asset)
+    if (!config.hasIntegratedDriver) {
+        float driverX = cx + config.driverSeatOffset.x * 80.25f * garageScale;
+        float driverY = chassisCenterY - config.driverSeatOffset.y * 80.25f * garageScale;
+        float driverScale = garageScale * 0.52f;
+        float dAnchorX = driverImg.width() * 0.5f;
+        float dAnchorY = driverImg.height() * 0.88f;
+        blitRotated(fb, driverImg, driverX, driverY, dAnchorX, dAnchorY, bounceY * 0.035f, driverScale);
+    }
 
     // Chassis
-    blitRotated(fb, s_chassisImg, cx, chassisCenterY, 126.4f, 70.0f, 0.0f, scale);
+    blitRotated(fb, chassisImg, cx, chassisCenterY, config.spriteAnchor.x, config.spriteAnchor.y, 0.0f, garageScale);
 }
 
 } // namespace Graphics

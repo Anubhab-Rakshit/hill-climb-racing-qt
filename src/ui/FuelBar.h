@@ -16,6 +16,8 @@ public:
     void update(float dt);
     void render(Graphics::Framebuffer& fb);
 
+    void triggerPickupFlash() { m_flashTimer = 0.5f; }
+
     float fuel() const { return m_fuelPercent; }
 
 private:
@@ -26,6 +28,7 @@ private:
     float m_fuelPercent;
     float m_blinkTimer;
     bool m_blinkState;
+    float m_flashTimer = 0.0f;
 };
 
 } // namespace UI

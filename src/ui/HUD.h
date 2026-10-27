@@ -20,11 +20,14 @@ public:
     void setDimensions(int width, int height);
 
     void setFuel(float fuelPercent) { m_fuelBar.setFuel(fuelPercent); }
+    void triggerFuelFlash() { m_fuelBar.triggerPickupFlash(); }
     void setSpeed(float kmh) { m_speedometer.setValue(kmh); }
     void setRpm(float rpm) { m_tachometer.setValue(rpm); }
     void setDistance(float meters) { m_distance = meters; }
     void setRecord(float meters) { m_recordDistance = meters; }
     void setCoins(int coins) { m_coins = coins; }
+    void setCheckpointProgress(int cleared, int total) { m_clearedCheckpoints = cleared; m_totalCheckpoints = total; }
+    void setNextCheckpoint(const std::string& name, float dist) { m_nextCheckpointName = name; m_nextCheckpointDist = dist; }
 
     void triggerStunt(const std::string& title, int bonusCoins, uint32_t color = 0xFFFFB300) {
         m_stuntBanner.trigger(title, bonusCoins, color);
@@ -35,9 +38,11 @@ public:
     void onMouseUp(int px, int py);
 
     bool isBrakePressed() const { return m_brakePedal.isPressed(); }
+    bool isReversePressed() const { return m_reversePedal.isPressed(); }
     bool isGasPressed() const { return m_gasPedal.isPressed(); }
 
     void setBrakeVirtualPressed(bool pressed);
+    void setReverseVirtualPressed(bool pressed);
     void setGasVirtualPressed(bool pressed);
 
     void setOnPauseClicked(std::function<void()> cb) { m_pauseButton.setOnClick(cb); }
@@ -51,6 +56,7 @@ public:
 private:
     int m_width;
     int m_height;
+    float m_animTime;
 
     FuelBar m_fuelBar;
     AnalogGauge m_speedometer;
@@ -58,12 +64,17 @@ private:
     StuntBanner m_stuntBanner;
 
     RetroButton m_brakePedal;
+    RetroButton m_reversePedal;
     RetroButton m_gasPedal;
     RetroButton m_pauseButton;
 
     float m_distance;
     float m_recordDistance;
     int m_coins;
+    int m_clearedCheckpoints;
+    int m_totalCheckpoints;
+    std::string m_nextCheckpointName;
+    float m_nextCheckpointDist;
 
     struct FloatingText {
         std::string text;

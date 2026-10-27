@@ -1,6 +1,7 @@
 #include "StuntBanner.h"
 #include "RasterFont.h"
 #include "UITheme.h"
+#include "UIComponents.h"
 #include <algorithm>
 
 namespace UI {
@@ -46,23 +47,51 @@ void StuntBanner::render(Graphics::Framebuffer& fb) {
 
     // Box dimensions
     int textW = Graphics::RasterFont::getTextWidth(m_title, 2);
-    int boxW = std::max(180, textW + 36);
-    int boxH = 42;
+    int boxW = std::max(200, textW + 48);
+    int boxH = 44;
     int boxX = cx - boxW / 2;
     int boxY = cy - boxH / 2;
 
-    // Dark pill container
-    fb.fillRect(boxX, boxY, boxW, boxH, 0xE00A101C);
-    fb.drawRect(boxX, boxY, boxW, boxH, m_color);
-    fb.drawRect(boxX - 1, boxY - 1, boxW + 2, boxH + 2, 0xFF000000);
+    // Deep drop shadow behind banner panel
+    fb.fillRect(boxX + 3, boxY + 4, boxW, boxH, 0x8804070D);
 
-    // Title
+    // Glowing border halo when freshly triggered
+    if (m_lifeTimer < 0.6f) {
+        float glowFrac = 1.0f - (m_lifeTimer / 0.6f);
+        uint32_t glowAlpha = static_cast<uint32_t>(glowFrac * 120.0f);
+        uint32_t glowCol = (glowAlpha << 24) | (m_color & 0x00FFFFFF);
+        fb.drawRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4, glowCol);
+    }
+
+    // Arcade panel with corner notches and border
+    UIComponents::drawArcadePanel(fb, boxX, boxY, boxW, boxH, 0xF00A101C, m_color, m_color, 3, true, true);
+
+    // Flanking decorative golden achievement stars
+    UIComponents::drawStar(fb, boxX + 16, cy, 6, true, Theme::GOLD, 0xFFFFA000);
+    UIComponents::drawStar(fb, boxX + boxW - 16, cy, 6, true, Theme::GOLD, 0xFFFFA000);
+
+    // Title with drop shadow
+    Graphics::RasterFont::drawStringCentered(fb, cx + 1, boxY + 9, m_title, 0xFF05080E, 2);
     Graphics::RasterFont::drawStringCentered(fb, cx, boxY + 8, m_title, m_color, 2);
+
+    // Dynamic diagonal specular gleam passing across banner
+    if (m_lifeTimer < 0.8f) {
+        float gleamT = m_lifeTimer / 0.8f;
+        int gleamX = boxX + static_cast<int>(gleamT * (boxW + 30)) - 15;
+        for (int gy = boxY + 3; gy < boxY + boxH - 3; ++gy) {
+            int gx = gleamX + (boxY + boxH - gy) / 2;
+            if (gx >= boxX + 3 && gx < boxX + boxW - 3) {
+                fb.blendPixelFast(gx, gy, 0x44FFFFFF);
+                fb.blendPixelFast(gx + 1, gy, 0x99FFFFFF);
+                fb.blendPixelFast(gx + 2, gy, 0x44FFFFFF);
+            }
+        }
+    }
 
     // Subtitle coins bonus
     if (m_bonusCoins > 0) {
-        std::string bonusStr = "+$" + std::to_string(m_bonusCoins) + " BONUS!";
-        Graphics::RasterFont::drawStringCentered(fb, cx, boxY + 26, bonusStr, Theme::GREEN_GAS, 1);
+        std::string bonusStr = "+$" + UIComponents::formatNumber(m_bonusCoins) + " BONUS!";
+        Graphics::RasterFont::drawStringCentered(fb, cx, boxY + 28, bonusStr, Theme::GREEN_GAS, 1);
     }
 }
 
