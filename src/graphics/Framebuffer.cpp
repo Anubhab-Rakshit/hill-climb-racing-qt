@@ -131,12 +131,14 @@ void Framebuffer::fillCircle(int xc, int yc, int r, uint32_t color) {
         int dx = static_cast<int>(std::sqrt(r2 - dy * dy));
         int x0 = std::max(0, xc - dx);
         int x1 = std::min(m_width - 1, xc + dx);
-        if (isOpaque) {
-            uint32_t* line = scanLine(y);
-            std::fill(line + x0, line + x1 + 1, opCol);
-        } else {
-            for (int x = x0; x <= x1; ++x) {
-                blendPixelFast(x, y, color);
+        if (x0 <= x1) {
+            if (isOpaque) {
+                uint32_t* line = scanLine(y);
+                std::fill(line + x0, line + x1 + 1, opCol);
+            } else {
+                for (int x = x0; x <= x1; ++x) {
+                    blendPixelFast(x, y, color);
+                }
             }
         }
     }
