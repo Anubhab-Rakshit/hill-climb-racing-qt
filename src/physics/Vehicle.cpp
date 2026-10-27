@@ -577,7 +577,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
         }
     } else {
         // Dynamic Weight Transfer (Poki/Fingersoft authentic squat & dive)
-        if (effectiveGas > 0.05f) {
+        if (effectiveGas > 0.05f && m_rearContact && m_frontContact && m_chassisAngle < 0.35f) {
             float squatTorque = 360.0f * effectiveGas * m_customTorqueMultiplier;
             m_chassisAngularVel += (squatTorque / m_chassisInertia) * dt;
         } else if (effectiveBrake > 0.05f && getSpeedKmh() > 2.0f) {
@@ -683,7 +683,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             }
 
             // Direct smooth Baumgarte position resolution
-            m_chassisPos += normal * (pen * 0.50f);
+            m_chassisPos += normal * (pen * 0.70f);
         }
     }
 
@@ -766,7 +766,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
 
     // Post-Integration Rigid-Body Position Projection (Constraint Solver)
     // Eliminates all residual penetration so the chassis and wheels strictly rest ON the terrain surface
-    for (int pass = 0; pass < 2; ++pass) {
+    for (int pass = 0; pass < 4; ++pass) {
         float curCos = std::cos(m_chassisAngle);
         float curSin = std::sin(m_chassisAngle);
         auto getCurMount = [&](float lx, float ly) -> Vec2 {
@@ -779,13 +779,13 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             Vec2 pt = getCurMount(hull[i].localPos.x, hull[i].localPos.y);
             float gy = terrain.getHeight(pt.x);
             float pen = gy - (pt.y - hull[i].radius);
-            if (pen > 0.0005f) {
+            if (pen > 0.0002f) {
                 Vec2 norm = terrain.getNormal(pt.x);
                 Vec2 r = pt - m_chassisPos;
                 float rCrossN = r.x * norm.y - r.y * norm.x;
                 float denom = (1.0f / m_chassisMass) + (rCrossN * rCrossN) / m_chassisInertia;
                 if (denom > 0.0001f) {
-                    float impulse = (pen * 0.65f) / denom;
+                    float impulse = (pen * 0.85f) / denom;
                     m_chassisPos += norm * (impulse / m_chassisMass);
                     float deltaTheta = (rCrossN * impulse / m_chassisInertia);
                     m_chassisAngle += std::clamp(deltaTheta, -0.05f, 0.05f);
@@ -983,11 +983,13 @@ float Vehicle::getMaxTerrainPenetration(const Terrain& terrain) const {
     }
 
     float rearGy = terrain.getHeight(m_rearWheelPos.x);
-    float rearPen = (rearGy + m_wheelRadius) - m_rearWheelPos.y;
+    float rearTargetY = rearGy + m_wheelRadius * std::max(0.20f, terrain.getNormal(m_rearWheelPos.x).y);
+    float rearPen = rearTargetY - m_rearWheelPos.y;
     if (rearPen > maxPen) maxPen = rearPen;
 
     float frontGy = terrain.getHeight(m_frontWheelPos.x);
-    float frontPen = (frontGy + m_wheelRadius) - m_frontWheelPos.y;
+    float frontTargetY = frontGy + m_wheelRadius * std::max(0.20f, terrain.getNormal(m_frontWheelPos.x).y);
+    float frontPen = frontTargetY - m_frontWheelPos.y;
     if (frontPen > maxPen) maxPen = frontPen;
 
     return maxPen;

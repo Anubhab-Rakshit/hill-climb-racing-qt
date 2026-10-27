@@ -21,7 +21,8 @@ public:
                DriverType driverType = DriverType::BILL,
                bool isMultiplayer = false,
                VehicleType vehicleType2 = VehicleType::PICKUP_TRUCK,
-               DriverType driverType2 = DriverType::SARAH);
+               DriverType driverType2 = DriverType::SARAH,
+               float customStartX = 5.0f);
 
     void step(float dt, const Core::ProfileManager& profile);
 
@@ -83,7 +84,7 @@ public:
 
     // Event callbacks for UI
     void setOnStunt(std::function<void(const std::string& title, int coins)> cb) { m_onStunt = cb; }
-    void setOnItemCollected(std::function<void(ItemType type, int value)> cb) { m_onItem = cb; }
+    void setOnItemCollected(std::function<void(ItemType type, int value, int itemIndex)> cb) { m_onItem = cb; }
     void setOnCheckpoint(std::function<void(const CheckpointInfo& cp)> cb) { m_onCheckpoint = cb; }
 
 private:
@@ -121,7 +122,7 @@ private:
     float m_deformAccum = 0.0f;
 
     std::function<void(const std::string&, int)> m_onStunt;
-    std::function<void(ItemType, int)> m_onItem;
+    std::function<void(ItemType, int, int)> m_onItem;
     std::function<void(const CheckpointInfo&)> m_onCheckpoint;
 
     // Live Tuning Variables (Dev Mode)

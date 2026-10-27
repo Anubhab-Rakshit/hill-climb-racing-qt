@@ -71,6 +71,27 @@ bool GameServer::isRunning() const {
 }
 
 QString GameServer::getLocalIpAddress() const {
+    // 1. Try active non-virtual interfaces (Wi-Fi / Ethernet)
+    const auto interfaces = QNetworkInterface::allInterfaces();
+    for (const auto& iface : interfaces) {
+        auto flags = iface.flags();
+        if ((flags & QNetworkInterface::IsUp) &&
+            (flags & QNetworkInterface::IsRunning) &&
+            !(flags & QNetworkInterface::IsLoopBack)) {
+            QString name = iface.humanReadableName().toLower();
+            bool isVirtual = name.contains("virtual") || name.contains("vbox") ||
+                             name.contains("vmware") || name.contains("vethernet") ||
+                             name.contains("wintun") || name.contains("loopback");
+            if (!isVirtual) {
+                for (const auto& entry : iface.addressEntries()) {
+                    if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
+                        return entry.ip().toString();
+                    }
+                }
+            }
+        }
+    }
+    // 2. Fallback to any non-loopback IPv4
     const QList<QHostAddress>& addresses = QNetworkInterface::allAddresses();
     for (const QHostAddress& addr : addresses) {
         if (addr.protocol() == QAbstractSocket::IPv4Protocol && !addr.isLoopback()) {
@@ -153,45 +174,43 @@ void GameServer::processPacket(QTcpSocket* socket, const QByteArray& packetData)
         int vehType = obj["vehicleType"].toInt(0);
         int drvType = obj["driverType"].toInt(0);
 
-        // Check if name is already taken by Host or another connected client
-        bool isTaken = false;
-        if (QString::compare(QString::fromStdString(m_hostClient.name),
-                             QString::fromStdString(requestedName),
-                             Qt::CaseInsensitive) == 0) {
-            isTaken = true;
-        }
-        for (const auto& c : m_clients) {
-            if (QString::compare(QString::fromStdString(c.name),
-                                 QString::fromStdString(requestedName),
+        if (requestedName.empty()) requestedName = "Racer";
+        std::string finalName = requestedName;
+
+        auto isNameTaken = [&](const std::string& name) {
+            if (QString::compare(QString::fromStdString(m_hostClient.name),
+                                 QString::fromStdString(name),
                                  Qt::CaseInsensitive) == 0) {
-                isTaken = true;
-                break;
+                return true;
+            }
+            for (const auto& c : m_clients) {
+                if (QString::compare(QString::fromStdString(c.name),
+                                     QString::fromStdString(name),
+                                     Qt::CaseInsensitive) == 0) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (isNameTaken(finalName)) {
+            int counter = 2;
+            while (true) {
+                std::string cand = requestedName + "_" + std::to_string(counter);
+                if (!isNameTaken(cand)) {
+                    finalName = cand;
+                    break;
+                }
+                counter++;
             }
         }
 
-        QJsonObject resp;
-        resp["type"] = static_cast<int>(PacketType::CONNECT_RESP);
-
-        if (isTaken) {
-            resp["accepted"] = false;
-            resp["error"] = "NAME_TAKEN";
-
-            std::vector<std::string> suggestions = Core::AccountManager::instance().generateSuggestions(requestedName);
-            QJsonArray sugArr;
-            for (const auto& s : suggestions) {
-                sugArr.append(QString::fromStdString(s));
-            }
-            resp["suggestions"] = sugArr;
-            sendPacket(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
-            return;
-        }
-
-        // Name accepted! Register client
+        // Name accepted / auto-disambiguated! Register client
         int newId = m_nextClientId++;
         ConnectedClient client;
         client.id = newId;
         client.socket = socket;
-        client.name = requestedName;
+        client.name = finalName;
         client.vehicleType = vehType;
         client.driverType = drvType;
         client.assignedColor = assignColorForId(newId);
@@ -200,8 +219,11 @@ void GameServer::processPacket(QTcpSocket* socket, const QByteArray& packetData)
         m_clients[newId] = client;
         m_socketToId[socket] = newId;
 
+        QJsonObject resp;
+        resp["type"] = static_cast<int>(PacketType::CONNECT_RESP);
         resp["accepted"] = true;
         resp["playerId"] = newId;
+        resp["name"] = QString::fromStdString(finalName);
         resp["assignedColor"] = static_cast<double>(client.assignedColor);
         resp["biomeId"] = QString::fromStdString(m_biomeId);
         sendPacket(socket, QJsonDocument(resp).toJson(QJsonDocument::Compact));
@@ -235,6 +257,9 @@ void GameServer::processPacket(QTcpSocket* socket, const QByteArray& packetData)
         st.velY = static_cast<float>(obj["vy"].toDouble());
         st.chassisAngle = static_cast<float>(obj["angle"].toDouble());
         st.chassisAngularVel = static_cast<float>(obj["angVel"].toDouble());
+        st.targetX = st.posX;
+        st.targetY = st.posY;
+        st.targetAngle = st.chassisAngle;
 
         st.rearWheelAngle = static_cast<float>(obj["rearWheelAngle"].toDouble());
         st.frontWheelAngle = static_cast<float>(obj["frontWheelAngle"].toDouble());

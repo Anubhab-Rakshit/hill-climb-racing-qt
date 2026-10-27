@@ -125,13 +125,65 @@ void GameStateManager::setupUiCallbacks() {
         m_client.disconnectFromHost();
         changeState(StateType::MAIN_MENU);
     });
+
+    m_lobbyScreen.setOnHostRoom([this]() {
+        m_server.startServer(Network::DEFAULT_PORT);
+        m_server.setHostPlayerInfo(AccountManager::instance().activeAccount()->username,
+                                   m_lobbyScreen.getSelectedVehicle(),
+                                   static_cast<int>(m_profile.selectedDriver()));
+        m_server.setTrack(m_lobbyScreen.getSelectedBiome());
+    });
+
+    m_lobbyScreen.setOnTrackChanged([this](const std::string& trackId) {
+        m_server.setTrack(trackId);
+    });
+
+    m_lobbyScreen.setOnVehicleChanged([this](int vehType) {
+        if (m_lobbyScreen.getMode() == UI::LobbyMode::HOST_LOBBY) {
+            m_server.setHostPlayerInfo(AccountManager::instance().activeAccount()->username,
+                                       vehType,
+                                       static_cast<int>(m_profile.selectedDriver()));
+        } else if (m_lobbyScreen.getMode() == UI::LobbyMode::JOIN_LOBBY) {
+            if (m_client.isConnected()) {
+                m_client.sendReady(m_lobbyScreen.isLocalReady(), vehType);
+            }
+        }
+    });
+
+    m_lobbyScreen.setOnConnect([this](const std::string& hostIp, int vehType) {
+        QString hostStr = QString::fromStdString(hostIp).trimmed();
+        quint16 port = Network::DEFAULT_PORT;
+        if (hostStr.contains(':')) {
+            QStringList parts = hostStr.split(':');
+            hostStr = parts[0].trimmed();
+            if (parts.size() > 1) {
+                bool ok = false;
+                int p = parts[1].trimmed().toInt(&ok);
+                if (ok && p > 0 && p <= 65535) {
+                    port = static_cast<quint16>(p);
+                }
+            }
+        }
+        std::string myName = AccountManager::instance().activeAccount()->username;
+        m_client.connectToHost(hostStr, port, myName, vehType, static_cast<int>(m_profile.selectedDriver()));
+    });
+
+    m_lobbyScreen.setOnDisconnect([this]() {
+        m_client.disconnectFromHost();
+    });
+
+    m_lobbyScreen.setOnToggleReady([this](bool isReady, int vehType) {
+        if (m_client.isConnected()) {
+            m_client.sendReady(isReady, vehType);
+        }
+    });
+
     m_lobbyScreen.setOnStartRace([this](const std::string& biomeId, bool isGP) {
         m_selectedBiome = biomeId;
         m_isGrandPrix = isGP;
         if (m_lobbyScreen.getMode() == UI::LobbyMode::HOST_LOBBY) {
-            m_server.startServer(Network::DEFAULT_PORT);
             m_server.setHostPlayerInfo(AccountManager::instance().activeAccount()->username,
-                                       static_cast<int>(m_profile.selectedVehicle()),
+                                       m_lobbyScreen.getSelectedVehicle(),
                                        static_cast<int>(m_profile.selectedDriver()));
             m_server.setTrack(biomeId);
             m_server.broadcastStartRace();
@@ -211,7 +263,7 @@ void GameStateManager::setupUiCallbacks() {
     });
 
     // 10. Physics World Events
-    m_physics.setOnItemCollected([this](Physics::ItemType type, int value) {
+    m_physics.setOnItemCollected([this](Physics::ItemType type, int value, int itemIndex) {
         Physics::Vec2 carScr = m_camera.worldToScreen(m_physics.vehicle().chassisPos());
         if (type == Physics::ItemType::COIN_BRONZE || 
             type == Physics::ItemType::COIN_SILVER || 
@@ -226,6 +278,12 @@ void GameStateManager::setupUiCallbacks() {
             m_audio.playFuelPickup();
             m_hud.triggerFuelFlash();
             m_hud.addFloatingText("+FUEL", carScr.x, carScr.y - 35.0f, UI::Theme::GREEN_GAS);
+        }
+
+        if (m_isNetworkHost) {
+            m_server.sendItemCollected(itemIndex, 0);
+        } else if (m_isNetworkClient) {
+            m_client.sendItemCollected(itemIndex);
         }
     });
 
@@ -255,9 +313,53 @@ void GameStateManager::setupUiCallbacks() {
 }
 
 void GameStateManager::setupNetworkCallbacks() {
+    auto updateOpponentTelemetry = [this](const Network::RemotePlayerState& st) {
+        auto it = m_networkOpponents.find(st.id);
+        if (it == m_networkOpponents.end()) {
+            Network::RemotePlayerState copy = st;
+            copy.posX = st.posX;
+            copy.posY = st.posY;
+            copy.chassisAngle = st.chassisAngle;
+            copy.targetX = st.posX;
+            copy.targetY = st.posY;
+            copy.targetAngle = st.chassisAngle;
+            m_networkOpponents[st.id] = copy;
+        } else {
+            it->second.name = st.name;
+            it->second.color = st.color;
+            it->second.vehicleType = st.vehicleType;
+            it->second.driverType = st.driverType;
+            it->second.targetX = st.posX;
+            it->second.targetY = st.posY;
+            it->second.velX = st.velX;
+            it->second.velY = st.velY;
+            it->second.targetAngle = st.chassisAngle;
+            it->second.chassisAngularVel = st.chassisAngularVel;
+            it->second.rearWheelAngle = st.rearWheelAngle;
+            it->second.frontWheelAngle = st.frontWheelAngle;
+            it->second.rearSuspLen = st.rearSuspLen;
+            it->second.frontSuspLen = st.frontSuspLen;
+            it->second.driverHeadAngle = st.driverHeadAngle;
+            it->second.speedKmh = st.speedKmh;
+            it->second.fuel = st.fuel;
+            it->second.distance = st.distance;
+            it->second.isAirborne = st.isAirborne;
+            it->second.isCrashed = st.isCrashed;
+            it->second.isFinished = st.isFinished;
+
+            float dx = it->second.targetX - it->second.posX;
+            float dy = it->second.targetY - it->second.posY;
+            if (dx * dx + dy * dy > 225.0f) {
+                it->second.posX = it->second.targetX;
+                it->second.posY = it->second.targetY;
+                it->second.chassisAngle = it->second.targetAngle;
+            }
+        }
+    };
+
     // --- SERVER CALLBACKS ---
-    m_server.setOnTelemetryReceived([this](const Network::RemotePlayerState& st) {
-        m_networkOpponents[st.id] = st;
+    m_server.setOnTelemetryReceived([this, updateOpponentTelemetry](const Network::RemotePlayerState& st) {
+        updateOpponentTelemetry(st);
     });
 
     m_server.setOnPlayerDisconnected([this](int id) {
@@ -273,12 +375,32 @@ void GameStateManager::setupNetworkCallbacks() {
     });
 
     // --- CLIENT CALLBACKS ---
+    m_client.setOnConnected([this]() {
+        m_lobbyScreen.setStatusMessage("Connected! Waiting for host to launch...");
+    });
+
+    m_client.setOnRejected([this](const std::string& reason, const std::vector<std::string>& suggestions) {
+        (void)suggestions;
+        m_lobbyScreen.setStatusMessage("Connection failed: " + reason);
+        m_lobbyScreen.setLocalReady(false);
+    });
+
+    m_client.setOnDisconnected([this]() {
+        m_lobbyScreen.setStatusMessage("Disconnected from host.");
+        m_lobbyScreen.setLocalReady(false);
+    });
+
+    m_client.setOnLobbyUpdated([this](const std::string& biomeId, const std::vector<Network::PlayerLobbyInfo>& players) {
+        m_lobbyScreen.setLobbyTrack(biomeId);
+        m_lobbyScreen.setLobbyPlayers(players);
+    });
+
     m_client.setOnRaceStart([this](const std::string& biomeId) {
         startNetworkMultiplayer(false, biomeId);
     });
 
-    m_client.setOnRemoteTelemetry([this](const Network::RemotePlayerState& st) {
-        m_networkOpponents[st.id] = st;
+    m_client.setOnRemoteTelemetry([this, updateOpponentTelemetry](const Network::RemotePlayerState& st) {
+        updateOpponentTelemetry(st);
     });
 
     m_client.setOnItemCollected([this](int itemIdx, int pId) {
@@ -335,9 +457,24 @@ void GameStateManager::startNetworkMultiplayer(bool isHost, const std::string& b
     m_isNetworkClient = !isHost;
     m_networkOpponents.clear();
 
+    // Use vehicle chosen in lobby
+    int vehIdx = m_lobbyScreen.getSelectedVehicle();
+    if (vehIdx >= 0 && vehIdx < static_cast<int>(Physics::VehicleType::COUNT)) {
+        m_profile.setSelectedVehicle(static_cast<Physics::VehicleType>(vehIdx));
+    }
+
+    float startX = 5.0f;
+    if (!isHost) {
+        int myId = m_client.getLocalPlayerId();
+        if (myId > 0) {
+            startX = 5.0f - myId * 3.5f;
+        }
+    }
+
     // Fullscreen single camera per player
     m_camera.setScreenSize(m_width, m_height);
-    m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver(), false);
+    m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver(), false,
+                    Physics::VehicleType::PICKUP_TRUCK, Physics::DriverType::SARAH, startX);
     m_camera.reset(m_physics.vehicle().chassisPos());
     m_particleSystem.clear();
     m_gameTime = 0.0f;
@@ -675,8 +812,42 @@ void GameStateManager::fixedUpdate(float dt) {
         const auto& car = m_physics.vehicle();
         m_camera.update(dt, car.chassisPos(), car.chassisVel().x);
 
-        // Update interpolation for smooth opponent rendering
-        m_client.updateInterpolation(dt);
+        // Dead reckoning lerp for all remote opponents
+        float lerpFactor = std::clamp(dt * 18.0f, 0.0f, 1.0f);
+        for (auto& pair : m_networkOpponents) {
+            auto& opp = pair.second;
+            opp.posX += (opp.targetX - opp.posX) * lerpFactor;
+            opp.posY += (opp.targetY - opp.posY) * lerpFactor;
+
+            float dAngle = opp.targetAngle - opp.chassisAngle;
+            while (dAngle > 3.14159f) dAngle -= 6.28318f;
+            while (dAngle < -3.14159f) dAngle += 6.28318f;
+            opp.chassisAngle += dAngle * lerpFactor;
+        }
+
+        // Exhaust smoke
+        m_smokeTimer -= dt;
+        if (car.fuel() > 0.0f && m_smokeTimer <= 0.0f) {
+            m_smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
+            float cosA = std::cos(car.chassisAngle());
+            float sinA = std::sin(car.chassisAngle());
+            Physics::Vec2 pLocal(car.rearMountOffset().x * 0.95f, car.rearMountOffset().y * 0.4f);
+            Physics::Vec2 pWorld = car.chassisPos() + Physics::Vec2(pLocal.x * cosA - pLocal.y * sinA, pLocal.x * sinA + pLocal.y * cosA);
+            m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+        }
+
+        // Wheel spray
+        const std::string& currentBiome = m_physics.terrain().getBiome();
+        if (car.isRearOnGround()) {
+            m_particleSystem.emitWheelSpray(car.rearWheelPos(), car.rearWheelRadius(),
+                                            car.rearContactTangent(), car.rearSlipSpeed(),
+                                            car.rearWheelAngularVel(), car.rearNormalForce(), currentBiome);
+        }
+        if (car.isFrontOnGround()) {
+            m_particleSystem.emitWheelSpray(car.frontWheelPos(), car.frontWheelRadius(),
+                                            car.frontContactTangent(), car.frontSlipSpeed(),
+                                            car.frontWheelAngularVel(), car.frontNormalForce(), currentBiome);
+        }
 
         m_hud.setSpeed(car.getSpeedKmh());
         m_hud.setRpm(car.getEngineRpm());
@@ -724,7 +895,37 @@ void GameStateManager::fixedUpdate(float dt) {
         }
 
         m_particleSystem.update(dt);
-        checkNetworkRaceFinish();
+
+        if (m_physics.isGameOver()) {
+            float dist = m_physics.distanceReached();
+            int coinsEarned = m_physics.coinsCollected();
+            bool isNewRec = dist > m_profile.getRecordDistance(m_selectedBiome);
+
+            m_profile.recordDistance(m_selectedBiome, dist);
+            AccountManager::instance().recordDistance(m_selectedBiome, dist);
+            AccountManager::instance().addXP(static_cast<int>(dist));
+
+            if (m_isGrandPrix) {
+                int pts = (dist >= 1500.0f) ? 10 : (dist > 1000.0f) ? 8 : (dist > 500.0f) ? 6 : 4;
+                m_gpStandings[0].points += pts;
+                m_gpStandings[0].bestDistance = std::max(m_gpStandings[0].bestDistance, dist);
+
+                bool isLast = (m_gpRound >= static_cast<int>(s_gpCircuit.size()));
+                std::string nextTrk = isLast ? "FINALE" : s_gpCircuit[m_gpRound];
+                m_challengeScreen.setStandings(m_gpStandings, m_gpRound, static_cast<int>(s_gpCircuit.size()),
+                                               m_selectedBiome, nextTrk, isLast);
+                changeState(StateType::GRAND_PRIX_CHALLENGE);
+            } else {
+                m_gameOverScreen.setStats(dist, coinsEarned, m_physics.flipsCompleted(), m_physics.totalAirTime(), isNewRec);
+                m_camera.addTrauma(0.9f);
+                if (m_physics.gameOverReason() == "DRIVER DOWN!") {
+                    m_audio.playNeckCrunch();
+                } else {
+                    m_audio.playCrash();
+                }
+                changeState(StateType::GAME_OVER);
+            }
+        }
     }
 
     m_audio.update(dt, m_physics.vehicle(), m_physics.terrain(), m_currentState);

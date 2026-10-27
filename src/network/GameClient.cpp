@@ -26,6 +26,9 @@ GameClient::~GameClient() {
 
 void GameClient::connectToHost(const QString& hostAddress, quint16 port,
                                const std::string& username, int vehicleType, int driverType) {
+    if (m_socket) {
+        m_socket->abort();
+    }
     disconnectFromHost();
     m_username = username;
     m_vehicleType = vehicleType;
@@ -110,6 +113,9 @@ void GameClient::processPacket(const QByteArray& packetData) {
         }
 
         m_localPlayerId = obj["playerId"].toInt();
+        if (obj.contains("name")) {
+            m_username = obj["name"].toString().toStdString();
+        }
         m_assignedColor = static_cast<uint32_t>(obj["assignedColor"].toDouble(0xFF00E5FF));
         m_currentBiomeId = obj["biomeId"].toString("countryside").toStdString();
 

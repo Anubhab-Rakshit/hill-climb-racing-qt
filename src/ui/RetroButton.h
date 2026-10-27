@@ -19,6 +19,7 @@ public:
     void setPosition(int x, int y) { m_x = x; m_y = y; }
     void setSize(int w, int h) { m_w = w; m_h = h; }
     void setText(const std::string& text) { m_text = text; }
+    const std::string& text() const { return m_text; }
     void setBaseColor(uint32_t color) { m_baseColor = color; }
     void setTextColor(uint32_t color) { m_textColor = color; }
     void setOnClick(std::function<void()> cb) { m_onClick = cb; }

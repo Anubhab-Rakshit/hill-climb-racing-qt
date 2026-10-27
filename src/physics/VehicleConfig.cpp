@@ -183,10 +183,10 @@ static const std::vector<VehicleConfig> s_vehicles = {
         0.12f,                // suspMinLength
         0.48f,                // suspMaxLength
         34000.0f,             // baseSpringRate
-        4200.0f,              // baseDamperRate
-        7400.0f,              // basePeakTorque
+        5400.0f,              // baseDamperRate
+        9200.0f,              // basePeakTorque
         82.0f,                // baseTopSpeedKmh
-        1.40f,                // baseGrip
+        1.45f,                // baseGrip
         0.50f,                // base4wdSplit
         2200.0f,              // baseBrakingTorque
         0.08f,                // baseDownforce

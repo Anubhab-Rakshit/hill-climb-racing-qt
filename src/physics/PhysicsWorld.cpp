@@ -84,13 +84,14 @@ void PhysicsWorld::reset(const std::string& biomeId,
                          DriverType driverType,
                          bool isMultiplayer,
                          VehicleType vehicleType2,
-                         DriverType driverType2) {
+                         DriverType driverType2,
+                         float customStartX) {
     m_isMultiplayer = isMultiplayer;
     m_terrain.setBiome(biomeId);
     m_terrain.resetDeformation();
 
     // Player 1 Vehicle
-    float startX1 = 5.0f;
+    float startX1 = customStartX;
     float groundY1 = m_terrain.getHeight(startX1);
     m_vehicle.setVehicleType(vehicleType);
     m_vehicle.setDriverType(driverType);
@@ -407,7 +408,7 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
                 }
             }
             if (m_onItem && isP1) {
-                m_onItem(items[i].type, items[i].value);
+                m_onItem(items[i].type, items[i].value, static_cast<int>(i));
             }
         }
     }
