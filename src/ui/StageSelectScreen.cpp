@@ -2,6 +2,7 @@
 #include "RasterFont.h"
 #include "UITheme.h"
 #include "UIComponents.h"
+#include "LocalizationManager.h"
 #include <cmath>
 #include <string>
 #include <algorithm>
@@ -18,13 +19,16 @@ struct StageCardMeta {
     uint32_t stripeColor;
 };
 
-static const StageCardMeta s_stages[6] = {
+static const StageCardMeta s_stages[9] = {
     {"countryside", "COUNTRYSIDE", "Smooth Rolling Hills", "1.0G (Normal)", 2, "Starter Stage", Theme::GREEN_GAS},
     {"desert", "DESERT DUNES", "Loose Sand & Slip-Faces", "1.0G (Loose)", 3, "Clear Countryside", Theme::GOLD},
     {"arctic", "ARCTIC TUNDRA", "Slippery Glacial Crevasses", "1.0G (Ice)", 4, "Clear Desert", 0xFF00E5FF},
     {"mountain", "MOUNTAIN RIDGE", "Craggy Rocky Escarpments", "1.0G (Rocky)", 4, "Clear Arctic", 0xFF78909C},
     {"moon", "THE MOON", "Floaty Low-G Impact Craters", "0.16G (Lunar)", 5, "Clear Mountain", 0xFFECEFF1},
-    {"volcano", "INFERNO PEAKS", "Dense Gravity & Calderas", "1.17G (Heavy)", 5, "Clear The Moon", 0xFFFF3D00}
+    {"volcano", "INFERNO PEAKS", "Dense Gravity & Calderas", "1.17G (Heavy)", 5, "Clear The Moon", 0xFFFF3D00},
+    {"neon", "NEON HIGHWAY", "Cyberpunk Synthwave Grid", "1.0G (Speed)", 4, "Clear Inferno", 0xFF00E5FF},
+    {"super_countryside", "SUPER COUNTRYSIDE", "Roller-Coaster Mega Jumps", "1.0G (Extreme)", 5, "Clear Neon", 0xFF00E676},
+    {"seasons", "CHANGING SEASONS", "Dynamic 4-Season Journey", "1.0G (Dynamic)", 5, "Clear Super Country", 0xFFFFB74D}
 };
 
 StageSelectScreen::StageSelectScreen()
@@ -37,7 +41,7 @@ StageSelectScreen::StageSelectScreen()
     , m_btnNextPage(0, 0, 80, 28, "NEXT >", 0xFF263238)
 {
     m_btnBack.setKeyHint("ESC");
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 9; ++i) {
         m_btnStageAction[i] = RetroButton(0, 0, 240, 42, "PLAY", Theme::GREEN_GAS);
         m_btnStageAction[i].setKeyHint("ENTER");
         std::string sId = s_stages[i].id;
@@ -53,7 +57,7 @@ void StageSelectScreen::setButtonSound(std::function<void()> cb) {
     m_btnBack.setOnSound(cb);
     m_btnPrevPage.setOnSound(cb);
     m_btnNextPage.setOnSound(cb);
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 9; ++i) {
         m_btnStageAction[i].setOnSound(cb);
     }
 }
@@ -88,6 +92,10 @@ void StageSelectScreen::setDimensions(int width, int height) {
         // Page 1 buttons (3..5)
         m_btnStageAction[i + 3].setPosition(x, btnY);
         m_btnStageAction[i + 3].setSize(btnW, btnH);
+
+        // Page 2 buttons (6..8)
+        m_btnStageAction[i + 6].setPosition(x, btnY);
+        m_btnStageAction[i + 6].setSize(btnW, btnH);
     }
 }
 
@@ -131,12 +139,12 @@ void StageSelectScreen::onMouseUp(int px, int py) {
     m_btnBack.onMouseUp(px, py);
 
     if (m_btnPrevPage.isPressed() && m_btnPrevPage.contains(px, py)) {
-        m_page = 0;
+        m_page = std::max(0, m_page - 1);
     }
     m_btnPrevPage.onMouseUp(px, py);
 
     if (m_btnNextPage.isPressed() && m_btnNextPage.contains(px, py)) {
-        m_page = 1;
+        m_page = std::min(2, m_page + 1);
     }
     m_btnNextPage.onMouseUp(px, py);
 
@@ -181,11 +189,26 @@ void StageSelectScreen::drawStageThumbnail(Graphics::Framebuffer& fb, int x, int
             groundCol = 0xFF90A4AE;
             subCol = 0xFF607D8B;
             hillY = std::sin(t * 4.0f) * 12.0f + h * 0.60f;
-        } else { // Volcano
+        } else if (stageIdx == 5) { // Volcano
             skyCol = 0xFF2B0A0A;
             groundCol = 0xFFD32F2F;
             subCol = 0xFFB71C1C;
             hillY = std::sin(t * 10.0f + m_animTime * 1.1f) * 20.0f + h * 0.53f;
+        } else if (stageIdx == 6) { // Neon Highway
+            skyCol = 0xFF120024;
+            groundCol = 0xFF00E5FF;
+            subCol = 0xFFFF007F;
+            hillY = std::sin(t * 9.0f + m_animTime * 1.8f) * 16.0f + h * 0.54f;
+        } else if (stageIdx == 7) { // Super Countryside
+            skyCol = 0xFF0288D1;
+            groundCol = 0xFF00E676;
+            subCol = 0xFF00C853;
+            hillY = std::sin(t * 5.0f + m_animTime * 1.2f) * 26.0f + h * 0.48f;
+        } else { // Changing Seasons
+            skyCol = 0xFF37474F;
+            groundCol = (t < 0.25f) ? 0xFF81C784 : (t < 0.5f) ? 0xFFFFD54F : (t < 0.75f) ? 0xFFFF7043 : 0xFFFFFFFF;
+            subCol = 0xFF5D4037;
+            hillY = std::sin(t * 7.0f + m_animTime * 0.9f) * 15.0f + h * 0.55f;
         }
 
         int hy = static_cast<int>(hillY);
@@ -276,16 +299,16 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
     m_btnPrevPage.setBaseColor((m_page > 0) ? 0xFF2A394A : 0xFF1E2834);
     m_btnPrevPage.render(fb, 1);
 
-    m_btnNextPage.setEnabled(m_page < 1);
-    m_btnNextPage.setBaseColor((m_page < 1) ? 0xFF2A394A : 0xFF1E2834);
+    m_btnNextPage.setEnabled(m_page < 2);
+    m_btnNextPage.setBaseColor((m_page < 2) ? 0xFF2A394A : 0xFF1E2834);
     m_btnNextPage.render(fb, 1);
 
-    std::string pageStr = "PAGE " + std::to_string(m_page + 1) + " OF 2";
+    std::string pageStr = "PAGE " + std::to_string(m_page + 1) + " OF 3";
     Graphics::RasterFont::drawStringCentered(fb, cx, 58, pageStr, Theme::CYAN_UPGRADE, 1);
 
     // Illuminated Page Navigation Dots
-    for (int p = 0; p < 2; ++p) {
-        int dotX = cx - 10 + p * 20;
+    for (int p = 0; p < 3; ++p) {
+        int dotX = cx - 20 + p * 20;
         int dotY = 72;
         uint32_t dotCol = (m_page == p) ? Theme::CYAN_UPGRADE : 0xFF2A3A4E;
         fb.fillCircle(dotX, dotY, (m_page == p) ? 4 : 3, dotCol);
@@ -313,13 +336,15 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
         UIComponents::drawBiomeIcon(fb, x + 12, y + 10, idx);
 
         // Title
-        Graphics::RasterFont::drawString(fb, x + 34, y + 11, stage.name, Theme::TEXT_WHITE, 2);
+        std::string locName = Core::LocalizationManager::instance().getStageName(stage.id);
+        std::string locDesc = Core::LocalizationManager::instance().getStageTagline(stage.id);
+        Graphics::RasterFont::drawString(fb, x + 34, y + 11, locName, Theme::TEXT_WHITE, 2);
 
         // Thumbnail
         drawStageThumbnail(fb, x + 14, y + 36, cardW - 28, 105, idx);
 
         // Info Chips
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 150, stage.desc, Theme::TEXT_MUTED, 1);
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 150, locDesc, Theme::TEXT_MUTED, 1);
         Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 168, "GRAVITY: " + stage.gravity, Theme::CYAN_UPGRADE, 1);
 
         // Difficulty Rating with Pixel Stars

@@ -1,4 +1,6 @@
 #include "MainMenuScreen.h"
+#include "AccountManager.h"
+#include "LocalizationManager.h"
 #include "RasterFont.h"
 #include "UITheme.h"
 #include "UIComponents.h"
@@ -14,16 +16,22 @@ MainMenuScreen::MainMenuScreen()
     : m_width(Theme::VIRTUAL_WIDTH)
     , m_height(Theme::VIRTUAL_HEIGHT)
     , m_animTime(0.0f)
-    , m_btnStart(540, 126, 340, 46, "START SOLO RACE", Theme::GREEN_GAS)
-    , m_btnMultiplayer(540, 178, 340, 46, "2P MULTIPLAYER", 0xFFFF5722)
-    , m_btnGarage(540, 230, 340, 44, "GARAGE & TUNING", Theme::GOLD)
-    , m_btnStages(540, 280, 340, 44, "STAGE SELECT", Theme::CYAN_UPGRADE)
-    , m_btnQuit(540, 330, 340, 38, "QUIT GAME", 0xFF2A3A4E)
+    , m_btnStart(540, 95, 340, 40, "START SOLO RACE", Theme::GREEN_GAS)
+    , m_btnMultiplayer(540, 140, 340, 40, "REMOTE MULTIPLAYER", 0xFFFF5722)
+    , m_btnGrandPrix(540, 185, 340, 40, "GRAND PRIX CHALLENGE", Theme::GOLD)
+    , m_btnGarage(540, 230, 340, 38, "GARAGE & TUNING", 0xFFFFB300)
+    , m_btnStages(540, 273, 340, 38, "STAGE SELECT", Theme::CYAN_UPGRADE)
+    , m_btnAccount(540, 316, 340, 38, "RACER PROFILE & LEVEL", 0xFF7C4DFF)
+    , m_btnEvaluator(540, 359, 340, 38, "VIP EVALUATOR MODE", 0xFF00B0FF)
+    , m_btnQuit(540, 402, 340, 34, "QUIT GAME", 0xFF2A3A4E)
 {
     m_btnStart.setKeyHint("ENTER");
     m_btnMultiplayer.setKeyHint("M");
+    m_btnGrandPrix.setKeyHint("C");
     m_btnGarage.setKeyHint("G");
     m_btnStages.setKeyHint("S");
+    m_btnAccount.setKeyHint("P");
+    m_btnEvaluator.setKeyHint("E");
     m_btnQuit.setKeyHint("ESC");
     setDimensions(m_width, m_height);
 }
@@ -32,39 +40,54 @@ void MainMenuScreen::setDimensions(int width, int height) {
     m_width = width;
     m_height = height;
 
-    int btnW = 340;
-    int btnX = width - btnW - 70; // 550 on 960 canvas
-    int startY = 126;
+    int btnW = 320;
+    int btnX = width - btnW - 60; // 580 on 960 canvas
+    int startY = 94;
 
     m_btnStart.setPosition(btnX, startY);
-    m_btnStart.setSize(btnW, 46);
+    m_btnStart.setSize(btnW, 38);
 
-    m_btnMultiplayer.setPosition(btnX, startY + 52);
-    m_btnMultiplayer.setSize(btnW, 46);
+    m_btnMultiplayer.setPosition(btnX, startY + 42);
+    m_btnMultiplayer.setSize(btnW, 38);
 
-    m_btnGarage.setPosition(btnX, startY + 104);
-    m_btnGarage.setSize(btnW, 44);
+    m_btnGrandPrix.setPosition(btnX, startY + 84);
+    m_btnGrandPrix.setSize(btnW, 38);
 
-    m_btnStages.setPosition(btnX, startY + 154);
-    m_btnStages.setSize(btnW, 44);
+    m_btnGarage.setPosition(btnX, startY + 126);
+    m_btnGarage.setSize(btnW, 36);
 
-    m_btnQuit.setPosition(btnX, startY + 204);
-    m_btnQuit.setSize(btnW, 38);
+    m_btnStages.setPosition(btnX, startY + 166);
+    m_btnStages.setSize(btnW, 36);
+
+    m_btnAccount.setPosition(btnX, startY + 206);
+    m_btnAccount.setSize(btnW, 36);
+
+    m_btnEvaluator.setPosition(btnX, startY + 246);
+    m_btnEvaluator.setSize(btnW, 36);
+
+    m_btnQuit.setPosition(btnX, startY + 286);
+    m_btnQuit.setSize(btnW, 32);
 }
 
 void MainMenuScreen::onMouseMove(int px, int py) {
     m_btnStart.onMouseMove(px, py);
     m_btnMultiplayer.onMouseMove(px, py);
+    m_btnGrandPrix.onMouseMove(px, py);
     m_btnGarage.onMouseMove(px, py);
     m_btnStages.onMouseMove(px, py);
+    m_btnAccount.onMouseMove(px, py);
+    m_btnEvaluator.onMouseMove(px, py);
     m_btnQuit.onMouseMove(px, py);
 }
 
 bool MainMenuScreen::onMouseDown(int px, int py) {
     if (m_btnStart.onMouseDown(px, py)) return true;
     if (m_btnMultiplayer.onMouseDown(px, py)) return true;
+    if (m_btnGrandPrix.onMouseDown(px, py)) return true;
     if (m_btnGarage.onMouseDown(px, py)) return true;
     if (m_btnStages.onMouseDown(px, py)) return true;
+    if (m_btnAccount.onMouseDown(px, py)) return true;
+    if (m_btnEvaluator.onMouseDown(px, py)) return true;
     if (m_btnQuit.onMouseDown(px, py)) return true;
     return false;
 }
@@ -72,8 +95,11 @@ bool MainMenuScreen::onMouseDown(int px, int py) {
 void MainMenuScreen::onMouseUp(int px, int py) {
     m_btnStart.onMouseUp(px, py);
     m_btnMultiplayer.onMouseUp(px, py);
+    m_btnGrandPrix.onMouseUp(px, py);
     m_btnGarage.onMouseUp(px, py);
     m_btnStages.onMouseUp(px, py);
+    m_btnAccount.onMouseUp(px, py);
+    m_btnEvaluator.onMouseUp(px, py);
     m_btnQuit.onMouseUp(px, py);
 }
 
@@ -210,32 +236,33 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     }
 
     // Telemetry Showcase Card directly beneath vehicle
-    const auto& vehCfg = Physics::VehicleRegistry::getConfig(profile.selectedVehicle());
-    int cardW = 390;
-    int cardH = 88;
+    int cardW = 370;
+    int cardH = 84;
     int cardX = vehX - cardW / 2;
-    int cardY = static_cast<int>(hillY + 16);
+    int cardY = static_cast<int>(hillY + 14);
 
     UIComponents::drawArcadePanel(fb, cardX, cardY, cardW, cardH, 0xF00B1422, Theme::CARD_BORDER, Theme::GOLD, 3, true, true);
 
     // Active Vehicle Title & Tagline
-    Graphics::RasterFont::drawString(fb, cardX + 14, cardY + 10, vehCfg.name, Theme::GOLD, 2);
+    std::string vName = Core::LocalizationManager::instance().getVehicleName(static_cast<int>(profile.selectedVehicle()));
+    std::string vTag = Core::LocalizationManager::instance().getVehicleTagline(static_cast<int>(profile.selectedVehicle()));
+    Graphics::RasterFont::drawString(fb, cardX + 14, cardY + 10, vName, Theme::GOLD, 2);
     // [ACTIVE RIG] Pill
     int tagW = 86;
     int tagX = cardX + cardW - tagW - 12;
     UIComponents::drawArcadePanel(fb, tagX, cardY + 8, tagW, 18, 0xFF143820, Theme::GREEN_GAS, 0, 0, false, true);
     Graphics::RasterFont::drawStringCentered(fb, tagX + tagW / 2, cardY + 12, "ACTIVE RIG", Theme::GREEN_GAS, 1);
 
-    Graphics::RasterFont::drawString(fb, cardX + 14, cardY + 30, vehCfg.tagline, Theme::TEXT_MUTED, 1);
+    Graphics::RasterFont::drawString(fb, cardX + 14, cardY + 30, vTag, Theme::TEXT_MUTED, 1);
 
     // 3 Performance Spec Chips
     int chipY = cardY + 48;
     auto drawMiniStat = [&](int x, const std::string& label, int level, uint32_t barCol) {
-        int w = 114;
-        fb.fillRect(x, chipY, w, 28, 0xEE111A26);
-        fb.drawRect(x, chipY, w, 28, 0xFF2A3A4E);
-        Graphics::RasterFont::drawString(fb, x + 6, chipY + 4, label, Theme::TEXT_MUTED, 1);
-        UIComponents::drawSegmentedBar(fb, x + 6, chipY + 16, w - 12, 7, level, 15, barCol);
+        int w = 108;
+        fb.fillRect(x, chipY, w, 26, 0xEE111A26);
+        fb.drawRect(x, chipY, w, 26, 0xFF2A3A4E);
+        Graphics::RasterFont::drawString(fb, x + 6, chipY + 3, label, Theme::TEXT_MUTED, 1);
+        UIComponents::drawSegmentedBar(fb, x + 6, chipY + 15, w - 12, 7, level, 15, barCol);
     };
 
     int engLvl = profile.getUpgradeLevel(profile.selectedVehicle(), Core::ProfileManager::UPGRADE_ENGINE);
@@ -243,8 +270,8 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     int suspLvl = profile.getUpgradeLevel(profile.selectedVehicle(), Core::ProfileManager::UPGRADE_SUSPENSION);
 
     drawMiniStat(cardX + 14, "ENGINE", engLvl, Theme::GOLD);
-    drawMiniStat(cardX + 138, "TIRES", tireLvl, Theme::CYAN_UPGRADE);
-    drawMiniStat(cardX + 262, "SUSPENSION", suspLvl, Theme::GREEN_GAS);
+    drawMiniStat(cardX + 130, "TIRES", tireLvl, Theme::CYAN_UPGRADE);
+    drawMiniStat(cardX + 246, "SUSPENSION", suspLvl, Theme::GREEN_GAS);
 
     // 6. ZONE B (RIGHT): Master Navigation Console & Career Ticker
     // Breathing pulse halo on START button
@@ -257,38 +284,53 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     uint32_t mpCol = UI::Theme::blend(0x00FF3D00, 0x88FF7043, mpPulse);
     fb.drawRect(m_btnMultiplayer.x() - 1, m_btnMultiplayer.y() - 1, m_btnMultiplayer.width() + 2, m_btnMultiplayer.height() + 2, mpCol);
 
+    bool isBn = Core::LocalizationManager::instance().isBengali();
+    m_btnStart.setText(isBn ? "KHELA SHURU" : "SOLO RACE");
+    m_btnMultiplayer.setText(isBn ? "2P LORAI (ONLINE)" : "ONLINE MULTIPLAYER");
+    m_btnGrandPrix.setText(isBn ? "SERADER CHALLENGE" : "GRAND PRIX CHALLENGE");
+    m_btnGarage.setText(isBn ? "GARIR KARKHANA" : "GARAGE & TUNING");
+    m_btnStages.setText(isBn ? "POHTH BACHHO" : "STAGE SELECT");
+    m_btnAccount.setText(isBn ? "PILOT PROFILE" : "RACER PROFILE & LEVEL");
+    m_btnEvaluator.setText(isBn ? "PROFESSOR BABUR PASS" : "VIP EVALUATOR MODE");
+    m_btnQuit.setText(isBn ? "BERIYE JAWA" : "QUIT GAME");
+
     m_btnStart.render(fb, 2);
     m_btnMultiplayer.render(fb, 2);
+    m_btnGrandPrix.render(fb, 2);
     m_btnGarage.render(fb, 2);
     m_btnStages.render(fb, 2);
+    m_btnAccount.render(fb, 2);
+    m_btnEvaluator.render(fb, 2);
     m_btnQuit.render(fb, 2);
 
-    // Career Highlights Box beneath buttons
-    int btnW = 340;
-    int btnX = m_width - btnW - 70;
-    int tickY = 376;
-    int tickH = 88;
-    UIComponents::drawArcadePanel(fb, btnX, tickY, btnW, tickH, 0xF00B1422, Theme::CARD_BORDER, Theme::CYAN_UPGRADE, 3, true, true);
+    // Active Racer Profile Badge (Top Right above menu, aligned with buttons)
+    int profBadgeW = 220;
+    int profBadgeX = m_btnStart.x() + m_btnStart.width() - profBadgeW;
+    int profBadgeY = 56;
+    auto* activeAcc = Core::AccountManager::instance().activeAccount();
+    std::string userDisplay = activeAcc ? activeAcc->username : "GuestRacer";
+    int userLvl = activeAcc ? activeAcc->level : 1;
 
-    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 10, "CAREER HIGHLIGHTS", Theme::CYAN_UPGRADE, 1);
+    UIComponents::drawArcadePanel(fb, profBadgeX, profBadgeY, profBadgeW, 28, 0xDD0C1524, Theme::CARD_BORDER, Theme::GOLD, 2, false, true);
+    fb.fillCircle(profBadgeX + 14, profBadgeY + 14, 5, Theme::GOLD);
+    Graphics::RasterFont::drawString(fb, profBadgeX + 26, profBadgeY + 9, userDisplay, Theme::TEXT_WHITE, 1);
+    std::string lvlStr = "LVL " + std::to_string(userLvl);
+    Graphics::RasterFont::drawString(fb, profBadgeX + profBadgeW - 48, profBadgeY + 9, lvlStr, Theme::GOLD, 1);
 
-    // Record stats
-    int bestDist = profile.getRecordDistance("countryside");
-    std::string recStr = "COUNTRYSIDE BEST: " + UIComponents::formatNumber(bestDist) + "m";
-    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 28, recStr, Theme::TEXT_WHITE, 1);
-
-    // Vehicle collection count
+    int btnX = m_btnStart.x();
+    int tickY = m_btnQuit.y() + m_btnQuit.height() + 8;
     int unlockedCount = 0;
     for (int v = 0; v < static_cast<int>(Physics::VehicleType::COUNT); ++v) {
         if (profile.isVehicleUnlocked(static_cast<Physics::VehicleType>(v))) unlockedCount++;
     }
+    UIComponents::drawArcadePanel(fb, btnX, tickY, m_btnStart.width(), 50, 0xDD0D1624, Theme::CARD_BORDER, Theme::GOLD, 2, false, true);
     std::string collStr = "FLEET: " + std::to_string(unlockedCount) + "/10 VEHICLES UNLOCKED";
-    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 46, collStr, Theme::GOLD, 1);
+    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 10, collStr, Theme::GOLD, 1);
 
     // Checkpoints cleared
     int cps = profile.getStageCheckpointProgress("countryside");
     std::string cpStr = "PROGRESS: CHECKPOINT " + std::to_string(cps) + "/5 CLEARED";
-    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 64, cpStr, Theme::GREEN_GAS, 1);
+    Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 28, cpStr, Theme::GREEN_GAS, 1);
 
     // 7. TOP BAR: Driver Identity + Title Marquee + Master Coin Badge
     // Top-Left: Pilot Profile Pill
@@ -296,7 +338,7 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     int pillW = 210;
     int pillH = 34;
     int pillX = 24;
-    int pillY = 16;
+    int pillY = 14;
     UIComponents::drawArcadePanel(fb, pillX, pillY, pillW, pillH, 0xEE0B1422, Theme::CARD_BORDER, drvCfg.themeColor, 2, true, true);
     // Pilot helmet icon pip
     fb.fillCircle(pillX + 18, pillY + 17, 7, drvCfg.themeColor);
@@ -308,61 +350,46 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     int coinBoxW = 155;
     int coinBoxH = 34;
     int coinBoxX = m_width - coinBoxW - 24;
-    int coinBoxY = 16;
+    int coinBoxY = 14;
     UIComponents::drawCoinBadge(fb, coinBoxX, coinBoxY, coinBoxW, coinBoxH, profile.coins(), m_animTime);
 
-    // Top-Center: Master Arcade Title Marquee
+    // Top-Center: Sleek, compact Arcade Title Badge
     int cx = m_width / 2;
-    float bounceY = std::sin(m_animTime * 2.5f) * 3.0f;
-    int titleY = static_cast<int>(18 + bounceY);
-
-    // Marquee Frame
-    int marqueeW = 460;
-    int marqueeH = 96;
+    int marqueeW = 310;
+    int marqueeH = 38;
     int marqueeX = cx - marqueeW / 2;
-    int marqueeY = titleY;
-    UIComponents::drawArcadePanel(fb, marqueeX, marqueeY, marqueeW, marqueeH, 0xE8080E18, 0xFF37474F, Theme::GOLD, 4, true, true);
+    int marqueeY = 12;
+
+    UIComponents::drawArcadePanel(fb, marqueeX, marqueeY, marqueeW, marqueeH, 0xFA080E18, 0xFF37474F, Theme::GOLD, 2, true, true);
 
     // Chrome Rivets at 4 corners
-    fb.fillCircle(marqueeX + 7, marqueeY + 7, 2, Theme::CHROME_MID);
-    fb.fillCircle(marqueeX + marqueeW - 8, marqueeY + 7, 2, Theme::CHROME_MID);
-    fb.fillCircle(marqueeX + 7, marqueeY + marqueeH - 8, 2, Theme::CHROME_MID);
-    fb.fillCircle(marqueeX + marqueeW - 8, marqueeY + marqueeH - 8, 2, Theme::CHROME_MID);
+    fb.fillCircle(marqueeX + 5, marqueeY + 5, 2, Theme::CHROME_MID);
+    fb.fillCircle(marqueeX + marqueeW - 6, marqueeY + 5, 2, Theme::CHROME_MID);
+    fb.fillCircle(marqueeX + 5, marqueeY + marqueeH - 6, 2, Theme::CHROME_MID);
+    fb.fillCircle(marqueeX + marqueeW - 6, marqueeY + marqueeH - 6, 2, Theme::CHROME_MID);
 
-    // Dual 3D Drop Shadow & Vibrant Typography
-    Graphics::RasterFont::drawStringCentered(fb, cx + 3, marqueeY + 13, "HILL CLIMB", 0xFF05080E, 4);
-    Graphics::RasterFont::drawStringCentered(fb, cx + 3, marqueeY + 45, "RACING", 0xFF05080E, 4);
+    isBn = Core::LocalizationManager::instance().isBengali();
+    std::string mainTitle = isBn ? "PAHARI GARI RACING" : "HILL CLIMB RACING";
+    std::string subTitle = isBn ? "* BANGLA EDITION *" : "* RETRO ARCADE MOTORSPORT *";
 
-    Graphics::RasterFont::drawStringCentered(fb, cx + 1, marqueeY + 11, "HILL CLIMB", 0xFFB26A00, 4);
-    Graphics::RasterFont::drawStringCentered(fb, cx + 1, marqueeY + 43, "RACING", 0xFFE65100, 4);
-
-    Graphics::RasterFont::drawStringCentered(fb, cx, marqueeY + 10, "HILL CLIMB", Theme::GOLD, 4);
-    Graphics::RasterFont::drawStringCentered(fb, cx, marqueeY + 42, "RACING", 0xFFFF9100, 4);
-
-    // Top highlight specular sheen
-    Graphics::RasterFont::drawStringCentered(fb, cx - 1, marqueeY + 9, "HILL CLIMB", 0xFFFFE082, 4);
+    // Dual 3D Drop Shadow & Crisp Typography
+    Graphics::RasterFont::drawStringCentered(fb, cx + 1, marqueeY + 7, mainTitle, 0xFF05080E, 2);
+    Graphics::RasterFont::drawStringCentered(fb, cx, marqueeY + 6, mainTitle, Theme::GOLD, 2);
+    Graphics::RasterFont::drawStringCentered(fb, cx, marqueeY + 23, subTitle, Theme::CYAN_UPGRADE, 1);
 
     // Dynamic diagonal specular gleam across title marquee
     float gleamFrac = std::fmod(m_animTime * 0.70f, 3.2f);
     if (gleamFrac < 1.0f) {
-        int gleamX = marqueeX + static_cast<int>(gleamFrac * (marqueeW + 60)) - 30;
-        for (int gy = marqueeY + 6; gy < marqueeY + marqueeH - 6; ++gy) {
+        int gleamX = marqueeX + static_cast<int>(gleamFrac * (marqueeW + 40)) - 20;
+        for (int gy = marqueeY + 3; gy < marqueeY + marqueeH - 3; ++gy) {
             int gx = gleamX - (gy - marqueeY) / 2;
-            if (gx >= marqueeX + 6 && gx < marqueeX + marqueeW - 6) {
+            if (gx >= marqueeX + 3 && gx < marqueeX + marqueeW - 3) {
                 fb.blendPixelFast(gx, gy, 0x44FFFFFF);
                 fb.blendPixelFast(gx + 1, gy, 0x77FFFFFF);
                 fb.blendPixelFast(gx + 2, gy, 0x44FFFFFF);
             }
         }
     }
-
-    // Arcade Subtitle Badge
-    int subW = 260;
-    int subH = 18;
-    int subX = cx - subW / 2;
-    int subY = marqueeY + 72;
-    UIComponents::drawArcadePanel(fb, subX, subY, subW, subH, 0xEE0B1422, Theme::CYAN_UPGRADE, 0, 0, false, true);
-    Graphics::RasterFont::drawStringCentered(fb, cx, subY + 3, "* RETRO ARCADE MOTORSPORT *", Theme::CYAN_UPGRADE, 1);
 
     // 8. Footer Controls Hint Bar with 3D Keycaps
     int footH = 28;

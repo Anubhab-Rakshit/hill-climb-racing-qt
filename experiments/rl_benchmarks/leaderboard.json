@@ -1,0 +1,86 @@
+[
+    {
+        "rank": 1,
+        "agent": "PPO (Proximal Policy Optimization)",
+        "championship_elo": 2086,
+        "max_distance_meters": 963.6,
+        "mean_distance_meters": 489.7,
+        "mean_speed_kmh": 74.6,
+        "fuel_efficiency_mpf": 2462.13,
+        "mean_coins_collected": 19.2,
+        "mean_air_time_sec": 7.68,
+        "crash_rate_percent": 75.0
+    },
+    {
+        "rank": 2,
+        "agent": "A3C (Asynchronous Advantage Actor-Critic)",
+        "championship_elo": 1915,
+        "max_distance_meters": 932.8,
+        "mean_distance_meters": 410.0,
+        "mean_speed_kmh": 70.4,
+        "fuel_efficiency_mpf": 3261.7,
+        "mean_coins_collected": 16.0,
+        "mean_air_time_sec": 6.17,
+        "crash_rate_percent": 75.0
+    },
+    {
+        "rank": 3,
+        "agent": "TD3 (Twin Delayed DDPG)",
+        "championship_elo": 1743,
+        "max_distance_meters": 539.2,
+        "mean_distance_meters": 386.4,
+        "mean_speed_kmh": 73.9,
+        "fuel_efficiency_mpf": 1873.99,
+        "mean_coins_collected": 15.0,
+        "mean_air_time_sec": 6.34,
+        "crash_rate_percent": 100.0
+    },
+    {
+        "rank": 4,
+        "agent": "Human Veteran (Telemetry Baseline)",
+        "championship_elo": 1738,
+        "max_distance_meters": 721.4,
+        "mean_distance_meters": 394.3,
+        "mean_speed_kmh": 70.8,
+        "fuel_efficiency_mpf": 1853.69,
+        "mean_coins_collected": 15.2,
+        "mean_air_time_sec": 6.17,
+        "crash_rate_percent": 100.0
+    },
+    {
+        "rank": 5,
+        "agent": "TRPO (Trust Region Policy Optimization)",
+        "championship_elo": 1707,
+        "max_distance_meters": 716.5,
+        "mean_distance_meters": 379.9,
+        "mean_speed_kmh": 69.9,
+        "fuel_efficiency_mpf": 2909.44,
+        "mean_coins_collected": 14.8,
+        "mean_air_time_sec": 6.45,
+        "crash_rate_percent": 100.0
+    },
+    {
+        "rank": 6,
+        "agent": "VPG (Vanilla Policy Gradient / REINFORCE)",
+        "championship_elo": 1706,
+        "max_distance_meters": 716.9,
+        "mean_distance_meters": 378.6,
+        "mean_speed_kmh": 70.4,
+        "fuel_efficiency_mpf": 3536.83,
+        "mean_coins_collected": 14.5,
+        "mean_air_time_sec": 6.11,
+        "crash_rate_percent": 100.0
+    },
+    {
+        "rank": 7,
+        "agent": "DDPG (Deep Deterministic Policy Gradient)",
+        "championship_elo": 1614,
+        "max_distance_meters": 539.2,
+        "mean_distance_meters": 323.5,
+        "mean_speed_kmh": 71.5,
+        "fuel_efficiency_mpf": 4022.32,
+        "mean_coins_collected": 12.5,
+        "mean_air_time_sec": 4.9,
+        "crash_rate_percent": 100.0
+    }
+]

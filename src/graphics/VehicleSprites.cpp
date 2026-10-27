@@ -127,7 +127,9 @@ void VehicleSprites::init() {
         {Physics::VehicleType::DESERT_RAID, "desertraid", createDesertRaidChassis, createDesertRaidWheel},
         {Physics::VehicleType::FORMULA_RACER, "formularacer", createFormulaChassis, createFormulaWheel},
         {Physics::VehicleType::MUSCLE_CAR, "musclecar", createMuscleCarChassis, createMuscleCarWheel},
-        {Physics::VehicleType::ELECTRIC_OFFROADER, "electricoffroader", createElectricOffroaderChassis, createElectricOffroaderWheel}
+        {Physics::VehicleType::ELECTRIC_OFFROADER, "electricoffroader", createElectricOffroaderChassis, createElectricOffroaderWheel},
+        {Physics::VehicleType::MOTOCROSS_BIKE, "motocross_bike", createMotocrossChassis, createMotocrossWheel},
+        {Physics::VehicleType::QUAD_BIKE, "quad_bike", createQuadChassis, createQuadWheel}
     };
 
     for (const auto& e : entries) {
@@ -1156,6 +1158,188 @@ QImage VehicleSprites::createElectricOffroaderWheel() {
     fillC(img, cx, cy, 5, 0xFF00E5FF);
     fillC(img, cx, cy, 2, 0xFFFFFFFF);
 
+    return img;
+}
+
+// 11. Agile Motocross Dirtbike Chassis
+QImage VehicleSprites::createMotocrossChassis() {
+    QImage img(256, 128, QImage::Format_ARGB32_Premultiplied);
+    img.fill(0x00000000);
+
+    uint32_t colOrange = 0xFFFF6D00;
+    uint32_t colHi     = 0xFFFF9E80;
+    uint32_t colFrame  = 0xFF37474F;
+    uint32_t colChrome = 0xFFECEFF1;
+
+    // Lightweight perimeter tubular frame
+    drawL(img, 70, 72, 110, 52, colFrame);
+    drawL(img, 70, 73, 110, 53, colFrame);
+    drawL(img, 110, 52, 175, 46, colFrame);
+    drawL(img, 110, 53, 175, 47, colFrame);
+    drawL(img, 110, 78, 175, 46, colFrame);
+
+    // Engine block & expansion chamber
+    fillR(img, 98, 62, 28, 20, 0xFF455A64);
+    drawR(img, 98, 62, 28, 20, 0xFF263238);
+    // Cylinder head cooling fins
+    for (int y = 64; y <= 78; y += 4) {
+        drawL(img, 102, y, 122, y, colChrome);
+    }
+    // High-mount 2-stroke tuned expansion chamber
+    drawL(img, 124, 70, 80, 58, 0xFF78909C);
+    fillC(img, 82, 58, 6, 0xFF607D8B);
+
+    // Slim competition fuel tank & racing seat
+    fillR(img, 115, 46, 42, 12, colOrange);
+    fillR(img, 115, 46, 42, 3,  colHi);
+    fillR(img, 82, 45, 36, 8,   0xFF212121); // Long non-slip motocross saddle
+    fillR(img, 82, 45, 36, 2,   0xFF424242);
+
+    // Handlebars & front fork clamp
+    drawL(img, 168, 48, 178, 30, colFrame);
+    drawL(img, 172, 30, 184, 30, 0xFF212121); // Crossbar handlebar
+    fillC(img, 172, 30, 3, 0xFFFFD600);       // Bar pad
+    fillC(img, 184, 30, 2, colOrange);        // Grip
+
+    // Front high-clearance beak fender
+    drawL(img, 168, 48, 206, 40, colOrange);
+    drawL(img, 168, 49, 206, 41, colHi);
+
+    // Rear upswept fender
+    drawL(img, 82, 48, 52, 44, colOrange);
+    drawL(img, 82, 49, 52, 45, colHi);
+
+    // Front racing number plate #7
+    fillR(img, 176, 36, 14, 16, 0xFFFFFFFF);
+    drawR(img, 176, 36, 14, 16, 0xFF212121);
+    drawL(img, 180, 39, 186, 39, 0xFF212121);
+    drawL(img, 185, 40, 181, 48, 0xFF212121);
+
+    return img;
+}
+
+// 11. Motocross Spoke Wheel with Deep Knobby Mud Tread
+QImage VehicleSprites::createMotocrossWheel() {
+    QImage img(64, 64, QImage::Format_ARGB32_Premultiplied);
+    img.fill(0x00000000);
+    int cx = 32, cy = 32;
+
+    fillC(img, cx, cy, 27, 0xFF1B1B1B);
+    drawC(img, cx, cy, 27, 0xFF0A0A0A);
+
+    // Knobby offroad rubber knobs
+    for (int a = 0; a < 14; ++a) {
+        float ang = a * (3.14159f * 2.0f / 14.0f);
+        int tx = static_cast<int>(cx + std::cos(ang) * 25.0f);
+        int ty = static_cast<int>(cy + std::sin(ang) * 25.0f);
+        fillR(img, tx - 2, ty - 2, 4, 4, 0xFF2E2E2E);
+    }
+
+    // Anodized Aluminum Rim
+    drawC(img, cx, cy, 20, 0xFFFF6D00);
+    drawC(img, cx, cy, 19, 0xFFFFAB40);
+
+    // Fine wire spokes (laced pattern)
+    for (int s = 0; s < 12; ++s) {
+        float ang = s * (3.14159f * 2.0f / 12.0f);
+        int px = static_cast<int>(cx + std::cos(ang) * 18.0f);
+        int py = static_cast<int>(cy + std::sin(ang) * 18.0f);
+        drawL(img, cx, cy, px, py, 0xFFCFD8DC);
+    }
+
+    // Billet hub & rotor
+    fillC(img, cx, cy, 6, 0xFF455A64);
+    fillC(img, cx, cy, 3, 0xFFFF6D00);
+    return img;
+}
+
+// 12. Heavy All-Terrain Quad Bike / ATV Chassis
+QImage VehicleSprites::createQuadChassis() {
+    QImage img(256, 128, QImage::Format_ARGB32_Premultiplied);
+    img.fill(0x00000000);
+
+    uint32_t colRed    = 0xFFD50000;
+    uint32_t colHi     = 0xFFFF5252;
+    uint32_t colFrame  = 0xFF263238;
+    uint32_t colSteel  = 0xFF78909C;
+
+    // Heavy reinforced chassis frame
+    fillR(img, 56, 68, 140, 16, colFrame);
+    drawR(img, 56, 68, 140, 16, 0xFF102027);
+
+    // Front high-strength bullbar bumper
+    drawL(img, 186, 76, 212, 60, colSteel);
+    drawL(img, 186, 77, 212, 61, colSteel);
+    drawL(img, 212, 60, 208, 48, colSteel);
+    fillC(img, 210, 52, 4, 0xFFFFF59D); // Heavy foglamp
+
+    // Wide aggressive fenders
+    // Front flared wheel arch
+    fillR(img, 160, 48, 44, 14, colRed);
+    fillR(img, 160, 48, 44, 3,  colHi);
+    // Rear flared mudguard
+    fillR(img, 52, 50, 48, 14, colRed);
+    fillR(img, 52, 50, 48, 3,  colHi);
+
+    // Central fuel tank & seat
+    fillR(img, 114, 46, 44, 18, colRed);
+    fillR(img, 114, 46, 44, 4,  colHi);
+    fillR(img, 84, 46, 38, 10,  0xFF212121); // Contoured all-weather saddle
+    fillR(img, 84, 46, 38, 2,   0xFF424242);
+
+    // ATV Handlebars & handguards
+    drawL(img, 162, 44, 170, 28, colFrame);
+    drawL(img, 164, 28, 178, 28, 0xFF212121);
+    fillC(img, 178, 28, 4, colRed); // Plastic roost handguard
+
+    // Heavy rear utility luggage rack
+    drawL(img, 50, 46, 80, 46, colSteel);
+    drawL(img, 50, 42, 80, 42, colSteel);
+    drawL(img, 50, 42, 50, 50, colSteel);
+
+    return img;
+}
+
+// 12. Quad Bike Massive High-Flotation All-Terrain Wheel
+QImage VehicleSprites::createQuadWheel() {
+    QImage img(70, 70, QImage::Format_ARGB32_Premultiplied);
+    img.fill(0x00000000);
+    int cx = 35, cy = 35;
+
+    fillC(img, cx, cy, 31, 0xFF1E2124);
+    drawC(img, cx, cy, 31, 0xFF0E1012);
+
+    // Chunky chevron directional lugs
+    for (int l = 0; l < 10; ++l) {
+        float ang = l * (3.14159f * 2.0f / 10.0f);
+        int px1 = static_cast<int>(cx + std::cos(ang) * 27.0f);
+        int py1 = static_cast<int>(cy + std::sin(ang) * 27.0f);
+        int px2 = static_cast<int>(cx + std::cos(ang + 0.25f) * 21.0f);
+        int py2 = static_cast<int>(cy + std::sin(ang + 0.25f) * 21.0f);
+        drawL(img, px1, py1, px2, py2, 0xFF37474F);
+        drawL(img, px1 + 1, py1, px2 + 1, py2, 0xFF546E7A);
+    }
+
+    // Heavy Beadlock Outer Ring
+    drawC(img, cx, cy, 21, 0xFFD50000);
+    for (int b = 0; b < 12; ++b) {
+        float ang = b * (3.14159f * 2.0f / 12.0f);
+        int bx = static_cast<int>(cx + std::cos(ang) * 21.0f);
+        int by = static_cast<int>(cy + std::sin(ang) * 21.0f);
+        setPx(img, bx, by, 0xFFECEFF1);
+    }
+
+    // Matte black 8-hole steel rim
+    fillC(img, cx, cy, 18, 0xFF212529);
+    for (int h = 0; h < 8; ++h) {
+        float ang = h * (3.14159f * 2.0f / 8.0f);
+        int hx = static_cast<int>(cx + std::cos(ang) * 12.0f);
+        int hy = static_cast<int>(cy + std::sin(ang) * 12.0f);
+        fillC(img, hx, hy, 2, 0xFF0D0F12);
+    }
+
+    fillC(img, cx, cy, 5, 0xFF455A64);
+    fillC(img, cx, cy, 2, 0xFFD50000);
     return img;
 }
 

@@ -492,6 +492,25 @@ void UIComponents::drawBiomeIcon(Graphics::Framebuffer& fb,
             fb.setPixelFast(x + 7, y + 3, 0xFFFFEB3B);   // Spark
             fb.setPixelFast(x + 8, y + 2, 0xFFFF5722);
             break;
+        case 6: // Neon (Cyber Grid)
+            fb.drawLine(x + 2, y + 13, x + 14, y + 13, 0xFF00E5FF);
+            fb.drawLine(x + 4, y + 8, x + 12, y + 8, 0xFFFF007F);
+            fb.drawLine(x + 8, y + 3, x + 8, y + 13, 0xFF7928CA);
+            fb.setPixelFast(x + 8, y + 4, 0xFF00E5FF);
+            break;
+        case 7: // Super Countryside (Double Giant Peaks)
+            fb.drawLine(x + 2, y + 14, x + 6, y + 5, 0xFF00E676);
+            fb.drawLine(x + 6, y + 5, x + 10, y + 10, 0xFF00E676);
+            fb.drawLine(x + 10, y + 10, x + 13, y + 3, 0xFF00C853);
+            fb.drawLine(x + 13, y + 3, x + 15, y + 14, 0xFF00C853);
+            fb.setPixelFast(x + 13, y + 2, 0xFFFFD600); // Crown star
+            break;
+        case 8: // Changing Seasons (4-quadrant tree)
+            fb.fillRect(x + 3, y + 3, 5, 5, 0xFF81C784);  // Spring
+            fb.fillRect(x + 9, y + 3, 5, 5, 0xFFFFD54F);  // Summer
+            fb.fillRect(x + 3, y + 9, 5, 5, 0xFFFF7043);  // Autumn
+            fb.fillRect(x + 9, y + 9, 5, 5, 0xFFFFFFFF);  // Winter
+            break;
         default:
             break;
     }

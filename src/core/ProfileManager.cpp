@@ -78,6 +78,7 @@ void ProfileManager::setSelectedVehicle(Physics::VehicleType type) {
 }
 
 bool ProfileManager::isVehicleUnlocked(Physics::VehicleType type) const {
+    if (m_isEvaluatorMode) return true;
     int v = static_cast<int>(type);
     if (v >= 0 && v < static_cast<int>(Physics::VehicleType::COUNT)) {
         return m_vehicleUnlocked[v];
@@ -246,6 +247,22 @@ bool ProfileManager::unlockStageWithCoins(const std::string& stageId) {
         return true;
     }
     return false;
+}
+
+void ProfileManager::setEvaluatorMode(bool b) {
+    m_isEvaluatorMode = b;
+    if (m_isEvaluatorMode) {
+        m_coins = 999999;
+        for (int v = 0; v < static_cast<int>(Physics::VehicleType::COUNT); ++v) {
+            m_vehicleUnlocked[v] = true;
+            for (int u = 0; u < UPGRADE_COUNT; ++u) {
+                m_upgradeLevels[v][u] = MAX_UPGRADE_LEVEL;
+            }
+        }
+        for (const auto& bSpec : Physics::BiomeRegistry::getAllBiomes()) {
+            m_stageUnlocked[bSpec.id] = true;
+        }
+    }
 }
 
 int ProfileManager::getStageCheckpointProgress(const std::string& stageId) const {

@@ -13,12 +13,20 @@
 #include "PauseOverlay.h"
 #include "GameOverScreen.h"
 #include "SoundManager.h"
+#include "AccountScreen.h"
+#include "LobbyScreen.h"
+#include "ChallengeScreen.h"
+#include "EvaluatorOverlay.h"
+#include "MinimapRadar.h"
+#include "DeveloperOverlay.h"
+#include "LocalizationManager.h"
+#include "GameServer.h"
+#include "GameClient.h"
 
 namespace Core {
 
 /**
- * @brief Manages screen transitions, coordinates rendering, and bridges UI with Physics.
- * Supports Single Player and Split-Screen 2-Truck Multiplayer Racing.
+ * @brief Manages screen transitions, coordinates rendering, network multiplayer, accounts, and challenge circuits.
  */
 class GameStateManager {
 public:
@@ -30,10 +38,16 @@ public:
     StateType currentState() const { return m_currentState; }
     void startRace(const std::string& biomeId);
     void startMultiplayerRace();
+    void startNetworkMultiplayer(bool isHost, const std::string& biomeId);
+    void startGrandPrixChallenge();
+    void advanceGrandPrixRound();
+    void startEvaluatorMode();
 
     void handleInput(const InputController::State& input);
     void fixedUpdate(float dt);
     void render(Graphics::Framebuffer& fb, float alpha);
+
+    void onKeyTyped(int key, const std::string& text);
 
     ProfileManager& profile() { return m_profile; }
     Physics::PhysicsWorld& physics() { return m_physics; }
@@ -56,6 +70,7 @@ private:
     float m_transitionTimer;
     float m_smokeTimer;
     float m_smokeTimer2 = 0.0f;
+    float m_netTelemetryTimer = 0.0f;
     std::string m_selectedBiome;
 
     // Subsystems
@@ -67,9 +82,24 @@ private:
     Graphics::ParticleSystem m_particleSystem;
     Audio::SoundManager m_audio;
 
-    // Multiplayer Split-Screen Viewport Buffers (960 x 266 each)
+    // Multiplayer Split-Screen Viewport Buffers
     Graphics::Framebuffer m_fbP1;
     Graphics::Framebuffer m_fbP2;
+
+    // Networking
+    Network::GameServer m_server;
+    Network::GameClient m_client;
+    bool m_isNetworkHost = false;
+    bool m_isNetworkClient = false;
+    std::map<int, Network::RemotePlayerState> m_networkOpponents;
+
+    // Grand Prix Circuit
+    bool m_isGrandPrix = false;
+    int m_gpRound = 1;
+    std::vector<UI::GrandPrixRacerScore> m_gpStandings;
+
+    // Evaluator Sandbox
+    bool m_isEvaluatorMode = false;
 
     // UI Screens
     UI::MainMenuScreen m_mainMenu;
@@ -78,11 +108,23 @@ private:
     UI::HUD m_hud;
     UI::PauseOverlay m_pauseOverlay;
     UI::GameOverScreen m_gameOverScreen;
+    UI::AccountScreen m_accountScreen;
+    UI::LobbyScreen m_lobbyScreen;
+    UI::ChallengeScreen m_challengeScreen;
+    UI::EvaluatorOverlay m_evaluatorOverlay;
+    UI::MinimapRadar m_minimapRadar;
+    UI::DeveloperOverlay m_devOverlay;
+    bool m_showDevOverlay = false;
 
     void setupUiCallbacks();
+    void setupNetworkCallbacks();
     void renderMultiplayer(Graphics::Framebuffer& fb, float alpha);
+    void renderNetworkRace(Graphics::Framebuffer& fb, float alpha);
     void renderCompactHud(Graphics::Framebuffer& fb, const Physics::Vehicle& veh, float dist,
                           const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint);
+    void renderOverheadTag(Graphics::Framebuffer& fb, const Graphics::Camera& cam, const Physics::Vec2& worldPos,
+                           const std::string& name, uint32_t color, float distDiff);
+    void checkNetworkRaceFinish();
 };
 
 } // namespace Core

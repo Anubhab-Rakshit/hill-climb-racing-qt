@@ -38,6 +38,8 @@ private:
     static QImage createFormulaChassis();
     static QImage createMuscleCarChassis();
     static QImage createElectricOffroaderChassis();
+    static QImage createMotocrossChassis();
+    static QImage createQuadChassis();
 
     static QImage createOffroaderWheel();
     static QImage createRallyWheel();
@@ -49,6 +51,8 @@ private:
     static QImage createFormulaWheel();
     static QImage createMuscleCarWheel();
     static QImage createElectricOffroaderWheel();
+    static QImage createMotocrossWheel();
+    static QImage createQuadWheel();
 
     static QImage createBillDriver();
     static QImage createSarahDriver();

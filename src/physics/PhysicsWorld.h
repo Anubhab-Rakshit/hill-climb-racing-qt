@@ -57,6 +57,30 @@ public:
 
     int currentCheckpoint() const { return m_lastClearedCheckpoint; }
 
+    // Runtime Developer Mode Tuning Parameters
+    void setCustomGravity(float g);
+    float customGravity() const { return m_customGravity; }
+    void setSuspStiffnessMultiplier(float m);
+    float suspStiffnessMultiplier() const { return m_suspStiffnessMult; }
+    void setSuspDampingMultiplier(float m);
+    float suspDampingMultiplier() const { return m_suspDampingMult; }
+    void setCustomTorqueMultiplier(float m);
+    float customTorqueMultiplier() const { return m_customTorqueMult; }
+    void setCustomFrictionMultiplier(float m);
+    float customFrictionMultiplier() const { return m_customFrictionMult; }
+    void setCustomAirGyroMultiplier(float m);
+    float customAirGyroMultiplier() const { return m_customAirGyroMult; }
+    void setFuelBurnMultiplier(float m);
+    float fuelBurnMultiplier() const { return m_fuelBurnMult; }
+    void setInfiniteFuel(bool inf);
+    bool isInfiniteFuel() const { return m_infiniteFuel; }
+
+    // Multiplayer Trophy Competition Configuration
+    void setFinishDistance(float d) { m_finishDistance = d; }
+    float finishDistance() const { return m_finishDistance; }
+    void setRubberbanding(bool enabled) { m_rubberbandingEnabled = enabled; }
+    bool isRubberbanding() const { return m_rubberbandingEnabled; }
+
     // Event callbacks for UI
     void setOnStunt(std::function<void(const std::string& title, int coins)> cb) { m_onStunt = cb; }
     void setOnItemCollected(std::function<void(ItemType type, int value)> cb) { m_onItem = cb; }
@@ -99,6 +123,18 @@ private:
     std::function<void(const std::string&, int)> m_onStunt;
     std::function<void(ItemType, int)> m_onItem;
     std::function<void(const CheckpointInfo&)> m_onCheckpoint;
+
+    // Live Tuning Variables (Dev Mode)
+    float m_customGravity = -9.81f;
+    float m_suspStiffnessMult = 1.0f;
+    float m_suspDampingMult = 1.0f;
+    float m_customTorqueMult = 1.0f;
+    float m_customFrictionMult = 1.0f;
+    float m_customAirGyroMult = 1.0f;
+    float m_fuelBurnMult = 1.0f;
+    bool m_infiniteFuel = false;
+    float m_finishDistance = 1500.0f;
+    bool m_rubberbandingEnabled = false;
 
     void checkItemCollisions();
     void checkItemCollisionsForVehicle(Vehicle& veh, bool isP1);

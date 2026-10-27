@@ -23,6 +23,10 @@ void InputController::updateCombinedInputs() {
 }
 
 void InputController::onKeyPress(QKeyEvent* event) {
+    if (m_keyTypedCallback) {
+        m_keyTypedCallback(event->key(), event->text().toStdString());
+    }
+
     if (event->isAutoRepeat()) return;
 
     int k = event->key();

@@ -203,6 +203,43 @@ float Terrain::computeRawBaseHeight(float x) const {
             magmaPeak = smoothWindow(mt) * 8.5f;
         }
         return (v1 + v2 + basalt + caldera + magmaPeak) * ramp;
+    } else if (m_biomeId == "neon") {
+        // Cyberpunk synthwave grid: geometric waves and high-speed launch ramps
+        float pN = lx * 0.018f + 0.32f * std::sin(lx * 0.0048f);
+        float n1 = std::sin(pN) * (9.2f * ampMult);
+        float n2 = std::sin(lx * 0.046f) * (2.9f + 1.5f * std::min(diff, 2.5f));
+        float gridRamp = 0.0f;
+        if (lx > 90.0f && lx < 160.0f) {
+            float gt = (lx - 90.0f) / 70.0f;
+            gridRamp = smoothWindow(gt) * 4.5f;
+        }
+        if (lx > 600.0f && lx < 720.0f) {
+            float gt = (lx - 600.0f) / 120.0f;
+            gridRamp += smoothWindow(gt) * 5.8f;
+        }
+        return (n1 + n2 + gridRamp) * ramp;
+    } else if (m_biomeId == "super_countryside") {
+        // Colossal roller-coaster hills and mega launch mounds
+        float pSC = lx * 0.0115f + 0.35f * std::sin(lx * 0.0032f);
+        float sc1 = std::sin(pSC) * (14.8f * ampMult);
+        float sc2 = std::sin(lx * 0.026f) * (4.8f + 2.4f * std::min(diff, 2.5f));
+        float megaJump = 0.0f;
+        if (lx > 120.0f && lx < 240.0f) {
+            float mt = (lx - 120.0f) / 120.0f;
+            megaJump = smoothWindow(mt) * 6.2f;
+        }
+        if (lx > 800.0f && lx < 1050.0f) {
+            float mt = (lx - 800.0f) / 250.0f;
+            megaJump += smoothWindow(mt) * 7.5f;
+        }
+        return (sc1 + sc2 + megaJump) * ramp;
+    } else if (m_biomeId == "seasons") {
+        // Dynamic 4-Season Journey: Spring -> Summer -> Autumn -> Winter
+        float pS = lx * 0.0142f + 0.28f * std::sin(lx * 0.0036f);
+        float s1 = std::sin(pS) * (10.2f * ampMult);
+        float s2 = std::sin(lx * 0.036f) * (3.2f + 1.6f * std::min(diff, 2.5f));
+        float s3 = std::sin(lx * 0.082f) * 0.55f;
+        return (s1 + s2 + s3) * ramp;
     }
 
     // Default Countryside: Signature progressive Hill Climb course with increasing slopes and technical humps

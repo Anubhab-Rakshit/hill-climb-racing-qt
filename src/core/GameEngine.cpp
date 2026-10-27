@@ -14,6 +14,10 @@ GameEngine::GameEngine(QWidget* parent)
     resize(UI::Theme::VIRTUAL_WIDTH, UI::Theme::VIRTUAL_HEIGHT); // 1:1 Pixel-perfect native window size (zero scaling cost)
     setCentralWidget(m_canvas);
 
+    m_input.setOnKeyTyped([this](int key, const std::string& text) {
+        m_stateManager.onKeyTyped(key, text);
+    });
+
     connect(&m_tickTimer, &QTimer::timeout, this, &GameEngine::onTick);
 }
 

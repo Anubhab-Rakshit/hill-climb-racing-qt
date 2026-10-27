@@ -33,20 +33,20 @@ public:
     void render(Graphics::Framebuffer& fb, const Core::ProfileManager& profile);
 
     int currentPage() const { return m_page; }
-    void setPage(int p) { m_page = (p < 0) ? 0 : (p > 1) ? 1 : p; }
+    void setPage(int p) { m_page = (p < 0) ? 0 : (p > 2) ? 2 : p; }
 
 private:
     int m_width;
     int m_height;
     float m_animTime;
-    int m_page; // 0 = stages 0..2, 1 = stages 3..5
+    int m_page; // 0 = stages 0..2, 1 = stages 3..5, 2 = stages 6..8
 
     RetroButton m_btnBack;
     RetroButton m_btnPrevPage;
     RetroButton m_btnNextPage;
 
-    // 6 Stage Select Buttons
-    RetroButton m_btnStageAction[6];
+    // 9 Stage Select Buttons
+    RetroButton m_btnStageAction[9];
 
     std::function<void(const std::string& stageId)> m_onSelectStage;
 

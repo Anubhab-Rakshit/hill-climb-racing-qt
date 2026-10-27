@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "PhysicsTypes.h"
 #include "Terrain.h"
@@ -31,6 +31,7 @@ public:
 
     // Chassis Telemetry
     const Vec2& chassisPos() const { return m_chassisPos; }
+    const Vec2& prevChassisPos() const { return m_prevChassisPos; }
     const Vec2& chassisVel() const { return m_chassisVel; }
     float chassisAngle() const { return m_chassisAngle; }
     float chassisAngularVel() const { return m_chassisAngularVel; }
@@ -81,6 +82,24 @@ public:
     bool isDriverDown() const { return m_driverDown; }
     bool isOutOfFuel() const { return m_fuel <= 0.0f; }
     bool isLowFuel() const { return m_fuel < 25.0f; }
+
+    // Runtime Tuning Parameters (Developer Mode)
+    void setCustomGravity(float g) { m_customGravity = g; }
+    float customGravity() const { return m_customGravity; }
+    void setSuspStiffnessMultiplier(float m) { m_suspStiffnessMultiplier = m; }
+    float suspStiffnessMultiplier() const { return m_suspStiffnessMultiplier; }
+    void setSuspDampingMultiplier(float m) { m_suspDampingMultiplier = m; }
+    float suspDampingMultiplier() const { return m_suspDampingMultiplier; }
+    void setCustomTorqueMultiplier(float m) { m_customTorqueMultiplier = m; }
+    float customTorqueMultiplier() const { return m_customTorqueMultiplier; }
+    void setCustomFrictionMultiplier(float m) { m_customFrictionMultiplier = m; }
+    float customFrictionMultiplier() const { return m_customFrictionMultiplier; }
+    void setCustomAirGyroMultiplier(float m) { m_customAirGyroMultiplier = m; }
+    float customAirGyroMultiplier() const { return m_customAirGyroMultiplier; }
+    void setFuelBurnMultiplier(float m) { m_fuelBurnMultiplier = m; }
+    float fuelBurnMultiplier() const { return m_fuelBurnMultiplier; }
+    void setInfiniteFuel(bool inf) { m_infiniteFuel = inf; }
+    bool isInfiniteFuel() const { return m_infiniteFuel; }
 
     float getMaxTerrainPenetration(const Terrain& terrain) const;
 
@@ -189,6 +208,16 @@ private:
     float m_prevDriverHeadAngle = 0.0f;
     float m_prevDriverHeadShiftY = 0.0f;
     float m_brakePressure = 0.0f;
+
+    // Live Tuning Variables (Dev Mode)
+    float m_customGravity = -9.81f;
+    float m_suspStiffnessMultiplier = 1.0f;
+    float m_suspDampingMultiplier = 1.0f;
+    float m_customTorqueMultiplier = 1.0f;
+    float m_customFrictionMultiplier = 1.0f;
+    float m_customAirGyroMultiplier = 1.0f;
+    float m_fuelBurnMultiplier = 1.0f;
+    bool m_infiniteFuel = false;
 
     void applyConfig();
 };

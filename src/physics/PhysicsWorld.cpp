@@ -31,6 +31,54 @@ PhysicsWorld::PhysicsWorld()
 {
 }
 
+void PhysicsWorld::setCustomGravity(float g) {
+    m_customGravity = g;
+    m_vehicle.setCustomGravity(g);
+    m_vehicle2.setCustomGravity(g);
+}
+
+void PhysicsWorld::setSuspStiffnessMultiplier(float m) {
+    m_suspStiffnessMult = m;
+    m_vehicle.setSuspStiffnessMultiplier(m);
+    m_vehicle2.setSuspStiffnessMultiplier(m);
+}
+
+void PhysicsWorld::setSuspDampingMultiplier(float m) {
+    m_suspDampingMult = m;
+    m_vehicle.setSuspDampingMultiplier(m);
+    m_vehicle2.setSuspDampingMultiplier(m);
+}
+
+void PhysicsWorld::setCustomTorqueMultiplier(float m) {
+    m_customTorqueMult = m;
+    m_vehicle.setCustomTorqueMultiplier(m);
+    m_vehicle2.setCustomTorqueMultiplier(m);
+}
+
+void PhysicsWorld::setCustomFrictionMultiplier(float m) {
+    m_customFrictionMult = m;
+    m_vehicle.setCustomFrictionMultiplier(m);
+    m_vehicle2.setCustomFrictionMultiplier(m);
+}
+
+void PhysicsWorld::setCustomAirGyroMultiplier(float m) {
+    m_customAirGyroMult = m;
+    m_vehicle.setCustomAirGyroMultiplier(m);
+    m_vehicle2.setCustomAirGyroMultiplier(m);
+}
+
+void PhysicsWorld::setFuelBurnMultiplier(float m) {
+    m_fuelBurnMult = m;
+    m_vehicle.setFuelBurnMultiplier(m);
+    m_vehicle2.setFuelBurnMultiplier(m);
+}
+
+void PhysicsWorld::setInfiniteFuel(bool inf) {
+    m_infiniteFuel = inf;
+    m_vehicle.setInfiniteFuel(inf);
+    m_vehicle2.setInfiniteFuel(inf);
+}
+
 void PhysicsWorld::reset(const std::string& biomeId,
                          VehicleType vehicleType,
                          DriverType driverType,
@@ -48,6 +96,14 @@ void PhysicsWorld::reset(const std::string& biomeId,
     m_vehicle.setDriverType(driverType);
     float restY1 = groundY1 + m_vehicle.suspRestLength() + m_vehicle.wheelRadius() - m_vehicle.rearMountOffset().y;
     m_vehicle.reset(startX1, restY1);
+    m_vehicle.setCustomGravity(m_customGravity);
+    m_vehicle.setSuspStiffnessMultiplier(m_suspStiffnessMult);
+    m_vehicle.setSuspDampingMultiplier(m_suspDampingMult);
+    m_vehicle.setCustomTorqueMultiplier(m_customTorqueMult);
+    m_vehicle.setCustomFrictionMultiplier(m_customFrictionMult);
+    m_vehicle.setCustomAirGyroMultiplier(m_customAirGyroMult);
+    m_vehicle.setFuelBurnMultiplier(m_fuelBurnMult);
+    m_vehicle.setInfiniteFuel(m_infiniteFuel);
 
     m_distance = 0.0f;
     m_coinsCollected = 0;
@@ -69,6 +125,14 @@ void PhysicsWorld::reset(const std::string& biomeId,
         m_vehicle2.setDriverType(driverType2);
         float restY2 = groundY2 + m_vehicle2.suspRestLength() + m_vehicle2.wheelRadius() - m_vehicle2.rearMountOffset().y;
         m_vehicle2.reset(startX2, restY2);
+        m_vehicle2.setCustomGravity(m_customGravity);
+        m_vehicle2.setSuspStiffnessMultiplier(m_suspStiffnessMult);
+        m_vehicle2.setSuspDampingMultiplier(m_suspDampingMult);
+        m_vehicle2.setCustomTorqueMultiplier(m_customTorqueMult);
+        m_vehicle2.setCustomFrictionMultiplier(m_customFrictionMult);
+        m_vehicle2.setCustomAirGyroMultiplier(m_customAirGyroMult);
+        m_vehicle2.setFuelBurnMultiplier(m_fuelBurnMult);
+        m_vehicle2.setInfiniteFuel(m_infiniteFuel);
 
         m_distance2 = 0.0f;
         m_flips2 = 0;
@@ -207,7 +271,21 @@ void PhysicsWorld::step(float dt, const Core::ProfileManager& profile) {
 }
 
 void PhysicsWorld::updateMultiplayerRules() {
-    const float FINISH_DISTANCE = 1500.0f;
+    const float FINISH_DISTANCE = m_finishDistance;
+
+    // Slipstream / Rubberbanding Catch-up Logic
+    if (m_rubberbandingEnabled && m_winner == 0) {
+        if (m_distance < m_distance2 - 25.0f) {
+            m_vehicle.setCustomTorqueMultiplier(m_customTorqueMult * 1.25f);
+            m_vehicle2.setCustomTorqueMultiplier(m_customTorqueMult);
+        } else if (m_distance2 < m_distance - 25.0f) {
+            m_vehicle2.setCustomTorqueMultiplier(m_customTorqueMult * 1.25f);
+            m_vehicle.setCustomTorqueMultiplier(m_customTorqueMult);
+        } else {
+            m_vehicle.setCustomTorqueMultiplier(m_customTorqueMult);
+            m_vehicle2.setCustomTorqueMultiplier(m_customTorqueMult);
+        }
+    }
 
     // Check finish line crossing
     if (m_distance >= FINISH_DISTANCE && m_winner == 0) {
@@ -279,18 +357,46 @@ void PhysicsWorld::checkItemCollisions() {
 
 void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
     Vec2 carPos = veh.chassisPos();
+    Vec2 rwPos = veh.rearWheelPos();
+    Vec2 fwPos = veh.frontWheelPos();
+    float rwR = veh.rearWheelRadius();
+    float fwR = veh.frontWheelRadius();
     auto& items = m_terrain.getItems();
+
+    // Swept bounding envelope incorporating vehicle wheelbase and trajectory step
+    float minCarX = std::min({carPos.x, rwPos.x, fwPos.x, veh.prevChassisPos().x}) - 2.4f;
+    float maxCarX = std::max({carPos.x, rwPos.x, fwPos.x, veh.prevChassisPos().x}) + 2.4f;
 
     for (size_t i = 0; i < items.size(); ++i) {
         if (items[i].collected) continue;
-        if (std::abs(items[i].position.x - carPos.x) > 2.8f) continue;
+        float ix = items[i].position.x;
+        float iy = items[i].position.y;
+        if (ix < minCarX || ix > maxCarX) continue;
 
-        float dx = items[i].position.x - carPos.x;
-        float dy = items[i].position.y - carPos.y;
-        float distSq = dx * dx + dy * dy;
+        // Proximity checks against:
+        // 1. Chassis center (radius 3.0m)
+        float dxC = ix - carPos.x;
+        float dyC = iy - carPos.y;
+        bool hitChassis = (dxC * dxC + dyC * dyC) < (3.0f * 3.0f);
 
-        // Collection radius: 2.2 meters
-        if (distSq < 2.2f * 2.2f) {
+        // 2. Rear Wheel (radius = wheel radius + 1.8m)
+        float dxR = ix - rwPos.x;
+        float dyR = iy - rwPos.y;
+        float rR = rwR + 1.8f;
+        bool hitRear = (dxR * dxR + dyR * dyR) < (rR * rR);
+
+        // 3. Front Wheel (radius = wheel radius + 1.8m)
+        float dxF = ix - fwPos.x;
+        float dyF = iy - fwPos.y;
+        float rF = fwR + 1.8f;
+        bool hitFront = (dxF * dxF + dyF * dyF) < (rF * rF);
+
+        // 4. Vehicle bounding box (catches items rolling directly under chassis or in swept area)
+        float minY = std::min({rwPos.y - rwR, fwPos.y - fwR, carPos.y - 1.2f}) - 0.8f;
+        float maxY = std::max({carPos.y + 2.4f, rwPos.y + 2.0f, fwPos.y + 2.0f});
+        bool hitBox = (ix >= minCarX && ix <= maxCarX && iy >= minY && iy <= maxY);
+
+        if (hitChassis || hitRear || hitFront || hitBox) {
             items[i].collected = true;
 
             if (items[i].type == ItemType::FUEL_CANISTER) {
@@ -318,6 +424,21 @@ void PhysicsWorld::checkCheckpoints() {
             if (m_onCheckpoint) {
                 m_onCheckpoint(cp);
             }
+        }
+    }
+
+    // Trophy Competition Finish Line
+    if (carX >= m_finishDistance && !m_gameOver && m_finishDistance < 90000.0f) {
+        m_gameOver = true;
+        m_gameOverReason = "FINISH LINE!";
+        CheckpointInfo finishCp;
+        finishCp.name = "TROPHY FINISH LINE!";
+        finishCp.index = 99;
+        finishCp.distance = m_finishDistance;
+        finishCp.coinReward = 2500;
+        finishCp.isFinishLine = true;
+        if (m_onCheckpoint) {
+            m_onCheckpoint(finishCp);
         }
     }
 }

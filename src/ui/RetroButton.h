@@ -44,6 +44,7 @@ public:
     bool isHovered() const { return m_hovered; }
     bool isPressed() const { return m_pressed; }
     void setPressed(bool p) { m_pressed = p; }
+    void triggerClick() { if (m_onClick && m_enabled) m_onClick(); }
 
 private:
     int m_x;

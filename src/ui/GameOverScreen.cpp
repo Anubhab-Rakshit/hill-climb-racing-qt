@@ -2,6 +2,7 @@
 #include "RasterFont.h"
 #include "UITheme.h"
 #include "UIComponents.h"
+#include "LocalizationManager.h"
 #include <iomanip>
 #include <sstream>
 
@@ -103,8 +104,20 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
     int cx = m_width / 2;
 
     // Header Title (e.g. "DRIVER DOWN!" or "OUT OF FUEL!")
-    Graphics::RasterFont::drawStringCentered(fb, cx + 2, boxY + 20, m_reason, 0xFF05080E, 3);
-    Graphics::RasterFont::drawStringCentered(fb, cx, boxY + 18, m_reason, stripeCol, 3);
+    std::string dispReason = m_reason;
+    if (Core::LocalizationManager::instance().isBengali()) {
+        if (m_reason.find("FUEL") != std::string::npos) {
+            dispReason = "TEL SHESH! GARI BONDHO";
+        } else if (m_reason.find("DRIVER") != std::string::npos) {
+            dispReason = "GHAR MOTKE GECHE! (CRASH)";
+        } else if (m_reason.find("FINISH") != std::string::npos) {
+            dispReason = "JAI HIND! FINISH LINE!";
+        } else {
+            dispReason = "GARI DHOBA! KHELA SHESH";
+        }
+    }
+    Graphics::RasterFont::drawStringCentered(fb, cx + 2, boxY + 20, dispReason, 0xFF05080E, 3);
+    Graphics::RasterFont::drawStringCentered(fb, cx, boxY + 18, dispReason, stripeCol, 3);
 
     // Performance Medal Tier Calculation
     std::string medalTitle = "ROOKIE";

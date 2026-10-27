@@ -1,5 +1,6 @@
 #include "Sprite.h"
 #include "VehicleSprites.h"
+#include "NetworkTypes.h"
 #include "UITheme.h"
 #include <cmath>
 #include <algorithm>
@@ -194,6 +195,54 @@ void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Phy
     }
 
     // 6. Render Pixel-Art Chassis Body (Drawn on top so wheels sit inside wheel arches)
+    blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale);
+}
+
+void SpriteRenderer::renderRemoteVehicle(Framebuffer& fb, const Camera& cam, const Network::RemotePlayerState& state) {
+    ensureLoaded();
+
+    Physics::VehicleType vType = static_cast<Physics::VehicleType>(state.vehicleType);
+    const auto& config = Physics::VehicleRegistry::getConfig(vType);
+    const QImage& chassisImg = VehicleSprites::getChassisSprite(vType);
+    const QImage& wheelImg = VehicleSprites::getWheelSprite(vType);
+
+    float zoom = cam.zoom();
+    float spriteScale = zoom / 80.25f;
+
+    Physics::Vec2 cPos(state.posX, state.posY);
+    float angle = state.chassisAngle;
+    Physics::Vec2 chassisScr = cam.worldToScreen(cPos);
+    float screenChassisAngle = -angle;
+
+    auto chassisPointToWorld = [&](const Physics::Vec2& local) -> Physics::Vec2 {
+        float cosW = std::cos(angle);
+        float sinW = std::sin(angle);
+        return {cPos.x + (local.x * cosW - local.y * sinW),
+                cPos.y + (local.x * sinW + local.y * cosW)};
+    };
+
+    Physics::Vec2 rearMountScr = cam.worldToScreen(chassisPointToWorld(config.rearMountOffset));
+    Physics::Vec2 frontMountScr = cam.worldToScreen(chassisPointToWorld(config.frontMountOffset));
+
+    Physics::Vec2 rearWheelScr(rearMountScr.x, rearMountScr.y + state.rearSuspLen * zoom);
+    Physics::Vec2 frontWheelScr(frontMountScr.x, frontMountScr.y + state.frontSuspLen * zoom);
+
+    // Colored Under-glow Aura in player's custom color!
+    fb.fillCircle(static_cast<int>(chassisScr.x), static_cast<int>(chassisScr.y + 12), 22, (state.color & 0x00FFFFFF) | 0x44000000);
+
+    // Draw suspension struts
+    fb.drawLine(static_cast<int>(rearMountScr.x), static_cast<int>(rearMountScr.y),
+                static_cast<int>(rearWheelScr.x), static_cast<int>(rearWheelScr.y), 0xFFB0BEC5);
+    fb.drawLine(static_cast<int>(frontMountScr.x), static_cast<int>(frontMountScr.y),
+                static_cast<int>(frontWheelScr.x), static_cast<int>(frontWheelScr.y), 0xFFB0BEC5);
+
+    // Render Wheels
+    float wheelScale = (config.wheelRadius * zoom) / config.wheelSpriteRadius;
+    float wheelAnchor = wheelImg.width() * 0.5f;
+    blitRotated(fb, wheelImg, rearWheelScr.x, rearWheelScr.y, wheelAnchor, wheelAnchor, -state.rearWheelAngle, wheelScale);
+    blitRotated(fb, wheelImg, frontWheelScr.x, frontWheelScr.y, wheelAnchor, wheelAnchor, -state.frontWheelAngle, wheelScale);
+
+    // Render Chassis
     blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale);
 }
 

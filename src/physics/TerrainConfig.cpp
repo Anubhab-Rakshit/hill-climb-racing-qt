@@ -153,7 +153,82 @@ static const std::vector<BiomeSpec> s_biomes = {
             {2, 550.0f, "MAGMA VENT STEPS", "Thermal Shock Rises", 2500, false},
             {3, 900.0f, "CALDERA ASCENT", "Steep Heavy-Gravity Walls", 3800, false},
             {4, 1300.0f, "SULPHUR ESCARPMENT", "Irregular Basalt Ledges", 5000, false},
-            {5, 1750.0f, "INFERNO CONQUERED", "Ultimate Hill Climb Master!", 15000, true}
+            {5, 1750.0f, "INFERNO CONQUERED", "Volcano Mastered!", 12000, true}
+        }
+    },
+
+    // 7. NEON HIGHWAY (Synthwave Cyberpunk Grid)
+    {
+        "neon",
+        "NEON HIGHWAY",
+        "Cyberpunk Synthwave Grid & Glowing Speed Launchpads",
+        "super_countryside",
+        6000,
+        9.81f,  // 1.0G
+        1.35f,  // High-grip synth track
+        0.90f,
+        1.25f,
+        1.10f,
+        // Sky & Parallax Colors
+        0xFF120024, 0xFF4A0E4E, 0xFF240038,
+        // Surface & Strata Colors (Glowing Neon Cyan, Vibrant Pink, Deep Synth Violet)
+        0xFF00E5FF, 0xFFFF007F, 0xFF7928CA, 0xFF1F0038, 0xFF0A0014,
+        {
+            {1, 250.0f, "CYBER GRID ENTRY", "Laser-Etched Highway", 1500, false},
+            {2, 550.0f, "SYNTHWAVE RAMPS", "Glowing Hyperspace Launchers", 2500, false},
+            {3, 900.0f, "DIGITAL CHASM", "High-Voltage Overpass", 3800, false},
+            {4, 1300.0f, "NEON PEAK SKYLINE", "Downtown Cyber Ascent", 5000, false},
+            {5, 1750.0f, "GRID FINALE", "Neon Grand Champion!", 14000, true}
+        }
+    },
+
+    // 8. SUPER COUNTRYSIDE (Colossal Roller-Coaster Hills & Super Jumps)
+    {
+        "super_countryside",
+        "SUPER COUNTRYSIDE",
+        "Colossal Roller-Coaster Hills & Mega Launch Ramps",
+        "seasons",
+        8500,
+        9.81f,  // 1.0G
+        1.30f,  // High-traction engineered turf
+        1.00f,
+        1.65f,  // Giant amplitude!
+        0.92f,  // Huge rolling wavelengths
+        // Sky & Parallax Colors
+        0xFF0288D1, 0xFF81D4FA, 0xFF1B5E20,
+        // Surface & Strata Colors
+        0xFFB9F6CA, 0xFF00E676, 0xFF00C853, 0xFF4E342E, 0xFF271C19,
+        {
+            {1, 250.0f, "MEGA RIDGE ENTRY", "High-Amplitude Hill Rise", 1800, false},
+            {2, 550.0f, "SUPER LAUNCH RAMP", "Massive 80m Aerial Clears", 3000, false},
+            {3, 900.0f, "DOUBLE CREST VALLEY", "Roller-Coaster G-Force Dips", 4500, false},
+            {4, 1300.0f, "THE GIANT WALL", "Extreme 50-Degree Incline", 6000, false},
+            {5, 1750.0f, "SUPER COUNTRYSIDE CLEARED", "King of the Hills!", 18000, true}
+        }
+    },
+
+    // 9. CHANGING SEASONS (Spring, Summer, Autumn & Icy Winter)
+    {
+        "seasons",
+        "CHANGING SEASONS",
+        "Dynamic 4-Season Journey: Spring, Summer, Autumn & Icy Winter",
+        "",     // Grand finale track!
+        12000,
+        9.81f,  // 1.0G
+        1.15f,  // Balanced multi-season traction
+        1.05f,
+        1.35f,
+        1.05f,
+        // Sky & Parallax Colors
+        0xFF37474F, 0xFFECEFF1, 0xFF455A64,
+        // Surface & Strata Colors
+        0xFFFFFFFF, 0xFF81C784, 0xFFFFB74D, 0xFF5D4037, 0xFF263238,
+        {
+            {1, 500.0f, "SPRING BLOSSOMS", "Fresh Green Meadows", 2000, false},
+            {2, 1000.0f, "SUMMER GLOW", "Sun-Drenched Golden Dunes", 3500, false},
+            {3, 1500.0f, "AUTUMN WINDS", "Amber Forest Leaves & Slick Mud", 5500, false},
+            {4, 2000.0f, "WINTER BLIZZARD", "Frozen Peaks & Slippery Ice", 8000, false},
+            {5, 2500.0f, "FOUR SEASONS MASTER", "Eternal Grand Prix Legend!", 25000, true}
         }
     }
 };

@@ -1,4 +1,4 @@
-﻿#define _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
 #include "Vehicle.h"
 #include <cmath>
 #include <algorithm>
@@ -185,11 +185,13 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     // Braking with throttle released: no fuel consumption.
     // Throttle / Reverse pressed: consume fuel at a calibrated rate matching distance traveled per tank.
     float activeThrottle = std::max(effectiveGas, effectiveReverse);
-    if (!m_driverDown && m_fuel > 0.0f && activeThrottle > 0.0f) {
+    if (m_infiniteFuel) {
+        m_fuel = 100.0f;
+    } else if (!m_driverDown && m_fuel > 0.0f && activeThrottle > 0.0f) {
         float speedRatio = std::clamp(getSpeedKmh() / (m_config.baseTopSpeedKmh * transMult), 0.0f, 1.2f);
         float slope = terrain.getSlope(m_chassisPos.x);
         float load = std::clamp(0.6f + std::abs(slope) * 1.5f + (1.0f - speedRatio * 0.35f), 0.5f, 1.5f);
-        float drainRate = activeThrottle * (3.3f + 0.9f * load) * 0.60f;
+        float drainRate = activeThrottle * (3.3f + 0.9f * load) * 0.60f * m_fuelBurnMultiplier;
         m_fuel = std::max(0.0f, m_fuel - drainRate * dt);
     }
 
@@ -197,7 +199,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     m_chassisMass = m_config.mass * chassisMassMult;
     m_chassisInertia = m_config.inertia * chassisMassMult;
 
-    float gravity = terrain.getGravity();
+    float gravity = (m_customGravity < -0.1f) ? -m_customGravity : terrain.getGravity();
     Vec2 gravForce(0.0f, -gravity * m_chassisMass);
 
     // Chassis local orientation
@@ -222,8 +224,8 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
     m_chassisVel += downDir * (downforceMag / m_chassisMass) * dt;
 
     // 2. Calibrated Ground-Hugging Suspension & Traction Solver
-    float k_susp = m_config.baseSpringRate * suspStiffnessMult;
-    float c_susp = m_config.baseDamperRate * std::sqrt(suspStiffnessMult);
+    float k_susp = m_config.baseSpringRate * suspStiffnessMult * m_suspStiffnessMultiplier;
+    float c_susp = m_config.baseDamperRate * std::sqrt(suspStiffnessMult) * m_suspDampingMultiplier;
 
     auto solveWheel = [&](const Vec2& mount, float& suspLen, float& suspVel,
                           Vec2& wheelPos, Vec2& wheelVel,
@@ -307,7 +309,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             wheelVel = mountVel + downDir * (-v_comp);
 
             // Drive Torque, Braking, and Calibrated Pacing (Scaled for 60% physical velocity)
-            float peakTorque = m_config.basePeakTorque * torqueMult * 0.72f;
+            float peakTorque = m_config.basePeakTorque * torqueMult * 0.72f * m_customTorqueMultiplier;
             float topSpeedMs = (m_config.baseTopSpeedKmh * transMult) / (3.6f * SPEED_CALIBRATION);
             float maxDriveOmega = (m_wheelRadius > 0.001f) ? (topSpeedMs / m_wheelRadius) : 100.0f;
             float currentOmega = std::max(0.0f, wheelAngVel);
@@ -347,7 +349,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             float targetOmega = (m_wheelRadius > 0.001f) ? (surfSpeed / m_wheelRadius) : 0.0f;
 
             float normalForce = suspForceMag + m_wheelMass * gravity * std::max(0.3f, normal.y);
-            float maxFriction = std::max(300.0f, normalForce * terrain.getFriction() * m_config.baseGrip * tireGripMult * 1.35f);
+            float maxFriction = std::max(300.0f, normalForce * terrain.getFriction() * m_config.baseGrip * tireGripMult * 1.35f * m_customFrictionMultiplier);
 
             // Unified Physics-Based Braking & Traction Model
             // Deceleration is generated entirely through tyre-ground contact forces (tractiveForce)
@@ -564,7 +566,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
 
     // 3. Stunt & In-Air Pitch Controls
     if (!m_rearContact && !m_frontContact) {
-        float airPitchTorque = 780.0f * m_config.baseAirAgility * downforceMult;
+        float airPitchTorque = 780.0f * m_config.baseAirAgility * downforceMult * m_customAirGyroMultiplier;
         float pitchBack = std::max(effectiveGas, m_tiltLeftInput);
         float pitchForward = std::max(effectiveBrake, m_tiltRightInput);
         if (pitchBack > 0.0f) {
@@ -573,19 +575,30 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
         if (pitchForward > 0.0f) {
             m_chassisAngularVel -= (airPitchTorque * pitchForward / m_chassisInertia) * dt;
         }
-    } else if (m_rearContact && !m_frontContact) {
-        if (m_chassisAngle > 0.40f && m_chassisAngularVel > 0.0f) {
-            m_chassisAngularVel *= std::max(0.0f, 1.0f - 10.0f * dt);
+    } else {
+        // Dynamic Weight Transfer (Poki/Fingersoft authentic squat & dive)
+        if (effectiveGas > 0.05f) {
+            float squatTorque = 360.0f * effectiveGas * m_customTorqueMultiplier;
+            m_chassisAngularVel += (squatTorque / m_chassisInertia) * dt;
+        } else if (effectiveBrake > 0.05f && getSpeedKmh() > 2.0f) {
+            float diveTorque = -420.0f * effectiveBrake;
+            m_chassisAngularVel += (diveTorque / m_chassisInertia) * dt;
         }
-        if (m_chassisAngle > 0.55f) {
-            m_chassisAngularVel -= (850.0f * (m_chassisAngle - 0.55f) / m_chassisInertia) * dt;
-        }
-        if (effectiveBrake > 0.0f) {
-            m_chassisAngularVel -= (1000.0f * effectiveBrake / m_chassisInertia) * dt;
-        }
-    } else if (!m_rearContact && m_frontContact) {
-        if (effectiveGas > 0.0f) {
-            m_chassisAngularVel += (650.0f * effectiveGas / m_chassisInertia) * dt;
+
+        if (m_rearContact && !m_frontContact) {
+            if (m_chassisAngle > 0.40f && m_chassisAngularVel > 0.0f) {
+                m_chassisAngularVel *= std::max(0.0f, 1.0f - 10.0f * dt);
+            }
+            if (m_chassisAngle > 0.55f) {
+                m_chassisAngularVel -= (850.0f * (m_chassisAngle - 0.55f) / m_chassisInertia) * dt;
+            }
+            if (effectiveBrake > 0.0f) {
+                m_chassisAngularVel -= (1000.0f * effectiveBrake / m_chassisInertia) * dt;
+            }
+        } else if (!m_rearContact && m_frontContact) {
+            if (effectiveGas > 0.0f) {
+                m_chassisAngularVel += (650.0f * effectiveGas / m_chassisInertia) * dt;
+            }
         }
     }
 

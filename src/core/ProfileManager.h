@@ -106,6 +106,10 @@ public:
     float sfxVolume() const { return m_sfxVolume; }
     void setSfxVolume(float vol) { m_sfxVolume = std::clamp(vol, 0.0f, 1.0f); save(); }
 
+    // Evaluator / Sandbox Showcase Mode
+    bool isEvaluatorMode() const { return m_isEvaluatorMode; }
+    void setEvaluatorMode(bool b);
+
     // Serialization
     void load();
     void save() const;
@@ -114,6 +118,7 @@ private:
     int m_coins;
     Physics::VehicleType m_selectedVehicle;
     Physics::DriverType m_selectedDriver;
+    bool m_isEvaluatorMode = false;
 
     float m_masterVolume = 1.0f;
     float m_musicVolume = 0.75f;

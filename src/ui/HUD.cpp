@@ -2,6 +2,7 @@
 #include "RasterFont.h"
 #include "UITheme.h"
 #include "UIComponents.h"
+#include "LocalizationManager.h"
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
@@ -237,12 +238,17 @@ void HUD::render(Graphics::Framebuffer& fb) {
     std::snprintf(distBuf, sizeof(distBuf), "%05dm", distInt);
 
     Graphics::RasterFont::drawString(fb, distCardX + 12, distCardY + 6, "DIST", Theme::TEXT_MUTED, 1);
-    Graphics::RasterFont::drawString(fb, distCardX + 48, distCardY + 5, distBuf, Theme::TEXT_WHITE, 2);
+    Graphics::RasterFont::drawString(fb, distCardX + 46, distCardY + 5, distBuf, Theme::TEXT_WHITE, 2);
+
+    int spdInt = static_cast<int>(m_speedometer.currentValue());
+    char spdBuf[32];
+    std::snprintf(spdBuf, sizeof(spdBuf), "%3d KM/H", spdInt);
+    Graphics::RasterFont::drawString(fb, distCardX + 138, distCardY + 7, spdBuf, Theme::CYAN_UPGRADE, 1);
 
     int recInt = static_cast<int>(m_recordDistance);
     char recBuf[32];
     std::snprintf(recBuf, sizeof(recBuf), "REC %04dm", recInt);
-    Graphics::RasterFont::drawString(fb, distCardX + 210, distCardY + 7, recBuf, Theme::GOLD, 1);
+    Graphics::RasterFont::drawString(fb, distCardX + 224, distCardY + 7, recBuf, Theme::GOLD, 1);
 
     // Mini Rally Stage Progress Track Line
     int trackX = distCardX + 12;
@@ -317,16 +323,21 @@ void HUD::render(Graphics::Framebuffer& fb) {
     m_tachometer.render(fb);
 
     // 7. Bottom Corners: Authentic Arcade Racing Pedals with Metallic Grip Textures & LED Halos
+    bool isBn = Core::LocalizationManager::instance().isBengali();
+    std::string brakeText = isBn ? "THAMO" : "BRAKE";
+    std::string revText = isBn ? "PECHHONE" : "REVERSE";
+    std::string gasText = isBn ? "CHALAO" : "GAS";
+
     drawArcadeRacingPedal(fb, 24, m_height - 95, 115, 80,
-                         "BRAKE", "[A]", Theme::RED_BRAKE,
+                         brakeText, "[A]", Theme::RED_BRAKE,
                          m_brakePedal.isPressed(), m_brakePedal.isHovered(), 0);
 
     drawArcadeRacingPedal(fb, 148, m_height - 95, 115, 80,
-                         "REVERSE", "[S]", 0xFFFF6D00,
+                         revText, "[S]", 0xFFFF6D00,
                          m_reversePedal.isPressed(), m_reversePedal.isHovered(), 1);
 
     drawArcadeRacingPedal(fb, m_width - 139, m_height - 95, 115, 80,
-                         "GAS", "[D]", Theme::GREEN_GAS,
+                         gasText, "[D]", Theme::GREEN_GAS,
                          m_gasPedal.isPressed(), m_gasPedal.isHovered(), 2);
 
     // 8. Stunt Notifications Banner (Top-Center floating)

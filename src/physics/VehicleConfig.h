@@ -18,6 +18,8 @@ enum class VehicleType {
     FORMULA_RACER,          // 8. Formula Racing Car
     MUSCLE_CAR,             // 9. Retro Muscle Car
     ELECTRIC_OFFROADER,     // 10. Futuristic Electric Off-Roader
+    MOTOCROSS_BIKE,         // 11. Agile Motocross Dirtbike
+    QUAD_BIKE,              // 12. All-Terrain Quad Bike / ATV
     COUNT,
 
     // Backward-compatibility alias

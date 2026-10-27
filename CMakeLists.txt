@@ -12,8 +12,8 @@ else()
 endif()
 
 # Find Qt packages (Supports both Qt 6 and Qt 5 seamlessly)
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Multimedia)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Multimedia)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Multimedia Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Multimedia Network)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -26,6 +26,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/physics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/network
 )
 
 set(SOURCES
@@ -35,6 +36,11 @@ set(SOURCES
     src/core/GameStateManager.cpp
     src/core/InputController.cpp
     src/core/ProfileManager.cpp
+    src/core/AccountManager.cpp
+    src/core/LocalizationManager.cpp
+    # Networking
+    src/network/GameServer.cpp
+    src/network/GameClient.cpp
     # Graphics & Software Rasterizer
     src/graphics/Framebuffer.cpp
     src/graphics/PixelCanvas.cpp
@@ -63,6 +69,12 @@ set(SOURCES
     src/ui/PauseOverlay.cpp
     src/ui/GameOverScreen.cpp
     src/ui/UIComponents.cpp
+    src/ui/AccountScreen.cpp
+    src/ui/LobbyScreen.cpp
+    src/ui/ChallengeScreen.cpp
+    src/ui/EvaluatorOverlay.cpp
+    src/ui/MinimapRadar.cpp
+    src/ui/DeveloperOverlay.cpp
     # Audio
     src/audio/SoundManager.cpp
     # Vehicle & Driver Pixel Sprites
@@ -77,6 +89,11 @@ set(HEADERS
     src/core/GameStateManager.h
     src/core/InputController.h
     src/core/ProfileManager.h
+    src/core/AccountManager.h
+    src/core/LocalizationManager.h
+    src/network/NetworkTypes.h
+    src/network/GameServer.h
+    src/network/GameClient.h
     src/graphics/Framebuffer.h
     src/graphics/PixelCanvas.h
     src/graphics/RasterFont.h
@@ -105,6 +122,12 @@ set(HEADERS
     src/ui/StageSelectScreen.h
     src/ui/PauseOverlay.h
     src/ui/GameOverScreen.h
+    src/ui/AccountScreen.h
+    src/ui/LobbyScreen.h
+    src/ui/ChallengeScreen.h
+    src/ui/EvaluatorOverlay.h
+    src/ui/MinimapRadar.h
+    src/ui/DeveloperOverlay.h
     src/audio/SoundManager.h
 )
 
@@ -115,4 +138,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt${QT_VERSION_MAJOR}::Gui
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Multimedia
+    Qt${QT_VERSION_MAJOR}::Network
 )

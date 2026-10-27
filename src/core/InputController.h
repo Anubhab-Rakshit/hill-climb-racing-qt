@@ -55,10 +55,13 @@ public:
     const State& state() const { return m_state; }
     State& state() { return m_state; }
 
+    void setOnKeyTyped(std::function<void(int key, const std::string& text)> cb) { m_keyTypedCallback = cb; }
+
     void resetTransientActions();
 
 private:
     State m_state;
+    std::function<void(int, const std::string&)> m_keyTypedCallback;
 
     void updateCombinedInputs();
 };

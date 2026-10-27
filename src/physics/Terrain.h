@@ -62,6 +62,15 @@ public:
     void resetDeformation();
 
     float getFriction() const { return m_friction; }
+    float getFrictionAt(float x) const {
+        if (m_biomeId == "seasons") {
+            if (x < 500.0f) return 1.25f;       // Spring: lush turf
+            if (x < 1000.0f) return 1.35f;      // Summer: warm dry soil
+            if (x < 1500.0f) return 0.92f;      // Autumn: wet leaf slick
+            return 0.52f;                       // Winter: slippery glacial ice
+        }
+        return m_friction;
+    }
     void setFriction(float f) { m_friction = f; }
     float getGravity() const { return m_gravity; }
     float getAirDensity() const { return m_airDensity; }

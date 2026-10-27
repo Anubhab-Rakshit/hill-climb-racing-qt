@@ -155,7 +155,7 @@ void AnalogGauge::render(Graphics::Framebuffer& fb) {
     int c = r + 4;
     int rLimitSq = (r + 2) * (r + 2);
 
-    // Fast blit cached static dial face with circular clipping mask
+    // Fast blit cached static dial face with circular clipping mask & alpha blending
     for (int y = 0; y < size; ++y) {
         int targetY = dstY + y;
         if (targetY < 0 || targetY >= fb.height()) continue;
@@ -167,9 +167,15 @@ void AnalogGauge::render(Graphics::Framebuffer& fb) {
             int dx = x - c;
             if (dx * dx + dySq > rLimitSq) continue;
             uint32_t col = srcLine[x];
+            if ((col >> 24) == 0) continue;
             int targetX = dstX + x;
             if (targetX < 0 || targetX >= fb.width()) continue;
-            dstLine[targetX] = col;
+            uint8_t a = (col >> 24) & 0xFF;
+            if (a == 255) {
+                dstLine[targetX] = col;
+            } else {
+                fb.blendPixelFast(targetX, targetY, col);
+            }
         }
     }
 

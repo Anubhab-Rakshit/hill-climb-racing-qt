@@ -27,7 +27,11 @@ namespace Audio {
 enum class MusicTrack {
     NONE = 0,
     MENU,
-    RACE
+    RACE,
+    POKEMON_CHIPTUNE,
+    SOOTHING_PASTORAL,
+    EDGY_SYNTHWAVE,
+    ENERGETIC_ARCADE
 };
 
 /**
@@ -56,6 +60,7 @@ public:
     void playFuelPickup();
     void playStuntCheer();
     void playCrash();
+    void playNeckCrunch();
     void playSoftImpact(float intensity = 1.0f);
     void playHardImpact(float intensity = 1.0f);
     void playLandingSoft(float intensity = 1.0f);
@@ -191,6 +196,11 @@ private:
     // Pre-synthesized PCM buffers for software mixer & headless verification
     std::vector<int16_t> m_bankMenuMusic;
     std::vector<int16_t> m_bankRaceMusic;
+    std::vector<int16_t> m_bankPokemonMusic;
+    std::vector<int16_t> m_bankSoothingMusic;
+    std::vector<int16_t> m_bankEdgyMusic;
+    std::vector<int16_t> m_bankEnergeticMusic;
+    std::vector<int16_t> m_bankNeckCrunch;
     std::vector<int16_t> m_bankEngineTiers[ENGINE_TIER_COUNT];
     std::vector<int16_t> m_bankTyreRoll;
     std::vector<int16_t> m_bankTyreSkidAsphalt;

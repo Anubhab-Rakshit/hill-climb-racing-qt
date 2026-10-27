@@ -359,13 +359,17 @@ SoundManager::~SoundManager() {
     if (m_raceMusicPlayer) m_raceMusicPlayer->stop();
 }
 
-void SoundManager::initProceduralSounds() {
+static QString makeAudioPath(const char* name) {
     QString tmpDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     if (tmpDir.isEmpty()) tmpDir = "/tmp";
+    return tmpDir + QString("/hcr_snd_%1.wav").arg(name);
+}
+
+void SoundManager::initProceduralSounds() {
     const uint32_t SR = 22050;
 
     auto makePath = [&](const char* name) -> QString {
-        return tmpDir + QString("/hcr_snd_%1.wav").arg(name);
+        return makeAudioPath(name);
     };
 
     // Helper PRNG for synthesis fallback
@@ -875,6 +879,132 @@ void SoundManager::initProceduralSounds() {
             m_raceMusicPlayer->setSource(QUrl::fromLocalFile(racePath));
         }
     }
+
+    // 17. Pokemon OG Game Boy 8-bit Chiptune Theme
+    {
+        QString fbPath = makePath("music_pokemon");
+        int count = static_cast<int>(SR * 8.0f);
+        m_bankPokemonMusic.resize(count);
+        float bpm = 136.0f;
+        float beatDur = 60.0f / bpm;
+        // Classic Pokemon Route 1 / Battle Fanfare Melody (Frequencies in Hz)
+        const float pkMelody[16] = {
+            392.00f, 523.25f, 587.33f, 659.25f, 783.99f, 659.25f, 587.33f, 523.25f,
+            440.00f, 523.25f, 659.25f, 587.33f, 523.25f, 440.00f, 392.00f, 440.00f
+        };
+        const float pkBass[8] = {130.81f, 130.81f, 174.61f, 174.61f, 196.00f, 196.00f, 130.81f, 196.00f};
+
+        for (int i = 0; i < count; ++i) {
+            float t = static_cast<float>(i) / SR;
+            int beat16 = static_cast<int>(t / (beatDur * 0.25f)) % 16;
+            int bar8 = static_cast<int>(t / (beatDur * 0.5f)) % 8;
+            float noteT = std::fmod(t, beatDur * 0.25f);
+            float env = std::exp(-noteT * 10.0f);
+
+            // Channel 1: 50% duty cycle square wave (Lead)
+            float freq1 = pkMelody[beat16];
+            float sq1 = (std::fmod(t * freq1, 1.0f) < 0.50f) ? 0.35f : -0.35f;
+
+            // Channel 2: 25% duty cycle square wave (Harmony / Arpeggio)
+            float freq2 = freq1 * 1.5f;
+            float sq2 = (std::fmod(t * freq2, 1.0f) < 0.25f) ? 0.22f : -0.22f;
+
+            // Channel 3: 4-bit stepped triangle wave bass
+            float bFreq = pkBass[bar8];
+            float triPhase = std::fmod(t * bFreq, 1.0f);
+            float tri = (triPhase < 0.5f) ? (4.0f * triPhase - 1.0f) : (3.0f - 4.0f * triPhase);
+            // 4-bit quantization (16 levels)
+            tri = std::round(tri * 8.0f) / 8.0f * 0.45f;
+
+            // Channel 4: Pseudo-random LFSR noise drums
+            int beat = static_cast<int>(t / (beatDur * 0.5f)) % 4;
+            float drT = std::fmod(t, beatDur * 0.5f);
+            float noiseHit = (beat == 1 || beat == 3) ? rnd() * std::exp(-drT * 40.0f) * 0.35f : 0.0f;
+            float hat = rnd() * std::exp(-std::fmod(t, beatDur * 0.25f) * 70.0f) * 0.12f;
+
+            float s = (sq1 * env + sq2 * env * 0.7f + tri + noiseHit + hat) * 0.85f;
+            m_bankPokemonMusic[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 23000.0f);
+        }
+        writeWavFile(fbPath, m_bankPokemonMusic, SR);
+    }
+
+    // 18. Soothing Pastoral Theme
+    {
+        QString fbPath = makePath("music_soothing");
+        int count = static_cast<int>(SR * 9.0f);
+        m_bankSoothingMusic.resize(count);
+        float bpm = 92.0f;
+        float beatDur = 60.0f / bpm;
+        const float chords[4] = {261.63f, 329.63f, 392.00f, 440.00f}; // C - E - G - A
+
+        for (int i = 0; i < count; ++i) {
+            float t = static_cast<float>(i) / SR;
+            int bar = static_cast<int>(t / (beatDur * 2.0f)) % 4;
+            float root = chords[bar];
+            float arp = (static_cast<int>(t * 4.0f) % 4 == 0) ? root :
+                        (static_cast<int>(t * 4.0f) % 4 == 1) ? root * 1.25f :
+                        (static_cast<int>(t * 4.0f) % 4 == 2) ? root * 1.50f : root * 2.0f;
+
+            float noteT = std::fmod(t, 0.25f);
+            float env = std::exp(-noteT * 5.0f);
+            float chime = std::sin(2.0f * M_PI * arp * t) * env * 0.35f;
+            float warmBass = std::sin(2.0f * M_PI * (root * 0.5f) * t) * 0.35f;
+            float softPad = std::sin(2.0f * M_PI * root * t * 1.002f) * 0.18f;
+
+            float s = chime + warmBass + softPad;
+            m_bankSoothingMusic[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 21000.0f);
+        }
+        writeWavFile(fbPath, m_bankSoothingMusic, SR);
+    }
+
+    // 19. Edgy Cyber Synthwave Theme
+    {
+        QString fbPath = makePath("music_edgy");
+        int count = static_cast<int>(SR * 7.0f);
+        m_bankEdgyMusic.resize(count);
+        float bpm = 132.0f;
+        float beatDur = 60.0f / bpm;
+        const float edgyBassNotes[4] = {110.0f, 98.0f, 87.31f, 130.81f};
+
+        for (int i = 0; i < count; ++i) {
+            float t = static_cast<float>(i) / SR;
+            int bar = static_cast<int>(t / (beatDur * 4.0f)) % 4;
+            float bFreq = edgyBassNotes[bar];
+            float saw1 = (2.0f * std::fmod(t * bFreq, 1.0f) - 1.0f);
+            float saw2 = (2.0f * std::fmod(t * (bFreq * 1.006f), 1.0f) - 1.0f);
+            float bass = (saw1 + saw2) * 0.35f;
+
+            // Arpeggio
+            float arpFreq = bFreq * (2.0f + 0.5f * (static_cast<int>(t * 8.0f) % 4));
+            float leadPh = std::fmod(t * arpFreq, 1.0f);
+            float lead = ((leadPh < 0.45f) ? 0.35f : -0.35f) * std::exp(-std::fmod(t, 0.125f) * 12.0f);
+
+            int beat = static_cast<int>(t / beatDur) % 4;
+            float bT = std::fmod(t, beatDur);
+            float kick = (beat == 0 || beat == 2) ? std::sin(2.0f * M_PI * 80.0f * bT) * std::exp(-bT * 26.0f) * 0.7f : 0.0f;
+            float clap = (beat == 1 || beat == 3) ? rnd() * std::exp(-bT * 25.0f) * 0.45f : 0.0f;
+
+            float s = bass * 0.45f + lead * 0.35f + kick + clap;
+            m_bankEdgyMusic[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 24000.0f);
+        }
+        writeWavFile(fbPath, m_bankEdgyMusic, SR);
+    }
+
+    // 20. Neck Crunch / Bone Snap SFX
+    {
+        QString fbPath = makePath("neck_crunch");
+        int count = static_cast<int>(SR * 0.35f);
+        m_bankNeckCrunch.resize(count);
+        for (int i = 0; i < count; ++i) {
+            float t = static_cast<float>(i) / SR;
+            float snap1 = std::sin(2.0f * M_PI * (420.0f - 300.0f * t) * t) * std::exp(-t * 22.0f);
+            float snap2 = (rnd() * 2.0f - 1.0f) * std::exp(-t * 35.0f) * 0.8f;
+            float thud = std::sin(2.0f * M_PI * 55.0f * t) * std::exp(-t * 12.0f) * 0.9f;
+            float s = snap1 * 0.6f + snap2 + thud;
+            m_bankNeckCrunch[i] = static_cast<int16_t>(std::clamp(s, -1.0f, 1.0f) * 29000.0f);
+        }
+        writeWavFile(fbPath, m_bankNeckCrunch, SR);
+    }
 }
 
 void SoundManager::playEffectSafe(QSoundEffect* effect, float volumeScale) {
@@ -940,6 +1070,36 @@ void SoundManager::applyVolumeScales() {
 
 void SoundManager::setTargetMusic(MusicTrack track) {
     m_targetMusicTrack = track;
+    if (m_raceMusicPlayer) {
+        if (track == MusicTrack::POKEMON_CHIPTUNE) {
+            QString path = makeAudioPath("music_pokemon");
+            m_raceMusicPlayer->setSource(QUrl::fromLocalFile(path));
+            m_raceMusicPlayer->play();
+        } else if (track == MusicTrack::SOOTHING_PASTORAL) {
+            QString path = makeAudioPath("music_soothing");
+            m_raceMusicPlayer->setSource(QUrl::fromLocalFile(path));
+            m_raceMusicPlayer->play();
+        } else if (track == MusicTrack::EDGY_SYNTHWAVE) {
+            QString path = makeAudioPath("music_edgy");
+            m_raceMusicPlayer->setSource(QUrl::fromLocalFile(path));
+            m_raceMusicPlayer->play();
+        } else if (track == MusicTrack::ENERGETIC_ARCADE || track == MusicTrack::RACE) {
+            QString path = makeAudioPath("music_race");
+            m_raceMusicPlayer->setSource(QUrl::fromLocalFile(path));
+            m_raceMusicPlayer->play();
+        } else if (track == MusicTrack::MENU) {
+            QString path = makeAudioPath("music_menu");
+            if (m_menuMusicPlayer) {
+                m_menuMusicPlayer->setSource(QUrl::fromLocalFile(path));
+                m_menuMusicPlayer->play();
+            }
+        }
+    }
+}
+
+void SoundManager::playNeckCrunch() {
+    queueOneShot(&m_bankNeckCrunch, 0.95f);
+    playCrash();
 }
 
 void SoundManager::stopAllMusic() {

@@ -322,6 +322,70 @@ static const std::vector<VehicleConfig> s_vehicles = {
         188, 79,              // spriteWidth, spriteHeight
         {94.00f, 80.00f},     // spriteAnchor
         24.5f                 // wheelSpriteRadius
+    },
+
+    // 11. Agile Motocross Dirtbike
+    {
+        VehicleType::MOTOCROSS_BIKE,
+        "motocross_bike",
+        "MOTOCROSS BIKE",
+        "Ultralight dirtbike with extreme acrobatic in-air flips and wheelie agility",
+        4500,
+        185.0f,               // mass (kg)
+        95.0f,                // inertia (kg*m^2)
+        0.285f,               // wheelRadius (meters)
+        10.5f,                // wheelMass
+        0.42f,                // wheelInertia
+        {-0.560f, 0.0f},      // rearMountOffset
+        {+0.560f, 0.0f},      // frontMountOffset
+        {-0.06f, +0.34f},     // driverSeatOffset
+        0.22f,                // suspRestLength
+        0.08f,                // suspMinLength
+        0.36f,                // suspMaxLength
+        32000.0f,             // baseSpringRate
+        3600.0f,              // baseDamperRate
+        4000.0f,              // basePeakTorque
+        112.0f,               // baseTopSpeedKmh
+        1.25f,                // baseGrip
+        0.00f,                // base4wdSplit (100% RWD)
+        2000.0f,              // baseBrakingTorque
+        0.05f,                // baseDownforce
+        1.95f,                // baseAirAgility (insane flip speed!)
+        180, 68,              // spriteWidth, spriteHeight
+        {90.00f, 68.00f},     // spriteAnchor
+        21.0f                 // wheelSpriteRadius
+    },
+
+    // 12. All-Terrain Quad Bike / ATV
+    {
+        VehicleType::QUAD_BIKE,
+        "quad_bike",
+        "QUAD BIKE ATV",
+        "4-Wheel heavy-duty ATV with supreme low-end torque and steep hill grip",
+        7500,
+        320.0f,               // mass (kg)
+        180.0f,               // inertia (kg*m^2)
+        0.298f,               // wheelRadius (meters)
+        15.5f,                // wheelMass
+        0.68f,                // wheelInertia
+        {-0.590f, 0.0f},      // rearMountOffset
+        {+0.590f, 0.0f},      // frontMountOffset
+        {-0.02f, +0.30f},     // driverSeatOffset
+        0.20f,                // suspRestLength
+        0.07f,                // suspMinLength
+        0.34f,                // suspMaxLength
+        41000.0f,             // baseSpringRate
+        4200.0f,              // baseDamperRate
+        4800.0f,              // basePeakTorque
+        105.0f,               // baseTopSpeedKmh
+        1.40f,                // baseGrip
+        0.50f,                // base4wdSplit (AWD)
+        2200.0f,              // baseBrakingTorque
+        0.18f,                // baseDownforce
+        1.20f,                // baseAirAgility
+        184, 72,              // spriteWidth, spriteHeight
+        {92.00f, 72.00f},     // spriteAnchor
+        23.0f                 // wheelSpriteRadius
     }
 };
 

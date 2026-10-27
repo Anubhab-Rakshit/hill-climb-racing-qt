@@ -22,3 +22,7 @@ moc_*.cpp
 mocs_compilation.cpp
 ui_*.h
 qrc_*.cpp
+
+# Python bytecode
+__pycache__/
+*.pyc
