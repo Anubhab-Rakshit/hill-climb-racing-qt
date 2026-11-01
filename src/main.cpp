@@ -11,6 +11,7 @@
 #include "Sprite.h"
 #include "graphics/ScanlineRasterizer.h"
 #include "audio/SoundManager.h"
+#include "ui/UILayoutRegression.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
@@ -18,6 +19,12 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName("HillClimbQtTeam");
 
     Core::GameEngine engine;
+
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--test-ui-layout" || std::string(argv[i]) == "--ui-layout-test") {
+            return UI::UILayoutRegression::run();
+        }
+    }
 
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--legacy-physics") {
