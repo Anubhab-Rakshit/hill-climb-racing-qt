@@ -1,17 +1,17 @@
 # Document 06: Team Division, Sprint Roadmap & QA Protocols
-**Roles, Milestone Deliverables, QTest Automated Testing, and Lab Defense Checklist**
+**Roles, Milestone Deliverables, Custom CLI Automated Testing Suites, and Lab Defense Checklist**
 
 ---
 
 ## 1. Team Role Allocation & Workload Distribution
-To maximize velocity and avoid merge conflicts, responsibilities are partitioned along clean architectural boundaries. This matrix supports teams of **3, 4, or 5 members**.
+To maximize velocity and eliminate merge conflicts, responsibilities are partitioned along clean architectural boundaries. This matrix supports teams of **3, 4, or 5 members**.
 
 ```mermaid
 graph LR
-    subgraph Member 1: Physics Lead
+    subgraph Member 1: Physics & Box2D Lead
         P1[Chassis & Wheel Rigid Bodies]
-        P2[Suspension Spring-Damper Solver]
-        P3[Continuous Collision & Friction]
+        P2[b2WheelJoint Suspension Solver]
+        P3[Box2D 2.2.1 EdgeChain & Dynamic Bodies]
     end
 
     subgraph Member 2: Raster Engine Lead
@@ -22,7 +22,7 @@ graph LR
 
     subgraph Member 3: Architecture & System Lead
         A1[Fixed-Timestep Game Loop]
-        A2[Game State Machine]
+        A2[GameStateManager Hierarchy]
         A3[Input & Audio Subsystems]
     end
 
@@ -33,9 +33,9 @@ graph LR
     end
 
     subgraph Member 5 / Shared: QA & Polish
-        Q1[QTest Verification Suites]
+        Q1[Automated CLI Test Suites]
         Q2[Valgrind Zero-Leak Audit]
-        Q3[Retro HUD & Camera Juice]
+        Q3[Retro Pixel HUD & Responsive Layouts]
     end
 
     A1 --> P1
@@ -48,157 +48,157 @@ graph LR
 ### Detailed Role Descriptions:
 
 #### 🧑‍💻 Member 1: Physics & Vehicle Dynamics Lead
-- **Scope**: Implements `PhysicsWorld`, `RigidBody`, `Wheel`, `SuspensionStrut`, and `CollisionSolver`.
+- **Scope**: Implements `Box2DPhysics`, `PhysicsWorld`, `Vehicle` facade, and `Terrain` colliders.
 - **Primary Deliverables**:
-  - Symplectic Euler integration at 120 Hz.
-  - Multi-body spring-damper suspension forces ($F = k \Delta x - c \dot{x}$).
-  - Tire Coulomb friction and slip velocity calculations.
-  - In-air pitch control (gas leans back, brake leans forward).
+  - Integration of vendored Box2D 2.2.1 rigid-body backend (`third_party/Box2D/`).
+  - Edge-chain terrain static body generation and `b2WheelJoint` soft suspension constraints.
+  - Multi-body spring-damper suspension forces with calibrated frequency ($f_0$) and damping ratio ($\zeta$).
+  - Tire Coulomb friction and forward/reverse tractive force models.
+  - In-air attitude pitch control (gas leans back, brake leans forward).
   - Driver head collision and neck-snap kill condition.
+  - Analytical fallback engine maintained under `--legacy-physics`.
 
 #### 🎨 Member 2: Rasterization & Visual Engine Lead
-- **Scope**: Implements `RasterCanvas`, `Framebuffer`, `ScanlineRasterizer`, `Sprite`, and `ParticleSystem`.
+- **Scope**: Implements `PixelCanvas`, `Framebuffer`, `ScanlineRasterizer`, `Sprite`, and `ParticleSystem`.
 - **Primary Deliverables**:
-  - 32-bit ARGB virtual framebuffer ($960 \times 540$) with SIMD-ready memory layout.
+  - 32-bit ARGB virtual framebuffer ($960 \times 540$ and $1280 \times 720$) with raw `uint32_t*` scanline memory.
+  - **Strict Software Rasterizer Constraint**: Zero QPainter shapes, SVG, or vector hardware acceleration.
   - Column-scanline vertical terrain rasterizer with grass, soil, and bedrock strata.
-  - Inverse-mapping rotated sprite blitter with alpha channel blending.
-  - Procedural exhaust smoke puffs, wheel dirt sprays, and coin pickup sparks.
-  - 4-layer parallax scrolling backgrounds.
+  - Inverse-mapping rotated sprite blitter with alpha blending for chassis, wheels, and driver heads.
+  - Procedural exhaust smoke puffs, wheel dirt sprays, and coin pickup sparkles.
+  - Multi-layer parallax scrolling backgrounds.
 
-#### ⚙️ Member 3: Engine Architecture, Loop & Input Lead
-- **Scope**: Implements `GameEngine`, `GameStateManager`, `InputController`, and `AudioManager`.
+#### ⚙️ Member 3: Engine Architecture, Loop & Audio Lead
+- **Scope**: Implements `GameEngine`, `GameStateManager`, `InputController`, and `SoundManager`.
 - **Primary Deliverables**:
-  - The canonical accumulator game loop ($dt = \frac{1}{120}\text{ s}$) with render interpolation.
-  - Finite State Machine (`MainMenuState`, `GarageState`, `StageSelectState`, `GameplayState`, `GameOverState`).
-  - Asynchronous keyboard polling to eliminate OS key-repeat latency.
-  - Low-latency sound mixing via `QtMultimedia` with dynamic engine RPM pitch shifting.
+  - Accumulator game loop with fixed physics timesteps ($dt = 1/60\text{ s}$ / $1/120\text{ s}$) and render interpolation.
+  - Finite State Machine (`MainMenuScreen`, `GarageScreen`, `StageSelectScreen`, `HUD`, `PauseOverlay`, `GameOverScreen`).
+  - Asynchronous keyboard polling to eliminate OS key-repeat latency for single-player and split-screen multiplayer.
+  - Low-latency sound mixing via `SoundManager` with dynamic engine RPM pitch shifting, wheel rolling loops, and crash effects.
 
 #### 🕹️ Member 4: Gameplay Systems, Levels & Economy Lead
-- **Scope**: Implements `TerrainGenerator`, `FuelSystem`, `CoinManager`, `StuntDetector`, and `VehicleUpgrades`.
+- **Scope**: Implements `Terrain` procedural biomes, `FuelSystem`, `CoinManager`, `StuntDetector`, and vehicle configurations.
 - **Primary Deliverables**:
-  - Multi-octave harmonic elevation formula with 1D Perlin noise.
-  - Biome definitions: Countryside, Desert (loose sand), Moon (low gravity), Mountains.
-  - Fuel consumption decay and procedural canister spawning.
-  - Aerial stunt detection (Backflips, Frontflips, Air Time, Wheelies).
-  - Garage upgrade shop scaling algorithms and persistent profile save/load (JSON).
+  - Multi-octave harmonic elevation functions with reachability and climbability guarantees.
+  - 6 distinct biomes: Countryside, Desert Dunes, Arctic Tundra, Mountain Ridge, The Moon, and Inferno Peaks.
+  - Fuel consumption decay (active throttle only; zero idle drain) and procedural canister reachability.
+  - Aerial stunt detection (Backflips, Frontflips, Air Time, Neck Flips).
+  - Garage upgrade shop (Engine, Suspension, Tires, 4WD) and persistent JSON profile storage.
 
 #### 🧪 Member 5 (or Distributed): QA, Testing & Visual Polish Lead
-- **Scope**: Implements `QTest` automated test suite, HUD gauges, dynamic camera, and project presentation.
+- **Scope**: Implements built-in automated CLI test suites, HUD telemetry gauges, responsive screen scaling, and project presentation.
 - **Primary Deliverables**:
-  - Dynamic camera controller with velocity look-ahead, speed zoom, and screen shake.
-  - Analog needle gauges for RPM and Speedometer; segmented flashing fuel bar.
-  - Automated physics regression tests (suspension stability, no-tunneling proof).
-  - Memory leak verification (Valgrind / AddressSanitizer).
+  - 6 comprehensive CLI verification suites (`--test-box2d`, `--test-box2d-vehicles`, `--test-box2d-world`, `--test-physics`, `--test-audio`, `--smoke-test`).
+  - Responsive screen layouts for $960 \times 540$ and $1280 \times 720$ with zero element occlusion.
+  - Analog needle gauges for RPM and Speedometer; segmented flashing fuel bar with low-fuel alert.
+  - Automated physics regression verification (suspension stability, non-penetration audit).
+  - Memory leak verification (zero memory leaks confirmed).
 
 ---
 
-## 2. Four-Sprint Milestone Roadmap
+## 2. Technology Stack & Build Workflow
 
+### Environment Standards
+- **Language**: Modern C++ (C++20 standard)
+- **Framework**: Qt 6.11.1 on macOS (Core, Gui, Widgets, Multimedia)
+- **Build System**: CMake 3.20+ with Ninja generator
+- **Physics Backend**: Vendored Box2D 2.2.1 (Default) with `--legacy-physics` fallback
+- **Rendering**: Pure software rasterization (direct `QImage` 32-bit ARGB framebuffer blit)
+
+### Build Commands (macOS)
+```bash
+# Configure with Ninja and Qt 6.11.1
+cmake -B build -G Ninja -DCMAKE_PREFIX_PATH="/Users/anubhabrakshit/Qt/6.11.1/macos"
+
+# Compile executable
+cmake --build build -j8
 ```
-Week 1: Foundations & Architecture  ====================>
-Week 2: Physics & Raster Engine     ========================================>
-Week 3: Gameplay Systems & Juice    ============================================================>
-Week 4: Hardening & Lab Defense     ========================================================================> [A+ SUBMISSION]
+
+### Windows & Linux Setup Notes
+- **Windows**: Install Qt 6.x via Qt Online Installer. From Qt Command Prompt: `cmake -B build -G Ninja -DCMAKE_PREFIX_PATH="C:/Qt/6.x.x/mingw_64"` followed by `cmake --build build`.
+- **Linux**: Install `qt6-base-dev`, `qt6-multimedia-dev`, `cmake`, and `ninja-build`. Run `cmake -B build -G Ninja` and `cmake --build build`.
+- **Vendored Box2D**: Vendored under `third_party/Box2D/`; no external Box2D dependencies required.
+
+### Launch Commands
+```bash
+# Launch with Box2D 2.2.1 physics engine (Default)
+./build/HillClimbRacingQt
+
+# Launch with legacy analytical physics engine (Fallback)
+./build/HillClimbRacingQt --legacy-physics
 ```
 
-### Sprint 1: Foundations & Architecture (Week 1)
-- [ ] Initialize repository structure with CMake / Qt 6.
-- [ ] Implement `Framebuffer` class with direct pixel memory access (`uint32_t*`).
-- [ ] Build `GameEngine` with fixed-timestep accumulator loop running at 120 Hz.
-- [ ] Setup `InputController` and basic `GameStateManager` with placeholder states.
-- [ ] **Sprint 1 Gate**: A window rendering a smooth 60 FPS animated color gradient via pure raster manipulation with responsive key press logging.
-
-### Sprint 2: Core Physics & Raster Pipeline (Week 2)
-- [ ] Implement `TerrainHeightmap` with analytical derivatives ($\frac{dy}{dx}$).
-- [ ] Build the column-scanline terrain rasterizer with grass and dirt texturing.
-- [ ] Implement chassis, wheels, and dual-strut spring-damper suspension solver.
-- [ ] Implement tire friction and on-ground driving torque.
-- [ ] Implement in-air gyroscopic pitch rotation.
-- [ ] Add inverse-rotation sprite blitter for vehicle chassis and spinning wheels.
-- [ ] **Sprint 2 Gate**: A fully drivable vehicle climbing undulating hills, showing realistic suspension bounce, with zero physics tunneling.
-
-### Sprint 3: Gameplay Systems & Audiovisual Juice (Week 3)
-- [ ] Implement fuel drainage, blinking low-fuel HUD warning, and fuel canister pickups.
-- [ ] Spawn coins along hill trajectories; implement collection detection and sound chimes.
-- [ ] Integrate `StuntDetector` (rewarding Backflips, Frontflips, and Air Time).
-- [ ] Add exhaust smoke particle system and tire dirt sprays.
-- [ ] Implement dynamic camera (speed zoom + look-ahead) and impact screen shake.
-- [ ] Build the interactive **Garage** upgrade screen (Engine, Suspension, Tires, 4WD).
-- [ ] **Sprint 3 Gate**: Complete playable game loop from Start $\rightarrow$ Drive $\rightarrow$ Stunts $\rightarrow$ Crash/Out of Fuel $\rightarrow$ Upgrade Garage $\rightarrow$ Restart.
-
-### Sprint 4: Hardening, Polish & Lab Defense (Week 4)
-- [ ] Add multiple biomes: Countryside, Desert (slippery), and Moon (low gravity).
-- [ ] Implement persistent JSON profile saving (coins, unlocked stages, upgrade tiers).
-- [ ] Run full `QTest` automated test suite to verify physics stability.
-- [ ] Execute Valgrind / AddressSanitizer audit to guarantee **0 memory leaks**.
-- [ ] Compile release binary with full optimization (`-O3 -march=native`).
-- [ ] Prepare slide deck, live demo script, and architectural defense for the evaluation panel.
-- [ ] **Sprint 4 Gate**: Exemplary, production-grade submission ready for evaluation.
+### Controls Reference Table
+| Action | Player 1 (Single / Left) | Player 2 (Local Multiplayer) | System / Global |
+| :--- | :--- | :--- | :--- |
+| **Throttle / Accelerate** | `W` | `Up Arrow` | — |
+| **Brake / Reverse** | `S` | `Down Arrow` | — |
+| **Tilt Back (Air Pitch Up)** | `A` | `Left Arrow` | — |
+| **Tilt Forward (Air Pitch Down)** | `D` | `Right Arrow` | — |
+| **Pause / Resume** | — | — | `Esc` or `P` |
+| **Quick Restart** | — | — | `R` |
+| **Select / Confirm / Click** | — | — | `Enter` or `Space` |
+| **Toggle Multiplayer Mode** | — | — | `M` (on Menu screen) |
 
 ---
 
-## 3. Automated QA Testing Suite (QTest Framework)
-To demonstrate elite software craftsmanship, we include automated tests verifying physical laws and game mechanics:
+## 3. Automated QA Testing Suite (Custom CLI Test Suites)
 
-```cpp
-#include <QtTest/QtTest>
-#include "PhysicsWorld.h"
-#include "Vehicle.h"
-#include "Terrain.h"
+To demonstrate elite software craftsmanship and deterministic physics guarantees, the project provides **6 automated CLI test suites** built directly into the binary.
 
-class TestPhysicsEngine : public QObject {
-    Q_OBJECT
-private slots:
-    void testSuspensionEquilibrium() {
-        // Vehicle dropped on flat ground must reach steady state without blowing up
-        Terrain flatTerrain([](float) { return 0.0f; });
-        Vehicle vehicle;
-        vehicle.setPosition(0.0f, 5.0f); // 5 meters above ground
-        
-        PhysicsWorld world(&flatTerrain);
-        world.addVehicle(&vehicle);
+> [!IMPORTANT]
+> The automated testing infrastructure is built with **custom deterministic CLI test runners** rather than the QTest library. This allows tests to run directly in headless/offscreen environments without GUI overhead using `QT_QPA_PLATFORM=offscreen`.
 
-        // Step simulation for 3 seconds (360 ticks)
-        for (int i = 0; i < 360; ++i) {
-            world.step(1.0f / 120.0f);
-        }
+### The 6 Automated Test Commands:
 
-        // Velocity should settle close to zero (damped equilibrium)
-        QVERIFY(std::abs(vehicle.chassisVelocity().y()) < 0.05f);
-        // Suspension should not be fully bottomed out
-        QVERIFY(vehicle.rearSuspensionCompression() > 0.01f);
-    }
+```bash
+# 1. Box2D 2.2.1 Fixed-Step & Terrain Verification Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d
 
-    void testNoTunnelingAtHighVelocity() {
-        // Vehicle traveling at 150 km/h must not penetrate terrain
-        Terrain steepHill([](float x) { return (x > 20.0f) ? (x - 20.0f) * 1.5f : 0.0f; });
-        Vehicle vehicle;
-        vehicle.setVelocity(40.0f, 0.0f); // ~144 km/h
+# 2. Box2D All-Vehicle Parity Suite (12 Vehicles)
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles
 
-        PhysicsWorld world(&steepHill);
-        world.addVehicle(&vehicle);
+# 3. Box2D Gameplay-World Integration Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 
-        for (int i = 0; i < 240; ++i) {
-            world.step(1.0f / 120.0f);
-            // Wheels must ALWAYS remain above or on the terrain surface
-            QVERIFY(vehicle.rearWheelPos().y() >= steepHill.getHeight(vehicle.rearWheelPos().x()) - 0.01f);
-        }
-    }
-};
-QTEST_MAIN(TestPhysicsEngine)
-#include "TestPhysicsEngine.moc"
+# 4. Comprehensive 19-Test Vehicle & Suspension Physics Audit
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
+
+# 5. Realistic Dynamic Audio Test Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
+
+# 6. End-to-End Procedural Reachability & Smoke Test
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
+
+### Invariants Tested & Verified:
+1. **Box2D Integration (`--test-box2d`)**: Verifies Box2D version 2.2.1, edge-chain terrain colliders (401 vertices), fixed 60 Hz accumulator, substep clamp, simulation determinism, flat ground idle stability (< 0.01 km/h), 12° slope brake hold, reverse drive, and in-air attitude pitch control.
+2. **Vehicle Parity (`--test-box2d-vehicles`)**: Audits all 12 vehicles (Classic Off-Roader, Rally Racing Car, Modern Sports Coupe, Venom Hyper-V12, Heavy-Duty Pickup, Monster Truck, Desert Rally Raid, Formula Racing Car, Retro Muscle Car, Electric Off-Roader, Motocross Bike, and Quad Bike ATV) for idle stability, forward drive, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt.
+3. **World Integration (`--test-box2d-world`)**: Single-player driving distance, propulsion-only fuel drainage, dynamic suspension strut deformation, checkpoint triggers at 250m intervals, split-screen local multiplayer dual-vehicle physics, and neck-snap crash detection.
+4. **Suspension & Dynamics Audit (`--test-physics`)**: Evaluates 1.5m drop landing rebound oscillation, flat ground zero-spin, 60 km/h ground contact retention over undulations, 65m ski jump trajectory, steep mountain climb at x=950m, upside-down inverted crash non-penetration (< 0.005m), 80 km/h slope impact non-penetration, speedometer accuracy, propulsion-only fuel consumption, and surface friction scaling (glacial ice vs arctic snow vs countryside turf vs mountain rock).
+5. **Dynamic Audio Audit (`--test-audio`)**: Validates volume hierarchy, BGM crossfading, dynamic engine RPM pitch modulation (1000 to 8500 RPM), tire rolling audio, crash intensity scaling, environmental wind loop, and multi-channel anti-clipping limiter.
+6. **Procedural Reachability (`--smoke-test`)**: Validates procedural climbability (< 38° slopes) and fuel reachability (< 165m intervals) across all 6 biomes, verifies stage progression unlock chaining, stationary idle stability, and exports visual screen verification captures to `scratch/`.
 
 ---
 
-## 4. Evaluator Defense & Presentation Strategy
-When demonstrating the project to the lab professor and evaluators, present following this structured script:
+## 4. Current Feature Matrix & Status
+- **Physics Backend**: Box2D 2.2.1 rigid-body backend default with `--legacy-physics` fallback.
+- **12 Vehicles**: Fully calibrated with individual masses, wheelbases, spring frequencies ($f_0$), damping ratios ($\zeta$), and air torques.
+- **6 Biomes**: Countryside, Desert, Arctic, Mountain, Moon, and Volcano.
+- **Multiplayer**: 2-player local split-screen with individual cameras, vehicle selections, and live scoreboards.
+- **Garage**: 4-attribute upgrade economy (Engine, Suspension, Tires, 4WD) with wheelbase-adaptive hydraulic lift.
+- **UI/UX**: Responsive retro pixel layouts supporting $960 \times 540$ and $1280 \times 720$ with zero element occlusion.
+
+---
+
+## 5. Evaluator Defense & Presentation Strategy
+When demonstrating the project to the evaluation panel and professor, follow this structured roadmap:
 
 1. **The Technical Hook (First 60 Seconds)**:
-   - *"While standard implementations rely on third-party physics or naive Euler calculations, our team engineered a bespoke 2D multi-body spring-damper physics solver running at 120 Hz with sub-stepping."*
-2. **The Raster Graphics Demonstration**:
-   - Show how the terrain is not an OpenGL vector polygon or SVG, but a vertical scanline rasterizer filling 32-bit pixel buffers directly into CPU memory. Toggle wireframe / pixel inspection mode to prove it.
-3. **Gameplay & Polish Demonstration**:
-   - Drive the car: show suspension compression under hard braking, perform a backflip in mid-air using throttle pitch control, kick up dirt particles, hit a hill crest, and collect fuel with low-fuel alarm tension.
-4. **Code Quality & Architecture Walkthrough**:
-   - Display the clean UML state machine, the fixed-timestep accumulator, and run the `QTest` suite live in the terminal showing 100% green passing tests with zero memory leaks.
+   - *"Our project features a vendored Box2D 2.2.1 physics backend with dynamic b2WheelJoint suspension constraints, edge-chain terrain colliders, and a fixed accumulator loop, alongside an analytical fallback engine under `--legacy-physics`."*
+2. **The Pure Rasterization Showcase**:
+   - Demonstrate that the graphics pipeline is 100% CPU software rasterization writing directly to a 32-bit ARGB framebuffer (`Framebuffer` class with `uint32_t*` scanline memory) — **strictly zero QPainter shapes, SVG, or vector hardware acceleration**.
+3. **Gameplay & Multi-Vehicle Dynamics**:
+   - Drive different vehicles (e.g. Classic Off-Roader vs Venom Hyper-V12 vs Monster Truck) to showcase distinct spring-damper dynamics, suspension compression under hard braking, in-air gyroscopic pitch acrobatics, and tire friction on varying terrain strata.
+4. **Automated Verification Live Demonstration**:
+   - Run the 6 built-in CLI test commands live in the terminal using `QT_QPA_PLATFORM=offscreen` to prove 100% passing automated regression checks across all 12 vehicles, physics invariants, and procedural biome fuel reachability.
