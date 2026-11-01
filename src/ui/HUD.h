@@ -50,6 +50,16 @@ public:
 
     void addFloatingText(const std::string& text, float x, float y, uint32_t color = 0xFFFFB300);
 
+    const RetroButton& brakePedal() const { return m_brakePedal; }
+    const RetroButton& reversePedal() const { return m_reversePedal; }
+    const RetroButton& gasPedal() const { return m_gasPedal; }
+    const RetroButton& pauseButton() const { return m_pauseButton; }
+
+    int distanceCardX() const { return (m_width - distanceCardWidth()) / 2; }
+    int distanceCardY() const { return (m_height >= 700) ? 42 : 38; }
+    int distanceCardWidth() const { return (m_width >= 1200) ? 380 : 320; }
+    int distanceCardHeight() const { return 48; }
+
     void update(float dt);
     void render(Graphics::Framebuffer& fb);
 

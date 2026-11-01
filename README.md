@@ -8,7 +8,7 @@ This project is engineered as an **exemplary academic and software engineering s
 1. **Deterministic Classical Mechanics & Vehicle Dynamics**: Multi-body rigid chassis, dual-wheel trailing arm / spring-damper suspension, Coulomb surface friction, in-air conservation of angular momentum, and Continuous Collision Detection (CCD). Default physics simulation is powered by a **vendored Box2D 2.2.1 engine** with an analytical `--legacy-physics` fallback mode.
 2. **Pure Rasterization & Pixel Graphics**: Dedicated CPU software rasterizer writing directly to a 32-bit ARGB virtual framebuffer (`Framebuffer` class with `uint32_t*` scanline memory) — **strictly zero QPainter shapes, SVG, or vector hardware acceleration**.
 3. **Enterprise-Grade Game Architecture**: Decoupled MVC / Component-Entity architecture, fixed-timestep accumulator game loop ($dt = 1/60\text{ s}$ / $1/120\text{ s}$ physics, $60\text{ Hz}$ render interpolation), state machine hierarchy, and robust memory management with zero memory leaks.
-4. **Juicy & Addictive Gameplay Feel**: Dynamic camera tracking with velocity zoom, suspension squash & stretch, neck-snap kill condition, fuel timer tension, stunt evaluation (backflips, airtime, wheelies), 12 tuned vehicles, 6 biomes, and progressive garage vehicle upgrades (Engine, Suspension, Tires, 4WD).
+4. **Juicy & Addictive Gameplay Feel**: Dynamic camera tracking with velocity zoom, suspension squash & stretch, neck-snap kill condition, fuel timer tension, stunt evaluation (backflips, airtime, wheelies), 12 tuned vehicles, 6 biomes, and progressive garage vehicle upgrades across 8 categories (Engine, Suspension, Tires, 4WD, Brakes, Gearbox, Chassis, Aerodynamics).
 
 ---
 
@@ -53,7 +53,7 @@ graph TD
 
 - **`GameStateManager`**: Finite state machine orchestrating screen lifecycle:
   - `MainMenuScreen`: Title menu with animated multi-layer parallax hills and vehicle showcase.
-  - `GarageScreen`: Interactive vehicle selector and 4-tier upgrade shop (Engine, Suspension, Tires, 4WD) with dynamic hydraulic lift.
+  - `GarageScreen`: Interactive vehicle selector and 8-category tuning shop across 2 tabs (Engine, Suspension, Tires, 4WD, Brakes, Gearbox, Chassis, Aerodynamics) with dynamic hydraulic lift.
   - `StageSelectScreen`: Stage card browser supporting all 6 biomes with unlock requirements and distance records.
   - `HUD`: In-game dashboard with analog needle speedometer, tachometer, segmented LED fuel alarm, minimap radar, and telemetry card.
   - `PauseOverlay`: Responsive modal dialog with resume, restart, garage, and main menu actions.
@@ -120,10 +120,11 @@ Launch with legacy analytical physics engine:
 
 ## 🧪 Automated Testing & Verification
 
-The project includes **6 comprehensive, deterministic CLI test suites**. Note that tests use custom built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
+The project includes **7 comprehensive, deterministic CLI test suites**. Note that tests use custom built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
 
 | Test Command | Scope & Invariants Verified |
 | :--- | :--- |
+| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout` | Automated UI layout regression mode: validates screen bounds containment, button non-overlap, real HUD telemetry vs minimap radar clearance, modal panel containment, and exports 12 reference captures (6 screens x 2 resolutions) to `scratch/ui_regression/`. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d` | Verifies Box2D 2.2.1 integration: edge-chain collider, fixed-step 60Hz accumulator, substep clamp, deterministic simulation, idle stability, 12° slope brake hold, reverse drive, and in-air pitch torque. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles` | Evaluates all 12 vehicles for idle stability, forward acceleration, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world` | Full world integration: single-player drive, fuel drainage, suspension deformation, checkpoint crossings, split-screen multiplayer dual-vehicle physics, and neck-snap crash detection. |
@@ -133,6 +134,7 @@ The project includes **6 comprehensive, deterministic CLI test suites**. Note th
 
 Run all tests together:
 ```bash
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
@@ -167,7 +169,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
   - *The Moon* (Low gravity, extended airtime)
   - *Inferno Peaks* (Extreme gradients and lava pits)
 - **Multiplayer Mode**: Two-player local split-screen with independent cameras, vehicle choices, and race rankings.
-- **Garage & Upgrade Economy**: Collect coins to level up Engine, Suspension, Tires, and 4WD.
+- **Garage & Upgrade Economy**: Collect coins to level up 8 mechanical categories (Engine, Suspension, Tires, 4WD, Brakes, Gearbox, Chassis, Aerodynamics).
 - **Audio & SFX**: Synthesized engine revving, tire skids, coin pickups, and CC0 background music tracks.
 
 ---

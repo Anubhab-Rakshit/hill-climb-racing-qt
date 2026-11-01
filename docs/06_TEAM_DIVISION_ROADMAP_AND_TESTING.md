@@ -83,12 +83,12 @@ graph LR
   - 6 distinct biomes: Countryside, Desert Dunes, Arctic Tundra, Mountain Ridge, The Moon, and Inferno Peaks.
   - Fuel consumption decay (active throttle only; zero idle drain) and procedural canister reachability.
   - Aerial stunt detection (Backflips, Frontflips, Air Time, Neck Flips).
-  - Garage upgrade shop (Engine, Suspension, Tires, 4WD) and persistent JSON profile storage.
+  - Garage upgrade shop across 8 mechanical categories (Engine, Suspension, Tires, 4WD, Brakes, Gearbox, Chassis, Aerodynamics) and persistent JSON profile storage.
 
 #### 🧪 Member 5 (or Distributed): QA, Testing & Visual Polish Lead
 - **Scope**: Implements built-in automated CLI test suites, HUD telemetry gauges, responsive screen scaling, and project presentation.
 - **Primary Deliverables**:
-  - 6 comprehensive CLI verification suites (`--test-box2d`, `--test-box2d-vehicles`, `--test-box2d-world`, `--test-physics`, `--test-audio`, `--smoke-test`).
+  - 7 comprehensive CLI verification suites (`--test-ui-layout`, `--test-box2d`, `--test-box2d-vehicles`, `--test-box2d-world`, `--test-physics`, `--test-audio`, `--smoke-test`).
   - Responsive screen layouts for $960 \times 540$ and $1280 \times 720$ with zero element occlusion.
   - Analog needle gauges for RPM and Speedometer; segmented flashing fuel bar with low-fuel alert.
   - Automated physics regression verification (suspension stability, non-penetration audit).
@@ -144,40 +144,44 @@ cmake --build build -j8
 
 ## 3. Automated QA Testing Suite (Custom CLI Test Suites)
 
-To demonstrate elite software craftsmanship and deterministic physics guarantees, the project provides **6 automated CLI test suites** built directly into the binary.
+To demonstrate elite software craftsmanship and deterministic physics guarantees, the project provides **7 automated CLI test suites** built directly into the binary.
 
 > [!IMPORTANT]
 > The automated testing infrastructure is built with **custom deterministic CLI test runners** rather than the QTest library. This allows tests to run directly in headless/offscreen environments without GUI overhead using `QT_QPA_PLATFORM=offscreen`.
 
-### The 6 Automated Test Commands:
+### The 7 Automated Test Commands:
 
 ```bash
-# 1. Box2D 2.2.1 Fixed-Step & Terrain Verification Suite
+# 1. Automated UI Layout Regression Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
+
+# 2. Box2D 2.2.1 Fixed-Step & Terrain Verification Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d
 
-# 2. Box2D All-Vehicle Parity Suite (12 Vehicles)
+# 3. Box2D All-Vehicle Parity Suite (12 Vehicles)
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles
 
-# 3. Box2D Gameplay-World Integration Suite
+# 4. Box2D Gameplay-World Integration Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 
-# 4. Comprehensive 19-Test Vehicle & Suspension Physics Audit
+# 5. Comprehensive 19-Test Vehicle & Suspension Physics Audit
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 
-# 5. Realistic Dynamic Audio Test Suite
+# 6. Realistic Dynamic Audio Test Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 
-# 6. End-to-End Procedural Reachability & Smoke Test
+# 7. End-to-End Procedural Reachability & Smoke Test
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 
 ### Invariants Tested & Verified:
-1. **Box2D Integration (`--test-box2d`)**: Verifies Box2D version 2.2.1, edge-chain terrain colliders (401 vertices), fixed 60 Hz accumulator, substep clamp, simulation determinism, flat ground idle stability (< 0.01 km/h), 12° slope brake hold, reverse drive, and in-air attitude pitch control.
-2. **Vehicle Parity (`--test-box2d-vehicles`)**: Audits all 12 vehicles (Classic Off-Roader, Rally Racing Car, Modern Sports Coupe, Venom Hyper-V12, Heavy-Duty Pickup, Monster Truck, Desert Rally Raid, Formula Racing Car, Retro Muscle Car, Electric Off-Roader, Motocross Bike, and Quad Bike ATV) for idle stability, forward drive, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt.
-3. **World Integration (`--test-box2d-world`)**: Single-player driving distance, propulsion-only fuel drainage, dynamic suspension strut deformation, checkpoint triggers at 250m intervals, split-screen local multiplayer dual-vehicle physics, and neck-snap crash detection.
-4. **Suspension & Dynamics Audit (`--test-physics`)**: Evaluates 1.5m drop landing rebound oscillation, flat ground zero-spin, 60 km/h ground contact retention over undulations, 65m ski jump trajectory, steep mountain climb at x=950m, upside-down inverted crash non-penetration (< 0.005m), 80 km/h slope impact non-penetration, speedometer accuracy, propulsion-only fuel consumption, and surface friction scaling (glacial ice vs arctic snow vs countryside turf vs mountain rock).
-5. **Dynamic Audio Audit (`--test-audio`)**: Validates volume hierarchy, BGM crossfading, dynamic engine RPM pitch modulation (1000 to 8500 RPM), tire rolling audio, crash intensity scaling, environmental wind loop, and multi-channel anti-clipping limiter.
-6. **Procedural Reachability (`--smoke-test`)**: Validates procedural climbability (< 38° slopes) and fuel reachability (< 165m intervals) across all 6 biomes, verifies stage progression unlock chaining, stationary idle stability, and exports visual screen verification captures to `scratch/`.
+1. **UI Layout Regression (`--test-ui-layout`)**: Validates screen bounds containment, button non-overlap, real HUD telemetry vs minimap radar clearance, modal panel containment, and exports 12 reference captures (6 screens x 2 resolutions) to `scratch/ui_regression/`.
+2. **Box2D Integration (`--test-box2d`)**: Verifies Box2D version 2.2.1, edge-chain terrain colliders (401 vertices), fixed 60 Hz accumulator, substep clamp, simulation determinism, flat ground idle stability (< 0.01 km/h), 12° slope brake hold, reverse drive, and in-air attitude pitch control.
+3. **Vehicle Parity (`--test-box2d-vehicles`)**: Audits all 12 vehicles (Classic Off-Roader, Rally Racing Car, Modern Sports Coupe, Venom Hyper-V12, Heavy-Duty Pickup, Monster Truck, Desert Rally Raid, Formula Racing Car, Retro Muscle Car, Electric Off-Roader, Motocross Bike, and Quad Bike ATV) for idle stability, forward drive, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt.
+4. **World Integration (`--test-box2d-world`)**: Single-player driving distance, propulsion-only fuel drainage, dynamic suspension strut deformation, checkpoint triggers at 250m intervals, split-screen local multiplayer dual-vehicle physics, and neck-snap crash detection.
+5. **Suspension & Dynamics Audit (`--test-physics`)**: Evaluates 1.5m drop landing rebound oscillation, flat ground zero-spin, 60 km/h ground contact retention over undulations, 65m ski jump trajectory, steep mountain climb at x=950m, upside-down inverted crash non-penetration (< 0.005m), 80 km/h slope impact non-penetration, speedometer accuracy, propulsion-only fuel consumption, and surface friction scaling (glacial ice vs arctic snow vs countryside turf vs mountain rock).
+6. **Dynamic Audio Audit (`--test-audio`)**: Validates volume hierarchy, BGM crossfading, dynamic engine RPM pitch modulation (1000 to 8500 RPM), tire rolling audio, crash intensity scaling, environmental wind loop, and multi-channel anti-clipping limiter.
+7. **Procedural Reachability (`--smoke-test`)**: Validates procedural climbability (< 38° slopes) and fuel reachability (< 165m intervals) across all 6 biomes, verifies stage progression unlock chaining, stationary idle stability, and exports visual screen verification captures to `scratch/`.
 
 ---
 
@@ -186,7 +190,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 - **12 Vehicles**: Fully calibrated with individual masses, wheelbases, spring frequencies ($f_0$), damping ratios ($\zeta$), and air torques.
 - **6 Biomes**: Countryside, Desert, Arctic, Mountain, Moon, and Volcano.
 - **Multiplayer**: 2-player local split-screen with individual cameras, vehicle selections, and live scoreboards.
-- **Garage**: 4-attribute upgrade economy (Engine, Suspension, Tires, 4WD) with wheelbase-adaptive hydraulic lift.
+- **Garage**: 8-category upgrade tuning shop across 2 tabs (Engine, Suspension, Tires, 4WD, Brakes, Gearbox, Chassis, Aerodynamics) with wheelbase-adaptive hydraulic lift.
 - **UI/UX**: Responsive retro pixel layouts supporting $960 \times 540$ and $1280 \times 720$ with zero element occlusion.
 
 ---
@@ -201,4 +205,4 @@ When demonstrating the project to the evaluation panel and professor, follow thi
 3. **Gameplay & Multi-Vehicle Dynamics**:
    - Drive different vehicles (e.g. Classic Off-Roader vs Venom Hyper-V12 vs Monster Truck) to showcase distinct spring-damper dynamics, suspension compression under hard braking, in-air gyroscopic pitch acrobatics, and tire friction on varying terrain strata.
 4. **Automated Verification Live Demonstration**:
-   - Run the 6 built-in CLI test commands live in the terminal using `QT_QPA_PLATFORM=offscreen` to prove 100% passing automated regression checks across all 12 vehicles, physics invariants, and procedural biome fuel reachability.
+   - Run the 7 built-in CLI test commands live in the terminal using `QT_QPA_PLATFORM=offscreen` to prove 100% passing automated regression checks across all 12 vehicles, physics invariants, and procedural biome fuel reachability.
