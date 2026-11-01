@@ -40,33 +40,37 @@ void MainMenuScreen::setDimensions(int width, int height) {
     m_width = width;
     m_height = height;
 
-    int btnW = 320;
-    int btnX = width - btnW - 60; // 580 on 960 canvas
-    int startY = 94;
+    int btnW = (width >= 1200) ? 350 : 320;
+    int btnX = width - btnW - (width >= 1200 ? 75 : 60);
+    int startY = (height >= 700) ? 108 : 94;
+    int btnH = (height >= 700) ? 40 : 38;
+    int btnHSmall = (height >= 700) ? 38 : 36;
+    int gap = (height >= 700) ? 46 : 42;
+    int gapSmall = (height >= 700) ? 44 : 40;
 
     m_btnStart.setPosition(btnX, startY);
-    m_btnStart.setSize(btnW, 38);
+    m_btnStart.setSize(btnW, btnH);
 
-    m_btnMultiplayer.setPosition(btnX, startY + 42);
-    m_btnMultiplayer.setSize(btnW, 38);
+    m_btnMultiplayer.setPosition(btnX, startY + gap);
+    m_btnMultiplayer.setSize(btnW, btnH);
 
-    m_btnGrandPrix.setPosition(btnX, startY + 84);
-    m_btnGrandPrix.setSize(btnW, 38);
+    m_btnGrandPrix.setPosition(btnX, startY + gap * 2);
+    m_btnGrandPrix.setSize(btnW, btnH);
 
-    m_btnGarage.setPosition(btnX, startY + 126);
-    m_btnGarage.setSize(btnW, 36);
+    m_btnGarage.setPosition(btnX, startY + gap * 3);
+    m_btnGarage.setSize(btnW, btnHSmall);
 
-    m_btnStages.setPosition(btnX, startY + 166);
-    m_btnStages.setSize(btnW, 36);
+    m_btnStages.setPosition(btnX, startY + gap * 3 + gapSmall);
+    m_btnStages.setSize(btnW, btnHSmall);
 
-    m_btnAccount.setPosition(btnX, startY + 206);
-    m_btnAccount.setSize(btnW, 36);
+    m_btnAccount.setPosition(btnX, startY + gap * 3 + gapSmall * 2);
+    m_btnAccount.setSize(btnW, btnHSmall);
 
-    m_btnEvaluator.setPosition(btnX, startY + 246);
-    m_btnEvaluator.setSize(btnW, 36);
+    m_btnEvaluator.setPosition(btnX, startY + gap * 3 + gapSmall * 3);
+    m_btnEvaluator.setSize(btnW, btnHSmall);
 
-    m_btnQuit.setPosition(btnX, startY + 286);
-    m_btnQuit.setSize(btnW, 32);
+    m_btnQuit.setPosition(btnX, startY + gap * 3 + gapSmall * 4);
+    m_btnQuit.setSize(btnW, (height >= 700) ? 34 : 32);
 }
 
 void MainMenuScreen::onMouseMove(int px, int py) {
@@ -154,26 +158,30 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     drawPixelCloud(static_cast<int>(cloud3X), 32, 18);
 
     // 4. Parallax Mountain Layers & Scenic Hills
+    float peakBaseY = (m_height >= 700) ? (m_height * 0.52f) : 295.0f;
+    float foothillBaseY = (m_height >= 700) ? (m_height * 0.62f) : 345.0f;
+    float hillBaseY = (m_height >= 700) ? (m_height * 0.72f) : 395.0f;
+
     for (int x = 0; x < m_width; ++x) {
         // Layer 1: Distant Alpine Peaks
-        float h0 = std::sin(x * 0.005f + 0.5f) * 45.0f + 295.0f;
+        float h0 = std::sin(x * 0.005f + 0.5f) * 45.0f + peakBaseY;
         int y0 = static_cast<int>(h0);
         for (int y = y0; y < m_height; ++y) {
             fb.setPixelFast(x, y, 0xFF455A64);
         }
-        if (y0 < 275) {
+        if (y0 < peakBaseY - 20.0f) {
             fb.fillRect(x, y0, 1, 5, 0xFFECEFF1); // Snowcaps
         }
 
         // Layer 2: Mid-ground Pine Foothills
-        float h1 = std::sin(x * 0.008f + m_animTime * 0.10f) * 32.0f + 345.0f;
+        float h1 = std::sin(x * 0.008f + m_animTime * 0.10f) * 32.0f + foothillBaseY;
         int y1 = static_cast<int>(h1);
         for (int y = y1; y < m_height; ++y) {
             fb.setPixelFast(x, y, (y - y1 < 4) ? 0xFF388E3C : 0xFF2E7D32);
         }
 
         // Layer 3: Foreground Emerald Lawn with Geological Strata
-        float h2 = std::sin(x * 0.011f + 0.8f) * 26.0f + 395.0f;
+        float h2 = std::sin(x * 0.011f + 0.8f) * 26.0f + hillBaseY;
         int y2 = static_cast<int>(h2);
         for (int y = y2; y < m_height; ++y) {
             int depth = y - y2;
@@ -198,8 +206,8 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     }
 
     // 5. ZONE A (LEFT): Hero Vehicle Showcase on Scenic Plateau
-    int vehX = 265;
-    float hillY = std::sin(vehX * 0.011f + 0.8f) * 26.0f + 395.0f;
+    int vehX = (m_width >= 1200) ? static_cast<int>(m_width * 0.28f) : 265;
+    float hillY = std::sin(vehX * 0.011f + 0.8f) * 26.0f + hillBaseY;
     float idleBob = std::sin(m_animTime * 3.5f) * 1.5f;
     int vy = static_cast<int>(hillY - 26 + idleBob);
 
@@ -236,7 +244,7 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     }
 
     // Telemetry Showcase Card directly beneath vehicle
-    int cardW = 370;
+    int cardW = (m_width >= 1200) ? 410 : 370;
     int cardH = 84;
     int cardX = vehX - cardW / 2;
     int cardY = static_cast<int>(hillY + 14);
@@ -257,12 +265,13 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
 
     // 3 Performance Spec Chips
     int chipY = cardY + 48;
+    int chipGap = 8;
+    int chipW = (cardW - 28 - 2 * chipGap) / 3;
     auto drawMiniStat = [&](int x, const std::string& label, int level, uint32_t barCol) {
-        int w = 108;
-        fb.fillRect(x, chipY, w, 26, 0xEE111A26);
-        fb.drawRect(x, chipY, w, 26, 0xFF2A3A4E);
+        fb.fillRect(x, chipY, chipW, 26, 0xEE111A26);
+        fb.drawRect(x, chipY, chipW, 26, 0xFF2A3A4E);
         Graphics::RasterFont::drawString(fb, x + 6, chipY + 3, label, Theme::TEXT_MUTED, 1);
-        UIComponents::drawSegmentedBar(fb, x + 6, chipY + 15, w - 12, 7, level, 15, barCol);
+        UIComponents::drawSegmentedBar(fb, x + 6, chipY + 15, chipW - 12, 7, level, 15, barCol);
     };
 
     int engLvl = profile.getUpgradeLevel(profile.selectedVehicle(), Core::ProfileManager::UPGRADE_ENGINE);
@@ -270,8 +279,8 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     int suspLvl = profile.getUpgradeLevel(profile.selectedVehicle(), Core::ProfileManager::UPGRADE_SUSPENSION);
 
     drawMiniStat(cardX + 14, "ENGINE", engLvl, Theme::GOLD);
-    drawMiniStat(cardX + 130, "TIRES", tireLvl, Theme::CYAN_UPGRADE);
-    drawMiniStat(cardX + 246, "SUSPENSION", suspLvl, Theme::GREEN_GAS);
+    drawMiniStat(cardX + 14 + chipW + chipGap, "TIRES", tireLvl, Theme::CYAN_UPGRADE);
+    drawMiniStat(cardX + 14 + (chipW + chipGap) * 2, "SUSPENSION", suspLvl, Theme::GREEN_GAS);
 
     // 6. ZONE B (RIGHT): Master Navigation Console & Career Ticker
     // Breathing pulse halo on START button
@@ -306,7 +315,7 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     // Active Racer Profile Badge (Top Right above menu, aligned with buttons)
     int profBadgeW = 220;
     int profBadgeX = m_btnStart.x() + m_btnStart.width() - profBadgeW;
-    int profBadgeY = 56;
+    int profBadgeY = m_btnStart.y() - 36;
     auto* activeAcc = Core::AccountManager::instance().activeAccount();
     std::string userDisplay = activeAcc ? activeAcc->username : "GuestRacer";
     int userLvl = activeAcc ? activeAcc->level : 1;
@@ -318,7 +327,7 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     Graphics::RasterFont::drawString(fb, profBadgeX + profBadgeW - 48, profBadgeY + 9, lvlStr, Theme::GOLD, 1);
 
     int btnX = m_btnStart.x();
-    int tickY = m_btnQuit.y() + m_btnQuit.height() + 8;
+    int tickY = m_btnQuit.y() + m_btnQuit.height() + (m_height >= 700 ? 12 : 8);
     int unlockedCount = 0;
     for (int v = 0; v < static_cast<int>(Physics::VehicleType::COUNT); ++v) {
         if (profile.isVehicleUnlocked(static_cast<Physics::VehicleType>(v))) unlockedCount++;
@@ -397,7 +406,8 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     fb.fillRect(0, footY, m_width, footH, 0xEE090E18);
     fb.drawLine(0, footY, m_width, footY, 0xFF1E2B3E);
 
-    int startKx = cx - 440;
+    int totalFooterW = 695;
+    int startKx = (m_width - totalFooterW) / 2;
     int ky = footY + 6;
 
     // ENTER: SOLO

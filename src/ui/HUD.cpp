@@ -226,10 +226,10 @@ void HUD::render(Graphics::Framebuffer& fb) {
     m_fuelBar.render(fb);
 
     // 2. Top Center: Unified Rally Stage Telemetry & Odometer Module
-    int distCardW = 320;
+    int distCardW = (m_width >= 1200) ? 380 : 320;
     int distCardH = 48;
     int distCardX = (m_width - distCardW) / 2;
-    int distCardY = 10;
+    int distCardY = (m_height >= 700) ? 42 : 38; // Positioned cleanly below MinimapRadar (y=10..36) to prevent overlap
 
     UIComponents::drawArcadePanel(fb, distCardX, distCardY, distCardW, distCardH, 0xEE090E18, Theme::CARD_BORDER, Theme::GOLD, 2, true, true);
 
@@ -243,12 +243,14 @@ void HUD::render(Graphics::Framebuffer& fb) {
     int spdInt = static_cast<int>(m_speedometer.currentValue());
     char spdBuf[32];
     std::snprintf(spdBuf, sizeof(spdBuf), "%3d KM/H", spdInt);
-    Graphics::RasterFont::drawString(fb, distCardX + 138, distCardY + 7, spdBuf, Theme::CYAN_UPGRADE, 1);
+    int spdX = distCardX + (distCardW >= 380 ? 165 : 138);
+    Graphics::RasterFont::drawString(fb, spdX, distCardY + 7, spdBuf, Theme::CYAN_UPGRADE, 1);
 
     int recInt = static_cast<int>(m_recordDistance);
     char recBuf[32];
     std::snprintf(recBuf, sizeof(recBuf), "REC %04dm", recInt);
-    Graphics::RasterFont::drawString(fb, distCardX + 224, distCardY + 7, recBuf, Theme::GOLD, 1);
+    int recX = distCardX + (distCardW >= 380 ? 275 : 224);
+    Graphics::RasterFont::drawString(fb, recX, distCardY + 7, recBuf, Theme::GOLD, 1);
 
     // Mini Rally Stage Progress Track Line
     int trackX = distCardX + 12;
