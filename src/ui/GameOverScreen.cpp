@@ -31,12 +31,14 @@ void GameOverScreen::setDimensions(int width, int height) {
     m_width = width;
     m_height = height;
 
-    int btnW = 180;
-    int btnH = 46;
-    int gap = 18;
+    int btnW = (width >= 1200) ? 195 : 180;
+    int btnH = (height >= 700) ? 48 : 46;
+    int gap = (width >= 1200) ? 20 : 18;
     int totalW = 3 * btnW + 2 * gap;
     int startX = (width - totalW) / 2;
-    int btnY = height / 2 + 130;
+    int boxH = (height >= 700) ? 450 : 410;
+    int boxY = (height - boxH) / 2;
+    int btnY = boxY + boxH - btnH - 24;
 
     m_btnRetry.setPosition(startX, btnY);
     m_btnRetry.setSize(btnW, btnH);
@@ -87,8 +89,8 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
     }
 
     // 2. Centered Summary Modal Card
-    int boxW = 620;
-    int boxH = 410;
+    int boxW = (m_width >= 1200) ? 680 : 620;
+    int boxH = (m_height >= 700) ? 450 : 410;
     int boxX = (m_width - boxW) / 2;
     int boxY = (m_height - boxH) / 2;
 
@@ -181,6 +183,7 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
     int colLeft = boxX + 60;
     int colRight = boxX + boxW - 60;
     int rowW = colRight - colLeft;
+    int rowGap = (m_height >= 700) ? 35 : 32;
 
     auto drawRow = [&](int y, const std::string& label, const std::string& value, uint32_t valCol, bool altBg) {
         if (altBg) {
@@ -196,12 +199,12 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
     };
 
     drawRow(tableY, "DISTANCE REACHED", UIComponents::formatNumber(static_cast<int64_t>(m_distance)) + " m", Theme::TEXT_WHITE, false);
-    drawRow(tableY + 32, "COINS COLLECTED", "+$" + UIComponents::formatNumber(m_coins), Theme::GOLD, true);
-    drawRow(tableY + 64, "AERIAL FLIPS", UIComponents::formatNumber(m_flips) + " FLIPS", Theme::CYAN_UPGRADE, false);
+    drawRow(tableY + rowGap, "COINS COLLECTED", "+$" + UIComponents::formatNumber(m_coins), Theme::GOLD, true);
+    drawRow(tableY + rowGap * 2, "AERIAL FLIPS", UIComponents::formatNumber(m_flips) + " FLIPS", Theme::CYAN_UPGRADE, false);
 
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1) << m_airTime << " s";
-    drawRow(tableY + 96, "TOTAL AIR TIME", ss.str(), Theme::GREEN_GAS, true);
+    drawRow(tableY + rowGap * 3, "TOTAL AIR TIME", ss.str(), Theme::GREEN_GAS, true);
 
     // Action Buttons
     float pulseAlpha = (std::sin(m_animTime * 4.0f) * 0.5f + 0.5f);

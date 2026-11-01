@@ -74,14 +74,15 @@ void StageSelectScreen::setDimensions(int width, int height) {
     m_btnNextPage.setPosition(cx + 55, 54);
     m_btnNextPage.setSize(75, 26);
 
-    int cardW = 270;
-    int cardGap = 20;
+    int cardW = (width >= 1200) ? 320 : 270;
+    int cardGap = (width >= 1200) ? 30 : 20;
     int totalCardsW = 3 * cardW + 2 * cardGap;
     int startX = (m_width - totalCardsW) / 2;
-    int cardY = 88;
+    int cardY = (height >= 700) ? 108 : 88;
+    int cardH = (height >= 700) ? 460 : 405;
     int btnW = cardW - 28;
-    int btnH = 40;
-    int btnY = cardY + 355;
+    int btnH = (height >= 700) ? 42 : 40;
+    int btnY = cardY + cardH - btnH - 10;
 
     for (int i = 0; i < 3; ++i) {
         // Page 0 buttons (0..2)
@@ -315,12 +316,14 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
         if (m_page == p) fb.setPixelFast(dotX, dotY, 0xFFFFFFFF);
     }
 
-    int cardW = 270;
-    int cardH = 405;
-    int cardGap = 20;
+    int cardW = (m_width >= 1200) ? 320 : 270;
+    int cardGap = (m_width >= 1200) ? 30 : 20;
     int totalCardsW = 3 * cardW + 2 * cardGap;
     int startX = (m_width - totalCardsW) / 2;
-    int cardY = 88;
+    int cardY = (m_height >= 700) ? 108 : 88;
+    int cardH = (m_height >= 700) ? 460 : 405;
+    int thumbH = (m_height >= 700) ? 125 : 105;
+    int btnH = (m_height >= 700) ? 42 : 40;
 
     int startIdx = m_page * 3;
     for (int i = 0; i < 3; ++i) {
@@ -341,16 +344,17 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
         Graphics::RasterFont::drawString(fb, x + 34, y + 11, locName, Theme::TEXT_WHITE, 2);
 
         // Thumbnail
-        drawStageThumbnail(fb, x + 14, y + 36, cardW - 28, 105, idx);
+        drawStageThumbnail(fb, x + 14, y + 36, cardW - 28, thumbH, idx);
 
         // Info Chips
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 150, locDesc, Theme::TEXT_MUTED, 1);
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 168, "GRAVITY: " + stage.gravity, Theme::CYAN_UPGRADE, 1);
+        int infoY = y + 36 + thumbH + 10;
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, infoY, locDesc, Theme::TEXT_MUTED, 1);
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, infoY + 18, "GRAVITY: " + stage.gravity, Theme::CYAN_UPGRADE, 1);
 
         // Difficulty Rating with Pixel Stars
         int starStartX = x + cardW / 2 - (5 * 10) / 2;
-        int starY = y + 186;
-        Graphics::RasterFont::drawString(fb, x + 30, starY - 1, "DIFFICULTY:", Theme::TEXT_MUTED, 1);
+        int starY = infoY + 36;
+        Graphics::RasterFont::drawString(fb, x + 20, starY - 1, "DIFFICULTY:", Theme::TEXT_MUTED, 1);
         for (int s = 0; s < 5; ++s) {
             UIComponents::drawStar(fb, starStartX + 35 + s * 12, starY + 2, 4, (s < stage.difficultyStars), Theme::GOLD, 0xFF37474F);
         }
@@ -362,7 +366,7 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
         int progBoxW = cardW - 28;
         int progBoxH = 46;
         int progBoxX = x + 14;
-        int progBoxY = y + 204;
+        int progBoxY = starY + 18;
 
         UIComponents::drawArcadePanel(fb, progBoxX, progBoxY, progBoxW, progBoxH, 0xFF121B27, 0xFF2A3A4E, 0, 0, false, false);
 
@@ -385,11 +389,13 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
         // High Score Record Box
         float rec = profile.getRecordDistance(stage.id);
         std::string recStr = "RECORD: " + UIComponents::formatNumber(static_cast<int64_t>(rec)) + "m";
-        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 266, recStr, Theme::GOLD, 2);
+        int recY = progBoxY + 54;
+        Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, recY, recStr, Theme::GOLD, 2);
 
         // Unlock status & Action Button
         bool unlocked = profile.isStageUnlocked(stage.id);
         auto& btn = m_btnStageAction[idx];
+        int btnY = y + cardH - btnH - 10;
 
         if (unlocked) {
             btn.setText("PLAY");
@@ -404,11 +410,11 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
 
             // Requirement hint under button
             std::string reqHint = "(" + stage.unlockRequirement + ")";
-            Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, y + 338, reqHint, Theme::TEXT_MUTED, 1);
+            Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, btnY - 14, reqHint, Theme::TEXT_MUTED, 1);
         }
 
-        btn.setPosition(x + 14, y + 355);
-        btn.setSize(cardW - 28, 40);
+        btn.setPosition(x + 14, btnY);
+        btn.setSize(cardW - 28, btnH);
         btn.render(fb, 2);
     }
 }

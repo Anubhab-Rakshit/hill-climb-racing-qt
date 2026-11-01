@@ -263,42 +263,22 @@ void GarageScreen::update(float dt) {
 }
 
 void GarageScreen::drawVehiclePreview(Graphics::Framebuffer& fb, int cx, int cy, const Core::ProfileManager& profile) {
-    // 1. Hydraulic Workshop Lift Platform
-    int liftW = 280;
-    int liftX = cx - liftW / 2;
-    int liftY = cy + 38;
-
-    // Hydraulic Ram Cylinders
-    fb.fillRect(cx - 72, liftY + 8, 16, 16, 0xFF78909C);
-    fb.fillRect(cx - 70, liftY + 8, 12, 16, 0xFFCFD8DC);
-    fb.fillRect(cx + 56, liftY + 8, 16, 16, 0xFF78909C);
-    fb.fillRect(cx + 58, liftY + 8, 12, 16, 0xFFCFD8DC);
-
-    // Lift Base Platform
-    fb.fillRect(liftX, liftY, liftW, 8, 0xFF263238);
-    fb.fillRect(liftX, liftY, liftW, 2, 0xFF90A4AE); // Top runner plate
-
-    // Neon inspection underglow beneath vehicle
-    int underglowW = 170;
-    fb.fillRect(cx - underglowW / 2, liftY - 2, underglowW, 2, 0x4400E5FF);
-
-    // Warning Hazard Chevron Stripes
-    for (int hx = liftX + 4; hx < liftX + liftW - 4; hx += 16) {
-        fb.fillRect(hx, liftY + 2, 8, 4, Theme::GOLD);
-    }
+    // 1. Neon inspection underglow beneath vehicle
+    int underglowW = 180;
+    fb.fillRect(cx - underglowW / 2, cy + 44, underglowW, 2, 0x4400E5FF);
 
     // Concrete Floor Divider Line
-    fb.fillRect(0, liftY + 24, m_width, 2, 0xFF142030);
+    fb.fillRect(0, cy + 70, m_width, 2, 0xFF142030);
 
-    // 2. Render Authentic Pixel Vehicle Sprite & Selected Driver
-    Graphics::SpriteRenderer::renderGarageVehicle(fb, cx, cy, m_carBounceY, profile, m_viewedVehicle, profile.selectedDriver());
+    // 2. Render Authentic Pixel Vehicle Sprite & Selected Driver with Hydraulic Lift
+    Graphics::SpriteRenderer::renderGarageVehicle(fb, cx, cy, m_carBounceY, profile, m_viewedVehicle, profile.selectedDriver(), /*drawLift=*/true);
 
     const auto& cfg = Physics::VehicleRegistry::getConfig(m_viewedVehicle);
 
     // 3. Vehicle Tagline (Clean Plaque)
     int tagW = Graphics::RasterFont::getTextWidth(cfg.tagline, 1) + 20;
     int tagX = cx - tagW / 2;
-    int tagY = liftY + 11;
+    int tagY = cy + 62;
     UIComponents::drawArcadePanel(fb, tagX, tagY, tagW, 16, 0xEE090F18, 0xFF2A3A4E, 0, 0, false, false);
     Graphics::RasterFont::drawStringCentered(fb, cx, tagY + 3, cfg.tagline, Theme::GOLD, 1);
 
@@ -365,7 +345,7 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     m_btnDrive.render(fb, 2);
 
     int cx = m_width / 2;
-    int headW = 350;
+    int headW = (m_width >= 1200) ? 350 : 280;
     int headX = cx - headW / 2;
     UIComponents::drawArcadePanel(fb, headX, 12, headW, 34, 0xEE0B121C, 0xFF37474F, Theme::GOLD, 2, true, true);
     Graphics::RasterFont::drawString(fb, headX + 16, 21, "GARAGE & TUNING", Theme::GOLD, 2);
@@ -483,7 +463,7 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     int cardGap = 16;
     int totalCardsW = 4 * cardW + 3 * cardGap;
     int startX = (m_width - totalCardsW) / 2;
-    int cardY = 328;
+    int cardY = 322;
 
     int startIdx = (m_activeTab == 0) ? 0 : 4;
     for (int i = 0; i < 4; ++i) {

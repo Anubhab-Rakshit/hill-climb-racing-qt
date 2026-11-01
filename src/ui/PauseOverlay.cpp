@@ -27,21 +27,22 @@ void PauseOverlay::setDimensions(int width, int height) {
     m_width = width;
     m_height = height;
 
-    int btnW = 230;
-    int btnH = 44;
+    int btnW = (width >= 1200) ? 270 : 230;
+    int btnH = (height >= 700) ? 48 : 44;
+    int gap = (height >= 700) ? 56 : 54;
     int cx = width / 2 - btnW / 2;
-    int startY = height / 2 - 76;
+    int startY = (height >= 700) ? (height / 2 - 88) : (height / 2 - 76);
 
     m_btnResume.setPosition(cx, startY);
     m_btnResume.setSize(btnW, btnH);
 
-    m_btnRestart.setPosition(cx, startY + 54);
+    m_btnRestart.setPosition(cx, startY + gap);
     m_btnRestart.setSize(btnW, btnH);
 
-    m_btnGarage.setPosition(cx, startY + 108);
+    m_btnGarage.setPosition(cx, startY + gap * 2);
     m_btnGarage.setSize(btnW, btnH);
 
-    m_btnMenu.setPosition(cx, startY + 162);
+    m_btnMenu.setPosition(cx, startY + gap * 3);
     m_btnMenu.setSize(btnW, btnH);
 }
 
@@ -77,8 +78,8 @@ void PauseOverlay::render(Graphics::Framebuffer& fb) {
     }
 
     // 2. Centered Modal Box
-    int boxW = 380;
-    int boxH = 330;
+    int boxW = (m_width >= 1200) ? 440 : 380;
+    int boxH = (m_height >= 700) ? 360 : 330;
     int boxX = (m_width - boxW) / 2;
     int boxY = (m_height - boxH) / 2;
 
@@ -93,10 +94,11 @@ void PauseOverlay::render(Graphics::Framebuffer& fb) {
     // Title Plaque
     int cx = m_width / 2;
     // Pause Double-Bar Icons flanking title with ample clearance
-    fb.fillRect(cx - 128, boxY + 22, 5, 18, Theme::GOLD);
-    fb.fillRect(cx - 118, boxY + 22, 5, 18, Theme::GOLD);
-    fb.fillRect(cx + 113, boxY + 22, 5, 18, Theme::GOLD);
-    fb.fillRect(cx + 123, boxY + 22, 5, 18, Theme::GOLD);
+    int barOff = (boxW >= 440) ? 142 : 128;
+    fb.fillRect(cx - barOff, boxY + 22, 5, 18, Theme::GOLD);
+    fb.fillRect(cx - barOff + 10, boxY + 22, 5, 18, Theme::GOLD);
+    fb.fillRect(cx + barOff - 15, boxY + 22, 5, 18, Theme::GOLD);
+    fb.fillRect(cx + barOff - 5, boxY + 22, 5, 18, Theme::GOLD);
 
     // Drop shadow title
     Graphics::RasterFont::drawStringCentered(fb, cx + 2, boxY + 24, "GAME PAUSED", 0xFF05080E, 3);

@@ -224,8 +224,10 @@ void SpriteRenderer::renderRemoteVehicle(Framebuffer& fb, const Camera& cam, con
     Physics::Vec2 rearMountScr = cam.worldToScreen(chassisPointToWorld(config.rearMountOffset));
     Physics::Vec2 frontMountScr = cam.worldToScreen(chassisPointToWorld(config.frontMountOffset));
 
-    Physics::Vec2 rearWheelScr(rearMountScr.x, rearMountScr.y + state.rearSuspLen * zoom);
-    Physics::Vec2 frontWheelScr(frontMountScr.x, frontMountScr.y + state.frontSuspLen * zoom);
+    Physics::Vec2 rearWheelWorld = chassisPointToWorld({config.rearMountOffset.x, config.rearMountOffset.y - state.rearSuspLen});
+    Physics::Vec2 frontWheelWorld = chassisPointToWorld({config.frontMountOffset.x, config.frontMountOffset.y - state.frontSuspLen});
+    Physics::Vec2 rearWheelScr = cam.worldToScreen(rearWheelWorld);
+    Physics::Vec2 frontWheelScr = cam.worldToScreen(frontWheelWorld);
 
     // Colored Under-glow Aura in player's custom color!
     fb.fillCircle(static_cast<int>(chassisScr.x), static_cast<int>(chassisScr.y + 12), 22, (state.color & 0x00FFFFFF) | 0x44000000);
