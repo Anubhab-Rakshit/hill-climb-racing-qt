@@ -26,6 +26,9 @@ public:
 
     void step(float dt, const Core::ProfileManager& profile);
 
+    void setUseBox2D(bool enabled);
+    bool usesBox2D() const { return m_useBox2D; }
+
     Vehicle& vehicle() { return m_vehicle; }
     const Vehicle& vehicle() const { return m_vehicle; }
 
@@ -93,6 +96,7 @@ private:
     Terrain m_terrain;
 
     bool m_isMultiplayer = false;
+    bool m_useBox2D = true;
 
     // Player 1 state
     float m_distance;

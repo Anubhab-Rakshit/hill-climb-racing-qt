@@ -1,9 +1,583 @@
 #define _USE_MATH_DEFINES
 #include "Vehicle.h"
+#include "Box2DPhysics.h"
 #include <cmath>
 #include <algorithm>
+#include <cstdio>
 
 namespace Physics {
+
+
+namespace {
+
+constexpr float kPi = 3.14159265358979323846f;
+
+inline Vec2 toVec2(const b2Vec2& v) { return Vec2(v.x, v.y); }
+
+struct ImpactListener : public b2ContactListener {
+    float maxImpact = 0.0f;
+
+    void PreSolve(b2Contact* contact, const b2Manifold*) override {
+        b2WorldManifold wm;
+        contact->GetWorldManifold(&wm);
+
+        b2Body* bodyA = contact->GetFixtureA()->GetBody();
+        b2Body* bodyB = contact->GetFixtureB()->GetBody();
+        b2Vec2 vA = bodyA->GetLinearVelocity();
+        b2Vec2 vB = bodyB->GetLinearVelocity();
+        float approach = -b2Dot(vB - vA, wm.normal);
+        if (approach > maxImpact) {
+            maxImpact = approach;
+        }
+    }
+};
+
+} // namespace
+
+struct Vehicle::Box2DVehicleSim {
+    Vehicle& owner;
+    Box2DPhysics world;
+    ImpactListener impactListener;
+
+    b2Body* chassis = nullptr;
+    b2Body* rearWheel = nullptr;
+    b2Body* frontWheel = nullptr;
+    b2WheelJoint* rearJoint = nullptr;
+    b2WheelJoint* frontJoint = nullptr;
+    b2Fixture* rearFixture = nullptr;
+    b2Fixture* frontFixture = nullptr;
+
+    float chassisCenterX = 0.0f;
+    float chassisCenterY = 0.0f;
+    float chassisHalfX = 0.0f;
+    float chassisHalfY = 0.0f;
+
+    float lastTerrainCenter = 0.0f;
+    float terrainRebuildTimer = 0.0f;
+    float appliedChassisMassMult = -1.0f;
+    float appliedWheelFriction = -1.0f;
+    float appliedSpringFreq = -1.0f;
+    float appliedSpringDamp = -1.0f;
+
+    explicit Box2DVehicleSim(Vehicle& v)
+        : owner(v)
+        , world(v.m_customGravity < -0.1f ? v.m_customGravity : -9.81f)
+    {
+        world.world().SetContactListener(&impactListener);
+    }
+
+    ~Box2DVehicleSim() {
+        destroyBodies();
+    }
+
+    void destroyBodies() {
+        if (rearJoint != nullptr) {
+            world.world().DestroyJoint(rearJoint);
+            rearJoint = nullptr;
+        }
+        if (frontJoint != nullptr) {
+            world.world().DestroyJoint(frontJoint);
+            frontJoint = nullptr;
+        }
+        if (rearWheel != nullptr) {
+            world.world().DestroyBody(rearWheel);
+            rearWheel = nullptr;
+            rearFixture = nullptr;
+        }
+        if (frontWheel != nullptr) {
+            world.world().DestroyBody(frontWheel);
+            frontWheel = nullptr;
+            frontFixture = nullptr;
+        }
+        if (chassis != nullptr) {
+            world.world().DestroyBody(chassis);
+            chassis = nullptr;
+        }
+        world.clearTerrain();
+    }
+
+    void buildTerrain(const Terrain& terrain, float centerX) {
+        Box2DTerrainOptions options;
+        options.startX = centerX - 80.0f;
+        options.endX = centerX + 140.0f;
+        options.sampleSpacing = 0.5f;
+        options.friction = std::clamp(terrain.getFrictionAt(centerX), 0.2f, 1.5f);
+        world.createSolidTerrainCollider(terrain, options, 2.0f);
+        lastTerrainCenter = centerX;
+        terrainRebuildTimer = 0.0f;
+    }
+
+    void reset(const Terrain& terrain, float startX, float startY, float startAngle) {
+        destroyBodies();
+        world.resetAccumulator();
+        world.setGravity(0.0f, owner.m_customGravity < -0.1f ? owner.m_customGravity : -terrain.getGravity());
+        buildTerrain(terrain, startX);
+
+        const VehicleConfig& cfg = owner.m_config;
+
+        const float lxMin = -cfg.spriteAnchor.x / 80.25f;
+        const float lxMax = (cfg.spriteWidth - cfg.spriteAnchor.x) / 80.25f;
+        const float lyMax = cfg.spriteAnchor.y / 80.25f;
+        const float lyMin = -(cfg.spriteHeight - cfg.spriteAnchor.y) / 80.25f;
+        const float skidY = std::min(-0.06f, lyMin - 0.04f);
+
+        chassisHalfX = std::max(0.25f, (lxMax - lxMin) * 0.5f);
+        chassisHalfY = std::max(0.18f, (lyMax - skidY) * 0.5f);
+        chassisCenterX = (lxMin + lxMax) * 0.5f;
+        chassisCenterY = (skidY + lyMax) * 0.5f;
+
+        b2BodyDef chassisDef;
+        chassisDef.type = b2_dynamicBody;
+        chassisDef.position.Set(startX, startY);
+        chassisDef.angle = startAngle;
+        chassisDef.allowSleep = true;
+        chassisDef.bullet = true;
+        chassisDef.linearDamping = 0.01f;
+        chassisDef.angularDamping = 0.04f;
+        chassis = world.world().CreateBody(&chassisDef);
+
+        b2PolygonShape chassisShape;
+        chassisShape.SetAsBox(chassisHalfX, chassisHalfY,
+                              b2Vec2(chassisCenterX, chassisCenterY), 0.0f);
+
+        b2FixtureDef chassisFixture;
+        chassisFixture.shape = &chassisShape;
+        chassisFixture.density = 1.0f;
+        chassisFixture.friction = 0.55f;
+        chassisFixture.restitution = 0.02f;
+        chassis->CreateFixture(&chassisFixture);
+
+        b2MassData chassisMassData;
+        chassisMassData.mass = cfg.mass;
+        chassisMassData.center = b2Vec2(chassisCenterX, chassisCenterY);
+        chassisMassData.I = cfg.inertia;
+        chassis->SetMassData(&chassisMassData);
+
+        const float cosA = std::cos(startAngle);
+        const float sinA = std::sin(startAngle);
+        const b2Vec2 down(sinA, -cosA);
+
+        auto createWheel = [&](const Vec2& mountOffset, float restLength,
+                               b2Body*& wheelBody, b2Fixture*& wheelFixture) {
+            const b2Vec2 mount(startX + (mountOffset.x * cosA - mountOffset.y * sinA),
+                               startY + (mountOffset.x * sinA + mountOffset.y * cosA));
+            const b2Vec2 wheelPos = mount + restLength * down;
+
+            b2BodyDef wheelDef;
+            wheelDef.type = b2_dynamicBody;
+            wheelDef.position = wheelPos;
+            wheelDef.angle = 0.0f;
+            wheelDef.allowSleep = true;
+            wheelDef.bullet = true;
+            wheelBody = world.world().CreateBody(&wheelDef);
+
+            b2CircleShape wheelShape;
+            wheelShape.m_radius = cfg.wheelRadius;
+
+            b2FixtureDef wheelFixtureDef;
+            wheelFixtureDef.shape = &wheelShape;
+            const float area = kPi * cfg.wheelRadius * cfg.wheelRadius;
+            wheelFixtureDef.density = cfg.wheelMass / std::max(area, 0.0001f);
+            wheelFixtureDef.friction = std::clamp(cfg.baseGrip, 0.4f, 3.0f);
+            wheelFixtureDef.restitution = 0.03f;
+            wheelFixture = wheelBody->CreateFixture(&wheelFixtureDef);
+
+            b2MassData wheelMassData;
+            wheelMassData.mass = cfg.wheelMass;
+            wheelMassData.center.SetZero();
+            wheelMassData.I = cfg.wheelInertia;
+            wheelBody->SetMassData(&wheelMassData);
+        };
+
+        createWheel(cfg.rearMountOffset, cfg.suspRestLength, rearWheel, rearFixture);
+        createWheel(cfg.frontMountOffset, cfg.suspRestLength, frontWheel, frontFixture);
+
+        auto createJoint = [&](const Vec2& mountOffset, b2Body* wheelBody,
+                               float springRate, float damperRate, float massEff) -> b2WheelJoint* {
+            const b2Vec2 mount(startX + (mountOffset.x * cosA - mountOffset.y * sinA),
+                               startY + (mountOffset.x * sinA + mountOffset.y * cosA));
+            const b2Vec2 anchor = mount + cfg.suspRestLength * down;
+
+            b2WheelJointDef jointDef;
+            jointDef.Initialize(chassis, wheelBody, anchor, down);
+            jointDef.enableMotor = true;
+            jointDef.maxMotorTorque = 0.0f;
+            jointDef.motorSpeed = 0.0f;
+
+            const float omega = std::sqrt(std::max(springRate, 1.0f) / std::max(massEff, 1.0f));
+            const float freq = std::clamp(omega / (2.0f * kPi), 0.5f, 12.0f);
+            const float damp = std::clamp(damperRate / (2.0f * std::sqrt(std::max(springRate, 1.0f) * std::max(massEff, 1.0f))), 0.15f, 1.0f);
+            jointDef.frequencyHz = freq;
+            jointDef.dampingRatio = damp;
+            return static_cast<b2WheelJoint*>(world.world().CreateJoint(&jointDef));
+        };
+
+        const float reducedMass = 1.0f / (1.0f / std::max(cfg.mass, 0.001f) + 1.0f / std::max(cfg.wheelMass, 0.001f));
+        rearJoint = createJoint(cfg.rearMountOffset, rearWheel, cfg.baseSpringRate, cfg.baseDamperRate, reducedMass);
+        frontJoint = createJoint(cfg.frontMountOffset, frontWheel, cfg.baseSpringRate, cfg.baseDamperRate, reducedMass);
+
+        appliedChassisMassMult = 1.0f;
+        appliedWheelFriction = -1.0f;
+        appliedSpringFreq = -1.0f;
+        appliedSpringDamp = -1.0f;
+    }
+
+    bool bodyHasContact(b2Body* body) const {
+        for (b2ContactEdge* edge = body->GetContactList(); edge != nullptr; edge = edge->next) {
+            if (edge->contact != nullptr && edge->contact->IsTouching()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void updateTerrainIfNeeded(const Terrain& terrain) {
+        if (chassis == nullptr) {
+            return;
+        }
+
+        const float centerX = chassis->GetPosition().x;
+        terrainRebuildTimer += Box2DPhysics::kFixedDt;
+        if (std::abs(centerX - lastTerrainCenter) > 18.0f || terrainRebuildTimer > 0.75f) {
+            buildTerrain(terrain, centerX);
+        }
+    }
+
+    void applyControls(float effectiveGas, float effectiveBrake, float effectiveReverse,
+                       float brakePressure, const Core::ProfileManager& profile,
+                       const Terrain& terrain) {
+        if (chassis == nullptr || rearWheel == nullptr || frontWheel == nullptr) {
+            return;
+        }
+
+        const VehicleConfig& cfg = owner.m_config;
+        const float torqueMult = profile.getEngineTorqueMultiplier(owner.m_vehicleType);
+        const float suspStiffnessMult = profile.getSuspensionStiffnessMultiplier(owner.m_vehicleType);
+        const float tireGripMult = profile.getTireGripMultiplier(owner.m_vehicleType);
+        const float fourWdAdd = profile.get4wdTorqueSplit(owner.m_vehicleType);
+        const float brakeMult = profile.getBrakingMultiplier(owner.m_vehicleType);
+        const float transMult = profile.getTransmissionMultiplier(owner.m_vehicleType);
+        const float chassisMassMult = profile.getChassisMassMultiplier(owner.m_vehicleType);
+
+        if (std::abs(chassisMassMult - appliedChassisMassMult) > 0.0001f) {
+            b2MassData massData;
+            massData.mass = cfg.mass * chassisMassMult;
+            massData.center = b2Vec2(chassisCenterX, chassisCenterY);
+            massData.I = cfg.inertia * chassisMassMult;
+            chassis->SetMassData(&massData);
+            appliedChassisMassMult = chassisMassMult;
+        }
+
+        const float wheelFriction = std::clamp(cfg.baseGrip * tireGripMult * owner.m_customFrictionMultiplier, 0.35f, 3.0f);
+        if (std::abs(wheelFriction - appliedWheelFriction) > 0.0001f) {
+            if (rearFixture != nullptr) rearFixture->SetFriction(wheelFriction);
+            if (frontFixture != nullptr) frontFixture->SetFriction(wheelFriction);
+            appliedWheelFriction = wheelFriction;
+        }
+
+        const float springRate = cfg.baseSpringRate * suspStiffnessMult * owner.m_suspStiffnessMultiplier;
+        const float damperRate = cfg.baseDamperRate * std::sqrt(std::max(suspStiffnessMult, 0.01f)) * owner.m_suspDampingMultiplier;
+        const float sprungMass = cfg.mass * chassisMassMult;
+        const float reducedMass = 1.0f / (1.0f / std::max(sprungMass, 0.001f) + 1.0f / std::max(cfg.wheelMass, 0.001f));
+        const float springFreq = std::clamp(std::sqrt(std::max(springRate, 1.0f) / std::max(reducedMass, 0.001f)) / (2.0f * kPi), 0.5f, 12.0f);
+        const float springDamp = std::clamp(damperRate / (2.0f * std::sqrt(std::max(springRate, 1.0f) * std::max(reducedMass, 0.001f))), 0.15f, 1.0f);
+        if (std::abs(springFreq - appliedSpringFreq) > 0.01f) {
+            if (rearJoint != nullptr) rearJoint->SetSpringFrequencyHz(springFreq);
+            if (frontJoint != nullptr) frontJoint->SetSpringFrequencyHz(springFreq);
+            appliedSpringFreq = springFreq;
+        }
+        if (std::abs(springDamp - appliedSpringDamp) > 0.005f) {
+            if (rearJoint != nullptr) rearJoint->SetSpringDampingRatio(springDamp);
+            if (frontJoint != nullptr) frontJoint->SetSpringDampingRatio(springDamp);
+            appliedSpringDamp = springDamp;
+        }
+
+        const float topSpeedMs = (cfg.baseTopSpeedKmh * transMult) / (3.6f * Vehicle::SPEED_CALIBRATION);
+        const float maxDriveOmega = (cfg.wheelRadius > 0.001f) ? (topSpeedMs / cfg.wheelRadius) : 100.0f;
+        const float chassisOmega = chassis->GetAngularVelocity();
+
+        float peakTorque = cfg.basePeakTorque * torqueMult * owner.m_customTorqueMultiplier * 0.72f;
+        float rearTorque = 0.0f;
+        float frontTorque = 0.0f;
+        float motorSpeed = 0.0f;
+
+        const bool braking = (brakePressure > 0.001f && effectiveGas < 0.01f && effectiveReverse < 0.01f);
+        if (braking) {
+            const float brakeTorque = 0.75f * cfg.baseBrakingTorque * brakeMult * brakePressure;
+            rearTorque = brakeTorque;
+            frontTorque = brakeTorque;
+            motorSpeed = -chassisOmega;
+        } else if (effectiveGas > 0.01f) {
+            const float ratio = std::clamp(-rearWheel->GetAngularVelocity() / std::max(maxDriveOmega, 0.01f), 0.0f, 1.0f);
+            const float currentTorque = peakTorque * (1.0f - ratio * ratio) * effectiveGas;
+            const float fourWdSplit = std::clamp(cfg.base4wdSplit + fourWdAdd, 0.0f, 0.5f);
+            rearTorque = currentTorque * (1.0f - fourWdSplit);
+            frontTorque = currentTorque * fourWdSplit;
+            motorSpeed = -maxDriveOmega - chassisOmega;
+        } else if (effectiveReverse > 0.01f) {
+            const float maxRevOmega = maxDriveOmega * 0.45f;
+            const float ratio = std::clamp(rearWheel->GetAngularVelocity() / std::max(maxRevOmega, 0.01f), 0.0f, 1.0f);
+            const float currentTorque = peakTorque * 0.65f * (1.0f - ratio * ratio) * effectiveReverse;
+            const float fourWdSplit = std::clamp(cfg.base4wdSplit + fourWdAdd, 0.0f, 0.5f);
+            rearTorque = currentTorque * (1.0f - fourWdSplit);
+            frontTorque = currentTorque * fourWdSplit;
+            motorSpeed = maxRevOmega - chassisOmega;
+        }
+
+        auto configureMotor = [&](b2WheelJoint* joint, float torque) {
+            if (joint == nullptr) return;
+            joint->EnableMotor(torque > 0.01f);
+            joint->SetMaxMotorTorque(std::max(torque, 0.0f));
+            if (torque > 0.01f) {
+                joint->SetMotorSpeed(motorSpeed);
+            }
+        };
+        configureMotor(rearJoint, rearTorque);
+        configureMotor(frontJoint, frontTorque);
+
+        const bool rearContact = bodyHasContact(rearWheel);
+        const bool frontContact = bodyHasContact(frontWheel);
+
+        const bool driving = (effectiveGas > 0.01f || effectiveReverse > 0.01f) &&
+                             brakePressure <= 0.001f;
+        if (driving && (rearContact || frontContact)) {
+            const float driveTorque = rearTorque + frontTorque;
+            const float motorSign = (motorSpeed < 0.0f) ? -1.0f : 1.0f;
+            chassis->ApplyTorque(motorSign * driveTorque * 0.85f);
+        } else if (braking && (rearContact || frontContact)) {
+            const float targetAngle = std::atan(terrain.getSlope(chassis->GetPosition().x));
+            const float angleError = chassis->GetAngle() - targetAngle;
+            const float angularVel = chassis->GetAngularVelocity();
+            chassis->ApplyTorque(-angleError * 9000.0f - angularVel * 2200.0f);
+        }
+
+        if (!rearContact && !frontContact) {
+            const float airPitchTorque = 780.0f * cfg.baseAirAgility * profile.getDownforceMultiplier(owner.m_vehicleType) * owner.m_customAirGyroMultiplier;
+            const float pitchBack = std::max(effectiveGas, owner.m_tiltLeftInput);
+            const float pitchForward = std::max(effectiveBrake, owner.m_tiltRightInput);
+            if (pitchBack > 0.0f) {
+                chassis->ApplyTorque(airPitchTorque * pitchBack);
+            }
+            if (pitchForward > 0.0f) {
+                chassis->ApplyTorque(-airPitchTorque * pitchForward);
+            }
+        }
+    }
+
+    void applyAerodynamics(const Terrain& terrain, const Core::ProfileManager& profile) {
+        if (chassis == nullptr) return;
+
+        const float airDensity = terrain.getAirDensity();
+        if (airDensity <= 0.0001f) return;
+
+        const VehicleConfig& cfg = owner.m_config;
+        const float angle = chassis->GetAngle();
+        const float cosA = std::cos(angle);
+        const float sinA = std::sin(angle);
+        const b2Vec2 uLong(cosA, sinA);
+        const b2Vec2 uPerp(-sinA, cosA);
+        const b2Vec2 vel = chassis->GetLinearVelocity();
+
+        const float vLong = b2Dot(vel, uLong);
+        const float vPerp = b2Dot(vel, uPerp);
+
+        float dragScale = 1.0f;
+        switch (owner.m_vehicleType) {
+            case VehicleType::FORMULA_RACER:      dragScale = 0.70f; break;
+            case VehicleType::SUPERCAR:           dragScale = 0.78f; break;
+            case VehicleType::SPORTS_COUPE:       dragScale = 0.85f; break;
+            case VehicleType::RALLY_CAR:          dragScale = 0.90f; break;
+            case VehicleType::ELECTRIC_OFFROADER: dragScale = 1.00f; break;
+            case VehicleType::OFFROADER:          dragScale = 1.10f; break;
+            case VehicleType::MUSCLE_CAR:         dragScale = 1.15f; break;
+            case VehicleType::DESERT_RAID:        dragScale = 1.20f; break;
+            case VehicleType::PICKUP_TRUCK:       dragScale = 1.30f; break;
+            case VehicleType::MONSTER_TRUCK:      dragScale = 1.45f; break;
+            default:                              dragScale = 1.0f; break;
+        }
+
+        const float mass = chassis->GetMass();
+        const float kLong = 0.009f * dragScale * airDensity;
+        const float kPerp = 0.025f * dragScale * airDensity;
+        const b2Vec2 drag = (-kLong * std::abs(vLong) * vLong * mass) * uLong
+                          + (-kPerp * std::abs(vPerp) * vPerp * mass) * uPerp;
+        chassis->ApplyForceToCenter(drag);
+
+        const float downforce = cfg.baseDownforce * profile.getDownforceMultiplier(owner.m_vehicleType) *
+                                vel.LengthSquared() * airDensity;
+        chassis->ApplyForceToCenter(downforce * b2Vec2(sinA, -cosA));
+    }
+
+    void clampSuspension(b2WheelJoint* joint, b2Body* wheel) {
+        if (joint == nullptr || wheel == nullptr) return;
+        const float minT = owner.m_suspMinLength - owner.m_suspRestLength;
+        const float maxT = owner.m_suspMaxLength - owner.m_suspRestLength;
+        const float t = joint->GetJointTranslation();
+        if (t >= minT && t <= maxT) return;
+
+        const float clamped = std::clamp(t, minT, maxT);
+        b2Body* chassisBody = joint->GetBodyA();
+        const b2Vec2 axis = chassisBody->GetWorldVector(joint->GetLocalAxisA());
+        wheel->SetTransform(wheel->GetPosition() + (clamped - t) * axis, wheel->GetAngle());
+
+        const b2Vec2 rel = wheel->GetLinearVelocity() - chassisBody->GetLinearVelocity();
+        const float along = b2Dot(rel, axis);
+        wheel->SetLinearVelocity(wheel->GetLinearVelocity() - along * axis);
+    }
+
+    void readWheelTelemetry(b2Body* wheel, bool& contact, float& slipSpeed,
+                            float& normalForce, Vec2& tangent) {
+        contact = false;
+        slipSpeed = 0.0f;
+        normalForce = 0.0f;
+        tangent = {1.0f, 0.0f};
+        if (wheel == nullptr) return;
+
+        for (b2ContactEdge* edge = wheel->GetContactList(); edge != nullptr; edge = edge->next) {
+            b2Contact* c = edge->contact;
+            if (c == nullptr || !c->IsTouching()) continue;
+
+            b2WorldManifold wm;
+            c->GetWorldManifold(&wm);
+            b2Vec2 normal = wm.normal;
+            if (normal.y < 0.0f) normal = -normal;
+
+            contact = true;
+            tangent = {normal.y, -normal.x};
+
+            const float surfaceSpeed = b2Dot(wheel->GetLinearVelocity(), normal.y != 0.0f ? b2Vec2(normal.y, -normal.x) : b2Vec2(1.0f, 0.0f));
+            slipSpeed = surfaceSpeed - wheel->GetAngularVelocity() * owner.m_wheelRadius;
+
+            const b2Manifold* manifold = c->GetManifold();
+            for (int i = 0; i < manifold->pointCount; ++i) {
+                normalForce += manifold->points[i].normalImpulse / Box2DPhysics::kFixedDt;
+            }
+            break;
+        }
+
+        normalForce = std::clamp(normalForce, 0.0f, 60000.0f);
+    }
+
+    bool readChassisContact() const {
+        return bodyHasContact(chassis);
+    }
+
+    void cachePreviousState() {
+        owner.m_prevChassisPos = owner.m_chassisPos;
+        owner.m_prevChassisAngle = owner.m_chassisAngle;
+        owner.m_prevRearWheelPos = owner.m_rearWheelPos;
+        owner.m_prevRearWheelAngle = owner.m_rearWheelAngle;
+        owner.m_prevFrontWheelPos = owner.m_frontWheelPos;
+        owner.m_prevFrontWheelAngle = owner.m_frontWheelAngle;
+        owner.m_prevDriverHeadAngle = owner.m_driverHeadAngle;
+        owner.m_prevDriverHeadShiftY = owner.m_driverHeadShiftY;
+    }
+
+    void syncFromBox2D(const Terrain& terrain) {
+        if (chassis == nullptr || rearWheel == nullptr || frontWheel == nullptr) return;
+
+        owner.m_chassisPos = toVec2(chassis->GetPosition());
+        owner.m_chassisVel = toVec2(chassis->GetLinearVelocity());
+        owner.m_chassisAngle = chassis->GetAngle();
+        owner.m_chassisAngularVel = chassis->GetAngularVelocity();
+        owner.m_chassisMass = chassis->GetMass();
+        owner.m_chassisInertia = chassis->GetInertia();
+
+        const float rearLenBefore = owner.m_rearSuspensionLength;
+        const float frontLenBefore = owner.m_frontSuspensionLength;
+
+        owner.m_rearWheelPos = toVec2(rearWheel->GetPosition());
+        owner.m_rearWheelAngle = rearWheel->GetAngle();
+        owner.m_rearWheelAngularVel = rearWheel->GetAngularVelocity();
+        owner.m_frontWheelPos = toVec2(frontWheel->GetPosition());
+        owner.m_frontWheelAngle = frontWheel->GetAngle();
+        owner.m_frontWheelAngularVel = frontWheel->GetAngularVelocity();
+
+        const float rearTranslation = rearJoint ? rearJoint->GetJointTranslation() : 0.0f;
+        const float frontTranslation = frontJoint ? frontJoint->GetJointTranslation() : 0.0f;
+        owner.m_rearSuspensionLength = std::clamp(owner.m_suspRestLength + rearTranslation,
+                                                  owner.m_suspMinLength, owner.m_suspMaxLength);
+        owner.m_frontSuspensionLength = std::clamp(owner.m_suspRestLength + frontTranslation,
+                                                   owner.m_suspMinLength, owner.m_suspMaxLength);
+        owner.m_rearSuspVel = (owner.m_rearSuspensionLength - rearLenBefore) / Box2DPhysics::kFixedDt;
+        owner.m_frontSuspVel = (owner.m_frontSuspensionLength - frontLenBefore) / Box2DPhysics::kFixedDt;
+
+        readWheelTelemetry(rearWheel, owner.m_rearContact, owner.m_rearSlipSpeed,
+                           owner.m_rearNormalForce, owner.m_rearContactTangent);
+        readWheelTelemetry(frontWheel, owner.m_frontContact, owner.m_frontSlipSpeed,
+                           owner.m_frontNormalForce, owner.m_frontContactTangent);
+        owner.m_chassisContact = readChassisContact();
+        owner.m_lastImpactVelocity = std::max(owner.m_lastImpactVelocity, impactListener.maxImpact);
+
+        if (owner.m_spawnGraceTimer > 0.0f) {
+            owner.m_spawnGraceTimer = std::max(0.0f, owner.m_spawnGraceTimer - Box2DPhysics::kFixedDt);
+        } else if (!owner.m_driverDown) {
+            const float cosA = std::cos(owner.m_chassisAngle);
+            const bool overturned = cosA < -0.15f;
+            const Vec2 head = owner.driverHeadPos();
+            const float headGround = terrain.getHeight(head.x);
+            if (overturned && (owner.m_chassisContact || head.y <= headGround + 0.04f)) {
+                owner.m_driverDown = true;
+            }
+            if (cosA < 0.20f && owner.m_chassisContact && owner.m_chassisVel.length() > 6.0f) {
+                owner.m_driverDown = true;
+            }
+        }
+    }
+
+    void updateDriverRagdoll() {
+        const float dt = Box2DPhysics::kFixedDt;
+        const Vec2 linAcc = (owner.m_chassisVel - owner.m_prevChassisVel) / dt;
+        owner.m_prevChassisVel = owner.m_chassisVel;
+
+        const float cosA = std::cos(owner.m_chassisAngle);
+        const float sinA = std::sin(owner.m_chassisAngle);
+        const float aLong = linAcc.x * cosA + linAcc.y * sinA;
+        const float aVert = -linAcc.x * sinA + linAcc.y * cosA;
+
+        float targetHeadAngle = -0.045f * aLong + 0.12f * owner.m_chassisAngularVel;
+        targetHeadAngle = std::clamp(targetHeadAngle, -0.65f, 0.65f);
+        const float torqueRot = -90.0f * (owner.m_driverHeadAngle - targetHeadAngle) - 12.0f * owner.m_driverHeadAngularVel;
+        owner.m_driverHeadAngularVel += torqueRot * dt;
+        owner.m_driverHeadAngle += owner.m_driverHeadAngularVel * dt;
+
+        float targetShiftY = -0.0035f * aVert;
+        targetShiftY = std::clamp(targetShiftY, -0.08f, 0.04f);
+        const float forceVert = -140.0f * (owner.m_driverHeadShiftY - targetShiftY) - 15.0f * owner.m_driverHeadShiftYVel;
+        owner.m_driverHeadShiftYVel += forceVert * dt;
+        owner.m_driverHeadShiftY += owner.m_driverHeadShiftYVel * dt;
+        owner.m_driverHeadShiftY = std::clamp(owner.m_driverHeadShiftY, -0.08f, 0.04f);
+
+        float targetShiftX = -0.0018f * aLong;
+        targetShiftX = std::clamp(targetShiftX, -0.04f, 0.04f);
+        owner.m_driverHeadShiftX += (targetShiftX - owner.m_driverHeadShiftX) * std::min(1.0f, 15.0f * dt);
+    }
+
+    void step(float dt, const Terrain& terrain, const Core::ProfileManager& profile,
+              float effectiveGas, float effectiveBrake, float effectiveReverse,
+              float brakePressure) {
+        if (chassis == nullptr) return;
+
+        updateTerrainIfNeeded(terrain);
+        world.setGravity(0.0f, owner.m_customGravity < -0.1f ? owner.m_customGravity : -terrain.getGravity());
+        impactListener.maxImpact = 0.0f;
+
+        applyControls(effectiveGas, effectiveBrake, effectiveReverse, brakePressure, profile, terrain);
+        applyAerodynamics(terrain, profile);
+
+        const int before = world.stepCount();
+        world.step(dt);
+        if (world.stepCount() == before) {
+            return;
+        }
+
+        clampSuspension(rearJoint, rearWheel);
+        clampSuspension(frontJoint, frontWheel);
+        cachePreviousState();
+        syncFromBox2D(terrain);
+        updateDriverRagdoll();
+    }
+};
 
 Vehicle::Vehicle(VehicleType type, DriverType driver)
     : m_vehicleType(type)
@@ -13,10 +587,28 @@ Vehicle::Vehicle(VehicleType type, DriverType driver)
     reset(5.0f, 1.20f);
 }
 
+Vehicle::~Vehicle() = default;
+
+void Vehicle::setUseBox2D(bool enabled) {
+    if (m_useBox2D == enabled) {
+        return;
+    }
+    m_useBox2D = enabled;
+    m_box2d.reset();
+}
+
+void Vehicle::ensureBox2D(const Terrain& terrain) {
+    if (!m_box2d) {
+        m_box2d = std::make_unique<Box2DVehicleSim>(*this);
+        m_box2d->reset(terrain, m_chassisPos.x, m_chassisPos.y, m_chassisAngle);
+    }
+}
+
 void Vehicle::setVehicleType(VehicleType type) {
     if (type >= VehicleType::OFFROADER && type < VehicleType::COUNT) {
         m_vehicleType = type;
         applyConfig();
+        m_box2d.reset();
     }
 }
 
@@ -41,6 +633,7 @@ void Vehicle::applyConfig() {
 
 void Vehicle::reset(float startX, float startY, float startAngle) {
     applyConfig();
+    m_box2d.reset();
 
     m_chassisPos = {startX, startY};
     m_chassisVel = {0.0f, 0.0f};
@@ -142,7 +735,42 @@ float Vehicle::getEngineRpm() const {
     return std::clamp(idleRpm + wheelRpm * gearRatio + throttleBoost, 1000.0f, 8500.0f);
 }
 
+void Vehicle::stepBox2D(float dt, const Terrain& terrain, const Core::ProfileManager& profile) {
+    ensureBox2D(terrain);
+    m_lastImpactVelocity = 0.0f;
+
+    const float effectiveGas = (!m_driverDown && m_fuel > 0.0f) ? m_gasInput : 0.0f;
+    const float effectiveReverse = (!m_driverDown && m_fuel > 0.0f) ? m_reverseInput : 0.0f;
+    const float effectiveBrake = (!m_driverDown) ? m_brakeInput : 0.0f;
+
+    if (effectiveBrake > m_brakePressure) {
+        m_brakePressure = std::min(effectiveBrake, m_brakePressure + 4.5f * dt);
+    } else {
+        m_brakePressure = std::max(effectiveBrake, m_brakePressure - 12.0f * dt);
+    }
+
+    const float activeThrottle = std::max(effectiveGas, effectiveReverse);
+    if (m_infiniteFuel) {
+        m_fuel = 100.0f;
+    } else if (!m_driverDown && m_fuel > 0.0f && activeThrottle > 0.0f) {
+        const float transMult = profile.getTransmissionMultiplier(m_vehicleType);
+        const float speedRatio = std::clamp(getSpeedKmh() / std::max(m_config.baseTopSpeedKmh * transMult, 1.0f), 0.0f, 1.2f);
+        const float slope = terrain.getSlope(m_chassisPos.x);
+        const float load = std::clamp(0.6f + std::abs(slope) * 1.5f + (1.0f - speedRatio * 0.35f), 0.5f, 1.5f);
+        const float drainRate = activeThrottle * (3.3f + 0.9f * load) * 0.60f * m_fuelBurnMultiplier;
+        m_fuel = std::max(0.0f, m_fuel - drainRate * dt);
+    }
+
+    m_box2d->step(dt, terrain, profile, effectiveGas, effectiveBrake,
+                  effectiveReverse, m_brakePressure);
+}
+
 void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager& profile) {
+    if (m_useBox2D) {
+        stepBox2D(dt, terrain, profile);
+        return;
+    }
+
     m_lastImpactVelocity = 0.0f;
 
     // Cache previous physics tick state for rendering interpolation
@@ -455,6 +1083,12 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
                 // Lock to rolling speed when throttle released, braking released, and near synchronous speed
                 if (diffBefore * diffAfter < 0.0f && effectiveGas <= 0.05f && effectiveReverse <= 0.05f && m_brakePressure <= 0.05f) {
                     wheelAngVel = targetOmega;
+                }
+
+                // Contact friction must never push the driven wheel past the configured
+                // top-speed cap; otherwise the chassis can exceed its rated velocity.
+                if (effectiveGas > 0.0f && wheelAngVel > maxDriveOmega) {
+                    wheelAngVel = maxDriveOmega;
                 }
             }
 
@@ -926,11 +1560,13 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
         }
     }
 
-    // Resting stabilization: eliminate micro-jitter when vehicle is at rest on terrain
-    bool atRestChassis = m_chassisContact && m_chassisVel.length() < 0.08f && std::abs(m_chassisAngularVel) < 0.08f;
+    // Resting stabilization: eliminate micro-jitter when vehicle is at rest on terrain.
+    // Never freeze a vehicle on a slope steeper than its tyres/brakes can actually hold.
     float sinSlope = std::abs(terrain.getNormal(m_chassisPos.x).x);
     float sinHoldMax = std::min(1.0f, 0.585f * brakeMult);
     bool slopeCanHold = (sinSlope <= sinHoldMax + 0.02f);
+    bool atRestChassis = m_chassisContact && m_chassisVel.length() < 0.08f &&
+                         std::abs(m_chassisAngularVel) < 0.08f && slopeCanHold;
     bool atRestBraking = (m_rearContact || m_frontContact) && m_brakePressure > 0.3f
                          && m_chassisVel.length() < 0.01f && std::abs(m_chassisAngularVel) < 0.02f
                          && slopeCanHold;

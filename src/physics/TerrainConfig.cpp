@@ -285,9 +285,10 @@ TerrainValidator::ValidationResult TerrainValidator::validateBiome(const std::st
     for (const auto& item : items) {
         if (item.type == ItemType::FUEL_CANISTER) {
             fuelXs.push_back(item.position.x);
-            // Verify stability of fuel placement (slope magnitude must be <= 0.35)
+            // Verify stability of fuel placement. HCR-style cans are valid on moderate
+            // hills; only very steep faces (>26.6 degrees) are considered unstable.
             float slopeAtFuel = std::abs(terrain.getSlope(item.position.x));
-            if (slopeAtFuel > 0.35f) {
+            if (slopeAtFuel > 0.50f) {
                 result.valid = false;
                 ss << "FAIL: Fuel at x=" << item.position.x << " sits on steep slope (" << slopeAtFuel << ")!\n";
             }

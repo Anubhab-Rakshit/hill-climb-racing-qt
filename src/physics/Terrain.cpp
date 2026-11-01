@@ -184,12 +184,18 @@ float Terrain::computeRawBaseHeight(float x) const {
             float st = (lx - 1700.0f) / 600.0f;
             superCrater = -smoothWindow(st) * 8.5f;
         }
-        return (c1 + c2 + c3 + crater + superCrater) * ramp;
+        // Low-gravity launch mound near the start line: tall enough to produce a real lunar arc.
+        float launchMound = 0.0f;
+        if (lx > 45.0f && lx < 110.0f) {
+            float lt = (lx - 45.0f) / 65.0f;
+            launchMound = smoothWindow(lt) * 7.0f;
+        }
+        return (c1 + c2 + c3 + crater + superCrater + launchMound) * ramp;
     } else if (m_biomeId == "volcano") {
         // Basalt ridges, thermal vent steps and caldera rims
         float pV = lx * 0.016f + 0.26f * std::sin(lx * 0.0040f);
-        float v1 = std::sin(pV) * (9.5f * ampMult);
-        float v2 = std::sin(lx * 0.042f) * (3.2f + 1.8f * std::min(diff, 2.5f));
+        float v1 = std::sin(pV) * (9.2f * ampMult);
+        float v2 = std::sin(lx * 0.042f) * (3.1f + 1.8f * std::min(diff, 2.5f));
         float basalt = std::sin(lx * 0.088f) * (0.8f + 0.4f * std::min(diff, 2.5f));
         // Caldera wall ascent at 850m - 1350m
         float caldera = 0.0f;
@@ -479,14 +485,15 @@ void Terrain::spawnItems() {
     float prevFuelX = 0.0f;
     while (fuelTargetX < 5000.0f) {
         float diff = getDifficultyFactor(fuelTargetX);
-        float maxAllowedSpacing = 110.0f + std::min(diff, 2.5f) * 40.0f; // 110m at start -> ~210m
+        // Fuel must remain reachable: never exceed the 165 m safe interval.
+        float maxAllowedSpacing = std::min(165.0f, 110.0f + std::min(diff, 2.5f) * 22.0f); // 110m -> 165m
 
         // Find best stable location (closest crest or flat saddle where |slope| <= 0.38)
         float bestX = fuelTargetX;
         float minSlopeMag = 999.0f;
 
         // Primary search window around target
-        for (float searchX = fuelTargetX - 14.0f; searchX <= fuelTargetX + 14.0f; searchX += 0.25f) {
+        for (float searchX = fuelTargetX - 20.0f; searchX <= fuelTargetX + 20.0f; searchX += 0.25f) {
             if (searchX < 25.0f) continue;
             float slopeMag = std::abs(getSlope(searchX));
             if (slopeMag < minSlopeMag) {
@@ -495,10 +502,10 @@ void Terrain::spawnItems() {
             }
         }
 
-        // Secondary search if minSlopeMag is still steep
+        // Secondary search across the whole reachable interval if the local crest is steep.
         if (minSlopeMag > 0.30f) {
-            float minX = std::max(25.0f, prevFuelX + 65.0f);
-            float maxX = (prevFuelX > 0.0f) ? (prevFuelX + maxAllowedSpacing) : 120.0f;
+            float minX = std::max(25.0f, prevFuelX + 40.0f);
+            float maxX = (prevFuelX > 0.0f) ? (prevFuelX + maxAllowedSpacing - 8.0f) : 120.0f;
             for (float sx = minX; sx <= maxX; sx += 0.25f) {
                 float sm = std::abs(getSlope(sx));
                 if (sm < minSlopeMag) {
@@ -521,8 +528,8 @@ void Terrain::spawnItems() {
         m_items.push_back(fuel);
 
         prevFuelX = bestX;
-        // Progressive interval: grows from 85m at start to 200m+
-        float nextInterval = 85.0f + std::min(diff, 2.5f) * 46.0f;
+        // Progressive interval: grows from 85 m toward the safe maximum, leaving room for the local search.
+        float nextInterval = std::min(maxAllowedSpacing - 22.0f, 85.0f + std::min(diff, 2.5f) * 46.0f);
         fuelTargetX = bestX + nextInterval;
     }
 

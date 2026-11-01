@@ -5,6 +5,8 @@
 #include "ProfileManager.h"
 #include "VehicleConfig.h"
 
+#include <memory>
+
 namespace Physics {
 
 /**
@@ -14,11 +16,20 @@ namespace Physics {
 class Vehicle {
 public:
     Vehicle(VehicleType type = VehicleType::OFFROADER, DriverType driver = DriverType::BILL);
+    ~Vehicle();
+
+    Vehicle(const Vehicle&) = delete;
+    Vehicle& operator=(const Vehicle&) = delete;
 
     void reset(float startX = 5.0f, float startY = 3.0f, float startAngle = 0.0f);
     void applyInput(float gas, float brake, float reverse = 0.0f, float tiltLeft = 0.0f, float tiltRight = 0.0f);
 
     void step(float dt, const Terrain& terrain, const Core::ProfileManager& profile);
+
+    // Physics backend selection. The legacy solver remains the default for direct
+    // Vehicle users; PhysicsWorld enables the authentic Box2D backend at runtime.
+    void setUseBox2D(bool enabled);
+    bool usesBox2D() const { return m_useBox2D; }
 
     // Archetype & Driver Configuration
     void setVehicleType(VehicleType type);
@@ -219,7 +230,13 @@ private:
     float m_fuelBurnMultiplier = 1.0f;
     bool m_infiniteFuel = false;
 
+    bool m_useBox2D = false;
+    struct Box2DVehicleSim;
+    std::unique_ptr<Box2DVehicleSim> m_box2d;
+
     void applyConfig();
+    void stepBox2D(float dt, const Terrain& terrain, const Core::ProfileManager& profile);
+    void ensureBox2D(const Terrain& terrain);
 };
 
 } // namespace Physics

@@ -26,3 +26,6 @@ qrc_*.cpp
 # Python bytecode
 __pycache__/
 *.pyc
+
+opencode_ses.txt
+accounts.json

@@ -29,6 +29,14 @@ PhysicsWorld::PhysicsWorld()
     , m_mpStatusMessage("")
     , m_lastClearedCheckpoint(0)
 {
+    m_vehicle.setUseBox2D(m_useBox2D);
+    m_vehicle2.setUseBox2D(m_useBox2D);
+}
+
+void PhysicsWorld::setUseBox2D(bool enabled) {
+    m_useBox2D = enabled;
+    m_vehicle.setUseBox2D(enabled);
+    m_vehicle2.setUseBox2D(enabled);
 }
 
 void PhysicsWorld::setCustomGravity(float g) {

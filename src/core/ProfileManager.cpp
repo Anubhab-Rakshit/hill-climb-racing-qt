@@ -171,6 +171,14 @@ bool ProfileManager::purchaseUpgrade(Physics::VehicleType vehicle, UpgradeType t
     return false;
 }
 
+void ProfileManager::resetUpgradesForTesting() {
+    for (int v = 0; v < static_cast<int>(Physics::VehicleType::COUNT); ++v) {
+        for (int u = 0; u < UPGRADE_COUNT; ++u) {
+            m_upgradeLevels[v][u] = 1;
+        }
+    }
+}
+
 float ProfileManager::getEngineTorqueMultiplier(Physics::VehicleType vehicle) const {
     int lvl = getUpgradeLevel(vehicle, UPGRADE_ENGINE);
     return 1.0f + 0.12f * (lvl - 1);

@@ -17,8 +17,8 @@ void InputController::resetTransientActions() {
 }
 
 void InputController::updateCombinedInputs() {
-    m_state.gas = m_state.p1.gas || m_state.p2.gas || m_state.p1.tiltRight || m_state.p2.tiltRight;
-    m_state.brake = m_state.p1.brake || m_state.p2.brake || m_state.p1.tiltLeft || m_state.p2.tiltLeft;
+    m_state.gas = m_state.p1.gas || m_state.p2.gas;
+    m_state.brake = m_state.p1.brake || m_state.p2.brake;
     m_state.reverse = m_state.p1.reverse || m_state.p2.reverse;
 }
 

@@ -1,5 +1,4 @@
 #include "VehicleSprites.h"
-#include <QPainter>
 #include <cmath>
 #include <algorithm>
 

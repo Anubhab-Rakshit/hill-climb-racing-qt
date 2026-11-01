@@ -59,6 +59,9 @@ public:
     bool canAffordUpgrade(Physics::VehicleType vehicle, UpgradeType type) const;
     bool purchaseUpgrade(Physics::VehicleType vehicle, UpgradeType type);
 
+    // In-memory baseline used by deterministic physics tests; does not touch saved profile.
+    void resetUpgradesForTesting();
+
     // Physical Multipliers (Derived from upgrades)
     float getEngineTorqueMultiplier() const { return getEngineTorqueMultiplier(m_selectedVehicle); }
     float getEngineTorqueMultiplier(Physics::VehicleType vehicle) const;

@@ -184,9 +184,9 @@ static const std::vector<VehicleConfig> s_vehicles = {
         0.48f,                // suspMaxLength
         34000.0f,             // baseSpringRate
         5400.0f,              // baseDamperRate
-        9200.0f,              // basePeakTorque
+        10200.0f,             // basePeakTorque
         82.0f,                // baseTopSpeedKmh
-        1.45f,                // baseGrip
+        1.55f,                // baseGrip
         0.50f,                // base4wdSplit
         2200.0f,              // baseBrakingTorque
         0.08f,                // baseDownforce
@@ -249,7 +249,7 @@ static const std::vector<VehicleConfig> s_vehicles = {
         48000.0f,             // baseSpringRate
         4800.0f,              // baseDamperRate
         4600.0f,              // basePeakTorque
-        185.0f,               // baseTopSpeedKmh
+        123.0f,               // baseTopSpeedKmh
         1.45f,                // baseGrip
         0.00f,                // base4wdSplit
         3000.0f,              // baseBrakingTorque
@@ -345,7 +345,7 @@ static const std::vector<VehicleConfig> s_vehicles = {
         32000.0f,             // baseSpringRate
         3600.0f,              // baseDamperRate
         4000.0f,              // basePeakTorque
-        112.0f,               // baseTopSpeedKmh
+        76.0f,                // baseTopSpeedKmh
         1.25f,                // baseGrip
         0.00f,                // base4wdSplit (100% RWD)
         2000.0f,              // baseBrakingTorque
