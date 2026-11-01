@@ -30,6 +30,11 @@ public:
     void setDimensions(int x, int y, int width, int height);
     void setCourseLength(float finishDistanceMeters);
 
+    int x() const { return m_x; }
+    int y() const { return m_y; }
+    int width() const { return m_width; }
+    int height() const { return m_height; }
+
     void render(Graphics::Framebuffer& fb, const std::vector<RadarRacer>& racers);
 
 private:

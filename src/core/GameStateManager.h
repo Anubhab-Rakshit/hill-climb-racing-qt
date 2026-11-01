@@ -60,6 +60,9 @@ public:
     Graphics::ScanlineRasterizer& terrainRasterizer() { return m_terrainRasterizer; }
     Graphics::ParticleSystem& particleSystem() { return m_particleSystem; }
     UI::HUD& hud() { return m_hud; }
+    const UI::HUD& hud() const { return m_hud; }
+    UI::MinimapRadar& minimapRadar() { return m_minimapRadar; }
+    const UI::MinimapRadar& minimapRadar() const { return m_minimapRadar; }
     float gameTime() const { return m_gameTime; }
 
 private:

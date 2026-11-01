@@ -7,6 +7,7 @@
 #include "HUD.h"
 #include "PauseOverlay.h"
 #include "GameOverScreen.h"
+#include "MinimapRadar.h"
 
 #include <QDir>
 #include <QString>
@@ -42,6 +43,17 @@ struct Rect {
 struct ResolutionLayout {
     int width;
     int height;
+    HUD hudWidget;
+    MinimapRadar minimapWidget;
+
+    ResolutionLayout(int w, int h)
+        : width(w), height(h)
+    {
+        hudWidget.setDimensions(w, h);
+        int miniW = 440;
+        int miniH = 26;
+        minimapWidget.setDimensions((w - miniW) / 2, 10, miniW, miniH);
+    }
 
     Rect screenRect() const {
         return {0, 0, width, height};
@@ -69,17 +81,14 @@ struct ResolutionLayout {
         return btns;
     }
 
-    // HUD Minimap & Distance Card
+    // Real HUD Minimap & Distance Card bounds via widget accessors
     Rect getMinimapRadar() const {
-        return {270, 10, 420, 26};
+        return {minimapWidget.x(), minimapWidget.y(), minimapWidget.width(), minimapWidget.height()};
     }
 
     Rect getHudDistanceCard() const {
-        int distCardW = (width >= 1200) ? 380 : 320;
-        int distCardH = 48;
-        int distCardX = (width - distCardW) / 2;
-        int distCardY = (height >= 700) ? 42 : 38;
-        return {distCardX, distCardY, distCardW, distCardH};
+        return {hudWidget.distanceCardX(), hudWidget.distanceCardY(),
+                hudWidget.distanceCardWidth(), hudWidget.distanceCardHeight()};
     }
 
     // Pause Modal Box and Buttons
@@ -199,26 +208,17 @@ struct ResolutionLayout {
         return btns;
     }
 
-    // HUD Buttons (Pedals and Pause)
+    // Real HUD Buttons (Pedals and Pause) via widget accessors
     std::vector<Rect> getHudButtons() const {
-        int pedalY = (height >= 700) ? (height - 94) : (height - 76);
-        int pedalH = (height >= 700) ? 76 : 62;
-        int brakeW = (width >= 1200) ? 135 : 115;
-        int brakeX = (width >= 1200) ? 24 : 20;
-        int revW = (width >= 1200) ? 120 : 100;
-        int revX = brakeX + brakeW + (width >= 1200 ? 12 : 10);
-        int gasW = (width >= 1200) ? 135 : 115;
-        int gasX = width - gasW - (width >= 1200 ? 25 : 20);
-        int pauseW = (width >= 1200) ? 56 : 46;
-        int pauseH = (height >= 700) ? 36 : 30;
-        int pauseX = width - pauseW - (width >= 1200 ? 24 : 19);
-        int pauseY = (height >= 700) ? 14 : 12;
-
         return {
-            {brakeX, pedalY, brakeW, pedalH},
-            {revX, pedalY, revW, pedalH},
-            {gasX, pedalY, gasW, pedalH},
-            {pauseX, pauseY, pauseW, pauseH}
+            {hudWidget.brakePedal().x(), hudWidget.brakePedal().y(),
+             hudWidget.brakePedal().width(), hudWidget.brakePedal().height()},
+            {hudWidget.reversePedal().x(), hudWidget.reversePedal().y(),
+             hudWidget.reversePedal().width(), hudWidget.reversePedal().height()},
+            {hudWidget.gasPedal().x(), hudWidget.gasPedal().y(),
+             hudWidget.gasPedal().width(), hudWidget.gasPedal().height()},
+            {hudWidget.pauseButton().x(), hudWidget.pauseButton().y(),
+             hudWidget.pauseButton().width(), hudWidget.pauseButton().height()}
         };
     }
 };

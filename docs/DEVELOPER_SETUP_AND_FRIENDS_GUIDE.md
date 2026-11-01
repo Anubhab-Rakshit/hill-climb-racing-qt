@@ -77,7 +77,7 @@ src/
 │   ├── GameEngine.*       # 60Hz/120Hz fixed-timestep accumulator loop
 │   ├── GameStateManager.*# Finite state machine (Menu -> Garage -> Stages -> Gameplay -> Over)
 │   ├── InputController.*  # Non-blocking keyboard state tracking (W/A/S/D & Arrow keys)
-│   └── ProfileManager.*   # Coins balance, high scores, upgrade tiers (Engine, Susp, Tires, 4WD)
+│   └── ProfileManager.*   # Coins balance, high scores, 8 upgrade categories (Engine, Susp, Tires, 4WD, Brakes, Gearbox, Chassis, Aero)
 │
 ├── graphics/              # Pure 32-bit ARGB Software Rasterizer (NO QPainter/SVG)
 │   ├── Framebuffer.*      # Raw scanline memory buffer (0xAARRGGBB uint32_t*)
@@ -96,7 +96,7 @@ src/
 │   ├── StuntBanner.*      # Floating animated popups (Backflip, Air Time)
 │   ├── HUD.*              # Complete in-game cockpit with Minimap radar & telemetry card
 │   ├── MainMenuScreen.*   # Title screen with multi-layer parallax hills & showcase plateau
-│   ├── GarageScreen.*     # Tuning shop with 4 upgrade cards & dynamic hydraulic lift
+│   ├── GarageScreen.*     # Tuning shop with 8 upgrade categories (2 tabs) & dynamic hydraulic lift
 │   ├── StageSelectScreen.*# Biome selection (Countryside, Desert, Arctic, Mountain, Moon, Volcano)
 │   ├── PauseOverlay.*     # Modal pause menu (Resume, Restart, Garage, Menu)
 │   └── GameOverScreen.*   # Detailed run summary table
@@ -128,28 +128,31 @@ Physical behaviors are encapsulated in `src/physics/`:
 
 ## 🧪 5. Automated Verification & Test Suites
 
-The project features **6 deterministic custom CLI test suites** built directly into the game executable.
+The project features **7 deterministic custom CLI test suites** built directly into the game executable.
 
 > [!NOTE]
 > Tests use custom built-in CLI verification routines rather than QTest. Prepend `QT_QPA_PLATFORM=offscreen` to run them headlessly in any terminal or automated CI pipeline.
 
 ```bash
-# 1. Box2D 2.2.1 Backend Integrity Suite
+# 1. Automated UI Layout Regression Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
+
+# 2. Box2D 2.2.1 Backend Integrity Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d
 
-# 2. All 12 Vehicles Behavior Suite (Idle, Drive, Brake, Slope, Air Tilt)
+# 3. All 12 Vehicles Behavior Suite (Idle, Drive, Brake, Slope, Air Tilt)
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles
 
-# 3. Box2D Gameplay-World Integration Suite (Drive, Fuel, Checkpoints, MP, Crash)
+# 4. Box2D Gameplay-World Integration Suite (Drive, Fuel, Checkpoints, MP, Crash)
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 
-# 4. Comprehensive 19-Test Vehicle & Suspension Physics Audit
+# 5. Comprehensive 19-Test Vehicle & Suspension Physics Audit
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 
-# 5. Dynamic Realistic Audio Test Suite
+# 6. Dynamic Realistic Audio Test Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 
-# 6. Full Smoke Test & Procedural Reachability Scan
+# 7. Full Smoke Test & Procedural Reachability Scan
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 
