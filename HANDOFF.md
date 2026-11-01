@@ -67,6 +67,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 ```
 
 ## Important Constraints
@@ -85,6 +86,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 - `--test-audio`: passing.
 - `--smoke-test`: passing on Box2D.
 - `--smoke-test --legacy-physics`: passing on the legacy solver.
+- `--test-ui-layout`: passing automated layout regression and screenshot capture at 960x540 and 1280x720.
 
 ## Phase 3
 Completed. See `PHASE3.md`.

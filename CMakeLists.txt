@@ -83,6 +83,7 @@ set(SOURCES
     src/ui/EvaluatorOverlay.cpp
     src/ui/MinimapRadar.cpp
     src/ui/DeveloperOverlay.cpp
+    src/ui/UILayoutRegression.cpp
     # Audio
     src/audio/SoundManager.cpp
     # Vehicle & Driver Pixel Sprites
@@ -137,6 +138,7 @@ set(HEADERS
     src/ui/EvaluatorOverlay.h
     src/ui/MinimapRadar.h
     src/ui/DeveloperOverlay.h
+    src/ui/UILayoutRegression.h
     src/audio/SoundManager.h
 )
 
