@@ -5,6 +5,9 @@
 #include <string>
 #include <cassert>
 #include <cmath>
+#include <algorithm>
+#include <set>
+#include <vector>
 #include "GameEngine.h"
 #include "physics/TerrainConfig.h"
 #include "physics/Box2DPhysics.h"
@@ -976,6 +979,232 @@ int main(int argc, char *argv[]) {
         return allWorldPassed ? 0 : 1;
     }
 
+    if (argc > 1 && (std::string(argv[1]) == "--test-terrain" || std::string(argv[1]) == "--terrain-test")) {
+        std::cout << "\n=======================================================" << std::endl;
+        std::cout << "  RUNNING TERRAIN TOPOLOGY & SURFACE MATERIAL TEST SUITE" << std::endl;
+        std::cout << "=======================================================" << std::endl;
+
+        Core::ProfileManager profile;
+        profile.resetUpgradesForTesting();
+        const float DT = 1.0f / 120.0f;
+        bool allTestsPassed = true;
+
+        const auto& recipes = Physics::TrackRecipeRegistry::all();
+        if (recipes.size() != 9) {
+            std::cout << "  Recipe Count: FAIL (" << recipes.size() << ", expected 9)" << std::endl;
+            allTestsPassed = false;
+        } else {
+            std::cout << "  Recipe Count: PASS (9 biomes)" << std::endl;
+        }
+
+        auto hasFeature = [](const Physics::TrackRecipe& recipe, Physics::TerrainFeature feature) {
+            for (const auto& section : recipe.sections) {
+                if (section.feature == feature) return true;
+            }
+            return false;
+        };
+        auto hasSurface = [](const Physics::TrackRecipe& recipe, Physics::SurfaceType surface) {
+            for (const auto& zone : recipe.surfaceZones) {
+                if (zone.material == surface) return true;
+            }
+            return false;
+        };
+
+        struct BiomeExpectation {
+            const char* id;
+            Physics::TerrainFeature signature;
+            Physics::SurfaceType surface;
+        };
+        const BiomeExpectation expectations[] = {
+            {"countryside", Physics::TerrainFeature::TABLETOP, Physics::SurfaceType::GRASS},
+            {"desert", Physics::TerrainFeature::DUNE_CREST, Physics::SurfaceType::SAND},
+            {"arctic", Physics::TerrainFeature::ICE_SHELF, Physics::SurfaceType::ICE},
+            {"mountain", Physics::TerrainFeature::ROCK_STEPS, Physics::SurfaceType::ROCK},
+            {"moon", Physics::TerrainFeature::RAVINE, Physics::SurfaceType::REGOLITH},
+            {"volcano", Physics::TerrainFeature::ASH_SLOPE, Physics::SurfaceType::ASH},
+            {"neon", Physics::TerrainFeature::RIDGE, Physics::SurfaceType::NEON},
+            {"super_countryside", Physics::TerrainFeature::RAVINE, Physics::SurfaceType::GRAVEL},
+            {"seasons", Physics::TerrainFeature::RIDGE, Physics::SurfaceType::MUD}
+        };
+
+        for (const auto& expectation : expectations) {
+            const Physics::TrackRecipe& recipe = Physics::TrackRecipeRegistry::get(expectation.id);
+            std::set<Physics::TerrainFeature> distinctFeatures;
+            for (const auto& section : recipe.sections) {
+                distinctFeatures.insert(section.feature);
+            }
+
+            bool zonesCoverTrack = !recipe.surfaceZones.empty() &&
+                                   recipe.surfaceZones.front().startX <= 0.01f &&
+                                   recipe.surfaceZones.back().endX >= recipe.length - 0.01f;
+            for (size_t i = 1; i < recipe.surfaceZones.size(); ++i) {
+                if (std::abs(recipe.surfaceZones[i].startX - recipe.surfaceZones[i - 1].endX) > 0.01f) {
+                    zonesCoverTrack = false;
+                }
+            }
+
+            Physics::Terrain terrain;
+            terrain.setBiome(expectation.id);
+            bool flatStart = true;
+            for (float x = 0.0f; x <= 20.0f; x += 0.5f) {
+                if (std::abs(terrain.getHeight(x)) > 0.001f) {
+                    flatStart = false;
+                    break;
+                }
+            }
+
+            const bool topologyOk = recipe.length == 5000.0f &&
+                                    recipe.sections.size() >= 10 &&
+                                    distinctFeatures.size() >= 6 &&
+                                    zonesCoverTrack &&
+                                    flatStart &&
+                                    hasFeature(recipe, expectation.signature) &&
+                                    hasSurface(recipe, expectation.surface);
+            const auto validation = Physics::TerrainValidator::validateBiome(expectation.id);
+            const bool validationOk = validation.valid && validation.maxUphillSlopeDeg <= 38.0f;
+
+            std::cout << "  [" << expectation.id << "] features=" << distinctFeatures.size()
+                      << ", sections=" << recipe.sections.size()
+                      << ", zones=" << recipe.surfaceZones.size()
+                      << ", maxUphill=" << validation.maxUphillSlopeDeg << " deg"
+                      << " -> " << ((topologyOk && validationOk) ? "PASS" : "FAIL") << std::endl;
+            if (!topologyOk || !validationOk) allTestsPassed = false;
+        }
+
+        const auto& materials = Physics::SurfaceMaterialRegistry::all();
+        const bool materialCountOk = materials.size() == static_cast<size_t>(Physics::SurfaceType::COUNT);
+        const auto& ice = Physics::SurfaceMaterialRegistry::get(Physics::SurfaceType::ICE);
+        const auto& mud = Physics::SurfaceMaterialRegistry::get(Physics::SurfaceType::MUD);
+        const auto& sand = Physics::SurfaceMaterialRegistry::get(Physics::SurfaceType::SAND);
+        const auto& grass = Physics::SurfaceMaterialRegistry::get(Physics::SurfaceType::GRASS);
+        const auto& rock = Physics::SurfaceMaterialRegistry::get(Physics::SurfaceType::ROCK);
+        const bool frictionOrderOk = ice.friction < mud.friction &&
+                                     mud.friction < sand.friction &&
+                                     sand.friction < grass.friction &&
+                                     grass.friction < rock.friction;
+        std::cout << "  Material Registry: " << (materialCountOk ? "PASS" : "FAIL")
+                  << " (" << materials.size() << " materials), friction order: "
+                  << (frictionOrderOk ? "PASS" : "FAIL") << std::endl;
+        if (!materialCountOk || !frictionOrderOk) allTestsPassed = false;
+
+        Physics::Terrain blendTerrain;
+        blendTerrain.setBiome("countryside");
+        const float grassFriction = blendTerrain.getFrictionAt(599.0f);
+        const float blendFriction = blendTerrain.getFrictionAt(603.0f);
+        const float dirtFriction = blendTerrain.getFrictionAt(606.0f);
+        const bool blendOk = grassFriction > blendFriction && blendFriction > dirtFriction &&
+                             std::abs(blendFriction - (grassFriction + dirtFriction) * 0.5f) < 0.01f;
+        std::cout << "  Material Blending: " << (blendOk ? "PASS" : "FAIL")
+                  << " (grass=" << grassFriction << ", blend=" << blendFriction
+                  << ", dirt=" << dirtFriction << ")" << std::endl;
+        if (!blendOk) allTestsPassed = false;
+
+        struct SurfaceRun {
+            Physics::SurfaceType type;
+            float decel = 0.0f;
+            float distance = 0.0f;
+            float speed = 0.0f;
+        };
+
+        auto runSurface = [&](Physics::SurfaceType type, bool useBox2D) {
+            Physics::Terrain terrain;
+            terrain.setTestIncline(0.0f);
+            terrain.setTestSurface(type);
+            Physics::Vehicle vehicle(Physics::VehicleType::OFFROADER);
+            vehicle.setUseBox2D(useBox2D);
+
+            const float startX = 40.0f;
+            const float groundY = terrain.getHeight(startX);
+            const float restY = groundY + vehicle.suspRestLength() + vehicle.wheelRadius() -
+                                vehicle.rearMountOffset().y;
+            vehicle.reset(startX, restY);
+
+            for (int tick = 0; tick < 240; ++tick) {
+                vehicle.applyInput(1.0f, 0.0f, 0.0f);
+                vehicle.step(DT, terrain, profile);
+            }
+
+            SurfaceRun run;
+            run.type = type;
+            run.speed = std::abs(vehicle.chassisVel().x);
+            const float brakeStartX = vehicle.chassisPos().x;
+            float brakeEndX = brakeStartX;
+            for (int tick = 0; tick < 600; ++tick) {
+                vehicle.applyInput(0.0f, 1.0f, 0.0f);
+                vehicle.step(DT, terrain, profile);
+                brakeEndX = vehicle.chassisPos().x;
+                if (tick > 30 && std::abs(vehicle.chassisVel().x) < 0.25f) {
+                    break;
+                }
+            }
+            run.distance = std::max(0.0f, brakeEndX - brakeStartX);
+            run.decel = (run.speed * run.speed) / (2.0f * std::max(run.distance, 0.01f));
+            return run;
+        };
+
+        const Physics::SurfaceType surfaces[] = {
+            Physics::SurfaceType::ICE,
+            Physics::SurfaceType::MUD,
+            Physics::SurfaceType::SAND,
+            Physics::SurfaceType::GRASS,
+            Physics::SurfaceType::ROCK
+        };
+
+        std::vector<SurfaceRun> box2dRuns;
+        for (auto surface : surfaces) {
+            box2dRuns.push_back(runSurface(surface, true));
+        }
+        for (const auto& run : box2dRuns) {
+            std::cout << "  Box2D " << Physics::SurfaceMaterialRegistry::name(run.type)
+                      << ": v0=" << run.speed << " m/s, stop=" << run.distance
+                      << " m, decel=" << run.decel << " m/s^2" << std::endl;
+        }
+
+        auto findRun = [](const std::vector<SurfaceRun>& runs, Physics::SurfaceType type) {
+            for (const auto& run : runs) {
+                if (run.type == type) return run;
+            }
+            return SurfaceRun{type};
+        };
+        const SurfaceRun box2dIce = findRun(box2dRuns, Physics::SurfaceType::ICE);
+        const SurfaceRun box2dMud = findRun(box2dRuns, Physics::SurfaceType::MUD);
+        const SurfaceRun box2dSand = findRun(box2dRuns, Physics::SurfaceType::SAND);
+        const SurfaceRun box2dGrass = findRun(box2dRuns, Physics::SurfaceType::GRASS);
+        const SurfaceRun box2dRock = findRun(box2dRuns, Physics::SurfaceType::ROCK);
+        const bool box2dOrderOk = box2dIce.decel < box2dMud.decel &&
+                                  box2dMud.decel < box2dSand.decel &&
+                                  box2dSand.decel < box2dGrass.decel &&
+                                  box2dGrass.decel < box2dRock.decel;
+        std::cout << "  Box2D Material Braking Order: " << (box2dOrderOk ? "PASS" : "FAIL") << std::endl;
+        if (!box2dOrderOk) allTestsPassed = false;
+
+        std::vector<SurfaceRun> legacyRuns;
+        for (auto surface : surfaces) {
+            legacyRuns.push_back(runSurface(surface, false));
+        }
+        const SurfaceRun legacyIce = findRun(legacyRuns, Physics::SurfaceType::ICE);
+        const SurfaceRun legacyMud = findRun(legacyRuns, Physics::SurfaceType::MUD);
+        const SurfaceRun legacySand = findRun(legacyRuns, Physics::SurfaceType::SAND);
+        const SurfaceRun legacyGrass = findRun(legacyRuns, Physics::SurfaceType::GRASS);
+        const SurfaceRun legacyRock = findRun(legacyRuns, Physics::SurfaceType::ROCK);
+        const bool legacyOrderOk = legacyIce.decel < legacyMud.decel &&
+                                   legacyMud.decel < legacySand.decel &&
+                                   legacySand.decel < legacyGrass.decel &&
+                                   legacyGrass.decel < legacyRock.decel;
+        std::cout << "  Legacy Material Braking Order: " << (legacyOrderOk ? "PASS" : "FAIL")
+                  << " (ice=" << legacyIce.decel << ", mud=" << legacyMud.decel
+                  << ", sand=" << legacySand.decel << ", grass=" << legacyGrass.decel
+                  << ", rock=" << legacyRock.decel << ")" << std::endl;
+        if (!legacyOrderOk) allTestsPassed = false;
+
+        std::cout << "\n=======================================================" << std::endl;
+        std::cout << "  TERRAIN & MATERIAL RESULT: "
+                  << (allTestsPassed ? "ALL TESTS PASSED!" : "SOME TESTS FAILED!")
+                  << std::endl;
+        std::cout << "=======================================================\n" << std::endl;
+        return allTestsPassed ? 0 : 1;
+    }
+
     if (argc > 1 && (std::string(argv[1]) == "--test-physics" || std::string(argv[1]) == "--physics-test")) {
         std::cout << "\n=======================================================" << std::endl;
         std::cout << "  RUNNING COMPREHENSIVE VEHICLE & SUSPENSION TEST SUITE" << std::endl;
@@ -1287,7 +1516,8 @@ int main(int argc, char *argv[]) {
         for (int v = 0; v < static_cast<int>(Physics::VehicleType::COUNT); ++v) {
             auto vType = static_cast<Physics::VehicleType>(v);
             Physics::Terrain terrain;
-            terrain.setBiome("countryside");
+            terrain.setTestIncline(0.0f);
+            terrain.setTestSurface(Physics::SurfaceType::TARMAC);
             Physics::Vehicle vehicle(vType);
 
             float startX = 10.0f;
@@ -1337,6 +1567,7 @@ int main(int argc, char *argv[]) {
             // Test 10A: Countryside (Earth Atmosphere, airDensity = 1.0)
             Physics::Terrain earthTerrain;
             earthTerrain.setBiome("countryside");
+            earthTerrain.setTestEnvironment(9.81f, 1.0f);
             Physics::Vehicle earthVehicle(Physics::VehicleType::RALLY_CAR);
             float startX = 25.0f;
             float groundY = earthTerrain.getHeight(startX);
@@ -1364,7 +1595,8 @@ int main(int argc, char *argv[]) {
 
             // Test 10B: Moon (Lunar Vacuum, airDensity = 0.0, gravity = 1.62)
             Physics::Terrain moonTerrain;
-            moonTerrain.setBiome("moon");
+            moonTerrain.setBiome("countryside");
+            moonTerrain.setTestEnvironment(1.62f, 0.0f);
             Physics::Vehicle moonVehicle(Physics::VehicleType::RALLY_CAR);
             float moonGroundY = moonTerrain.getHeight(startX);
             moonVehicle.reset(startX, moonGroundY + 0.5f);

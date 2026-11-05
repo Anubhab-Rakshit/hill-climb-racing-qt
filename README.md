@@ -120,7 +120,7 @@ Launch with legacy analytical physics engine:
 
 ## 🧪 Automated Testing & Verification
 
-The project includes **7 comprehensive, deterministic CLI test suites**. Note that tests use custom built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
+The project includes **8 comprehensive, deterministic CLI test suites**. Note that tests use built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
 
 | Test Command | Scope & Invariants Verified |
 | :--- | :--- |
@@ -129,6 +129,7 @@ The project includes **7 comprehensive, deterministic CLI test suites**. Note th
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles` | Evaluates all 12 vehicles for idle stability, forward acceleration, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world` | Full world integration: single-player drive, fuel drainage, suspension deformation, checkpoint crossings, split-screen multiplayer dual-vehicle physics, and neck-snap crash detection. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics` | Comprehensive 19-test physics audit: drop landings, rebound oscillations, 60 km/h ground contact retention, ski jump trajectories, extreme tumble non-penetration (< 0.005m), speedometer accuracy, brake upgrades, and surface friction scaling (ice vs snow vs turf vs rock). |
+| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain` | Validates all 9 track recipes, signature features and surface zones, 5000m reachability, material registry/friction ordering, boundary blending, and Box2D/legacy braking order across ice, mud, sand, grass, and rock. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio` | Validates volume hierarchy, BGM state crossfading, dynamic RPM pitch modulation, wheel rolling SFX, impact scaling, and multi-channel clipping limiter. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test` | End-to-end procedural terrain scan (fuel reachability across all biomes), stage progression unlocks, stationary idle check, checkpoint crossing, and visual screenshot generation. |
 
@@ -139,6 +140,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```

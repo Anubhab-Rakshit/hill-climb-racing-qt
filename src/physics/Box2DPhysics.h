@@ -13,6 +13,7 @@ struct Box2DTerrainOptions {
     float sampleSpacing = 0.5f;
     float surfaceOffset = 0.0f;
     float friction = 0.9f;
+    bool useMaterialFriction = false;
 };
 
 /**

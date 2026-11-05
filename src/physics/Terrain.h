@@ -1,7 +1,9 @@
 #pragma once
 
 #include "PhysicsTypes.h"
+#include "SurfaceMaterial.h"
 #include "TerrainConfig.h"
+#include "TrackRecipe.h"
 #include <string>
 #include <vector>
 
@@ -47,8 +49,13 @@ public:
 
     void setBiome(const std::string& biomeId);
     void setTestIncline(float angleDeg);
+    void setTestEnvironment(float gravity, float airDensity);
+    void setTestSurface(SurfaceType type);
+    void clearTestSurface();
     const std::string& getBiome() const { return m_biomeId; }
     const BiomeSpec& getBiomeSpec() const { return m_spec; }
+    const TrackRecipe& getTrackRecipe() const { return m_recipe; }
+    float getTrackLength() const { return m_recipe.length; }
 
     float getBaseHeight(float x) const;
     float getHeight(float x) const;
@@ -62,15 +69,9 @@ public:
     void resetDeformation();
 
     float getFriction() const { return m_friction; }
-    float getFrictionAt(float x) const {
-        if (m_biomeId == "seasons") {
-            if (x < 500.0f) return 1.25f;       // Spring: lush turf
-            if (x < 1000.0f) return 1.35f;      // Summer: warm dry soil
-            if (x < 1500.0f) return 0.92f;      // Autumn: wet leaf slick
-            return 0.52f;                       // Winter: slippery glacial ice
-        }
-        return m_friction;
-    }
+    float getFrictionAt(float x) const;
+    SurfaceProperties getSurfaceAt(float x) const;
+    SurfaceType getSurfaceTypeAt(float x) const { return getSurfaceAt(x).type; }
     void setFriction(float f) { m_friction = f; }
     float getGravity() const { return m_gravity; }
     float getAirDensity() const { return m_airDensity; }
@@ -90,15 +91,18 @@ public:
 private:
     std::string m_biomeId;
     BiomeSpec m_spec;
+    TrackRecipe m_recipe;
     float m_friction;
     float m_gravity;
     float m_airDensity = 1.0f;
+    bool m_hasSurfaceOverride = false;
+    SurfaceType m_surfaceOverride = SurfaceType::GRASS;
     std::vector<WorldItem> m_items;
     std::vector<MilestoneSign> m_milestones;
 
     static constexpr float DEFORM_MIN_X = -50.0f;
     static constexpr float DEFORM_DX = 0.05f;
-    static constexpr size_t DEFORM_SAMPLES = 72000;
+    static constexpr size_t DEFORM_SAMPLES = 102000;
     std::vector<TerrainDeformation> m_deformGrid;
     std::vector<float> m_baseHeightCache;
     int m_modifiedMinIdx = static_cast<int>(DEFORM_SAMPLES);

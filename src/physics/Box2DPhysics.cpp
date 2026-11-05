@@ -126,7 +126,9 @@ void Box2DPhysics::createSolidTerrainCollider(const Terrain& terrain,
 
         b2FixtureDef fixtureDef;
         fixtureDef.shape = &shape;
-        fixtureDef.friction = options.friction;
+        fixtureDef.friction = options.useMaterialFriction
+                                 ? terrain.getSurfaceAt((x0 + x1) * 0.5f).friction
+                                 : options.friction;
         fixtureDef.restitution = 0.0f;
         m_terrainBody->CreateFixture(&fixtureDef);
     };

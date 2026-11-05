@@ -1,0 +1,60 @@
+Phase 4 — Terrain topology overhaul
+This is the highest-priority phase.
+Replace the single sine formula with a data-driven track system:
+- Add TrackRecipe / TerrainGenerator: deterministic seed, difficulty curve, ordered sections, and biome-specific feature recipes.
+- Add multi-octave value noise, ridged noise, domain warping, and roughness layers at 0.5 m / 2 m / 8 m scales.
+- Add a real feature library:
+- rollers, whoops, washboard bumps
+- tabletops, doubles, step-ups, drop-offs
+- ledges, cliffs, ravines, ridges, plateaus
+- sand dune crests, ice shelves, rock steps, ash slopes
+- Blend features with C1-continuous entry/exit transitions so there are no accidental kinks.
+- Keep the first 20 m flat, then immediately introduce the biome’s signature terrain.
+- Extend the validator: max climbable slope, safe jump landing angles, fuel reachability, no long boring flat sections, checkpoint spacing.
+Done when: all 9 maps have distinct topology and signature sections, and automated tests prove every generated map is traversable.
+Phase 5 — Surface material physics
+This fixes “different terrain should have different physics.”
+Add a proper material system:
+- SurfaceMaterial table: grass, dirt, mud, sand, gravel, rock, ice, packed snow, ash, regolith, tarmac, neon.
+- Each material gets its own friction, rolling resistance, sinkage/drag, deformation rate, restitution, dust particle, and tire audio.
+- Terrain::getSurfaceAt(x) returns the local material, with blended transition zones.
+- Box2D collider strips become material-aware, so each 0.5 m strip can have different friction.
+- Legacy solver samples material at each wheel contact instead of using one biome-wide value.
+- Per-biome material maps, e.g. desert = sand + rock outcrops, arctic = ice + snow + rock, mountain = rock + scree, volcano = basalt + ash, seasons = grass → dry dirt → mud → ice.
+Done when: the same slope, same vehicle, and same input produce clearly different acceleration, wheelspin, braking distance, and slide behavior on sand, ice, mud, rock, and grass.
+Phase 6 — Vehicle dynamics realism
+- Add a real engine torque curve, RPM/load behavior, engine braking, and drivetrain split.
+- Improve tires: slip ratio, load-sensitive grip, combined slip, rolling resistance, wheel sinkage.
+- Improve suspension: progressive springs, bump stops, compression/rebound damping, unsprung mass.
+- Add aero drag and stronger downforce effects.
+- Tune all 12 vehicles so they feel genuinely different on the new terrain.
+- Keep Box2D as the backend; do not restart the physics work.
+Done when: each vehicle has a distinct acceleration, braking, climbing, and landing character, and none of them become unstable on rough terrain.
+Phase 7 — Driver ragdoll, damage, and crashes
+- Replace the head-spring with a multi-body driver ragdoll: torso, head, arms/legs, seat belt, neck limits.
+- Add ejection on severe crashes, helmet/body collisions, and a proper “driver down” slow-motion moment.
+- Add damage zones: front, rear, underbody, wheels, suspension.
+- Damage affects performance: bent wheels, engine smoke, suspension sag, reduced power.
+- Add crash camera, impact audio, smoke/fire particles, and repair/restart flow.
+Done when: bad landings and rollovers look and feel dangerous, not just trigger an instant game-over text.
+Phase 8 — Map identity, visuals, and weather
+- Material-specific terrain rendering: sand ripples, snow caps, ice cracks, rock striations, mud, ash, lava veins, neon grid.
+- Better cliff faces, strata, ledges, and surface detail.
+- Tire tracks, skid marks, dust/snow/rain/ash weather, improved lighting and shadows.
+- More biome-specific landmarks and set pieces at checkpoints.
+- Keep everything inside the software rasterizer; no QPainter vector shapes.
+Done when: every map is recognizable from a single screenshot, not just from its color palette.
+Phase 9 — Game feel, audio, camera, HUD, progression
+- Dynamic engine audio tied to RPM/load, surface-specific tire loops, impacts, wind.
+- Camera anticipation, landing zoom, crash slow-motion, better shake.
+- HUD additions: RPM/gear, surface indicator, damage/fuel status, better terrain-profile minimap.
+- Make upgrades actually affect the new physics: engine, tires, suspension, 4WD, brakes.
+- Add challenge modes, ghosts/replays, and better reward pacing.
+Done when: driving feels responsive and readable, and upgrades are felt immediately.
+Phase 10 — Content, balance, multiplayer, performance, release
+- Finish and balance all 9 biomes and 12 vehicles.
+- Sync terrain seeds, materials, ragdolls, and damage in multiplayer.
+- Performance pass for 60 FPS at 960×540 and 1280×720.
+- Final QA, screenshots, docs, packaging, and release.
+Recommended order
+Do Phase 4 + Phase 5 together as one “Terrain & Surface Realism Sprint.” They depend on each other: the material system must be designed into the generator and collider, not bolted on afterward.

@@ -59,6 +59,8 @@ set(SOURCES
     src/graphics/Camera.cpp
     src/graphics/ParticleSystem.cpp
     # Physics Backend & Interfaces for teammates
+    src/physics/SurfaceMaterial.cpp
+    src/physics/TrackRecipe.cpp
     src/physics/TerrainConfig.cpp
     src/physics/Terrain.cpp
     src/physics/VehicleConfig.cpp
@@ -114,6 +116,8 @@ set(HEADERS
     src/graphics/Camera.h
     src/graphics/ParticleSystem.h
     src/physics/PhysicsTypes.h
+    src/physics/SurfaceMaterial.h
+    src/physics/TrackRecipe.h
     src/physics/TerrainConfig.h
     src/physics/Terrain.h
     src/physics/VehicleConfig.h

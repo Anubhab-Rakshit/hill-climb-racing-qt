@@ -102,6 +102,7 @@ struct Vehicle::Box2DVehicleSim {
         options.endX = centerX + 140.0f;
         options.sampleSpacing = 0.5f;
         options.friction = std::clamp(terrain.getFrictionAt(centerX), 0.2f, 1.5f);
+        options.useMaterialFriction = true;
         world.createSolidTerrainCollider(terrain, options, 2.0f);
         lastTerrainCenter = centerX;
         terrainRebuildTimer = 0.0f;
@@ -338,6 +339,30 @@ struct Vehicle::Box2DVehicleSim {
         const bool rearContact = bodyHasContact(rearWheel);
         const bool frontContact = bodyHasContact(frontWheel);
 
+        if (effectiveGas <= 0.01f && effectiveReverse <= 0.01f && brakePressure <= 0.001f) {
+            auto applyRollingResistance = [&](b2Body* wheel) {
+                if (wheel == nullptr) return;
+                bool contact = false;
+                float slipSpeed = 0.0f;
+                float normalForce = 0.0f;
+                Vec2 tangent;
+                readWheelTelemetry(wheel, contact, slipSpeed, normalForce, tangent);
+                if (!contact || normalForce <= 0.0f) return;
+
+                const b2Vec2 velocity = wheel->GetLinearVelocity();
+                const float along = velocity.x * tangent.x + velocity.y * tangent.y;
+                if (std::abs(along) < 0.05f) return;
+
+                const SurfaceProperties surface = terrain.getSurfaceAt(wheel->GetPosition().x);
+                const float force = surface.rollingResistance * normalForce;
+                const float direction = (along > 0.0f) ? -1.0f : 1.0f;
+                wheel->ApplyForceToCenter(b2Vec2(direction * force * tangent.x,
+                                                 direction * force * tangent.y));
+            };
+            applyRollingResistance(rearWheel);
+            applyRollingResistance(frontWheel);
+        }
+
         const bool driving = (effectiveGas > 0.01f || effectiveReverse > 0.01f) &&
                              brakePressure <= 0.001f;
         if (driving && (rearContact || frontContact)) {
@@ -412,17 +437,22 @@ struct Vehicle::Box2DVehicleSim {
         if (joint == nullptr || wheel == nullptr) return;
         const float minT = owner.m_suspMinLength - owner.m_suspRestLength;
         const float maxT = owner.m_suspMaxLength - owner.m_suspRestLength;
-        const float t = joint->GetJointTranslation();
-        if (t >= minT && t <= maxT) return;
-
-        const float clamped = std::clamp(t, minT, maxT);
         b2Body* chassisBody = joint->GetBodyA();
         const b2Vec2 axis = chassisBody->GetWorldVector(joint->GetLocalAxisA());
-        wheel->SetTransform(wheel->GetPosition() + (clamped - t) * axis, wheel->GetAngle());
+        const b2Vec2 anchor = chassisBody->GetWorldPoint(joint->GetLocalAnchorA());
+        const b2Vec2 wheelPos = wheel->GetPosition();
+        const float t = b2Dot(wheelPos - anchor, axis);
+        const float clamped = std::clamp(t, minT, maxT);
+        const b2Vec2 target = anchor + clamped * axis;
 
-        const b2Vec2 rel = wheel->GetLinearVelocity() - chassisBody->GetLinearVelocity();
-        const float along = b2Dot(rel, axis);
-        wheel->SetLinearVelocity(wheel->GetLinearVelocity() - along * axis);
+        if ((wheelPos - target).LengthSquared() <= 1e-8f) return;
+        wheel->SetTransform(target, wheel->GetAngle());
+
+        if (clamped != t) {
+            const b2Vec2 rel = wheel->GetLinearVelocity() - chassisBody->GetLinearVelocity();
+            const float along = b2Dot(rel, axis);
+            wheel->SetLinearVelocity(wheel->GetLinearVelocity() - along * axis);
+        }
     }
 
     void readWheelTelemetry(b2Body* wheel, bool& contact, float& slipSpeed,
@@ -493,12 +523,19 @@ struct Vehicle::Box2DVehicleSim {
         owner.m_frontWheelAngle = frontWheel->GetAngle();
         owner.m_frontWheelAngularVel = frontWheel->GetAngularVelocity();
 
-        const float rearTranslation = rearJoint ? rearJoint->GetJointTranslation() : 0.0f;
-        const float frontTranslation = frontJoint ? frontJoint->GetJointTranslation() : 0.0f;
-        owner.m_rearSuspensionLength = std::clamp(owner.m_suspRestLength + rearTranslation,
-                                                  owner.m_suspMinLength, owner.m_suspMaxLength);
-        owner.m_frontSuspensionLength = std::clamp(owner.m_suspRestLength + frontTranslation,
-                                                   owner.m_suspMinLength, owner.m_suspMaxLength);
+        const float syncCos = std::cos(owner.m_chassisAngle);
+        const float syncSin = std::sin(owner.m_chassisAngle);
+        const Vec2 syncDown(syncSin, -syncCos);
+        const Vec2 rearMountWorld(owner.m_chassisPos.x +
+                                      (owner.m_rearMountOffset.x * syncCos - owner.m_rearMountOffset.y * syncSin),
+                                  owner.m_chassisPos.y +
+                                      (owner.m_rearMountOffset.x * syncSin + owner.m_rearMountOffset.y * syncCos));
+        const Vec2 frontMountWorld(owner.m_chassisPos.x +
+                                       (owner.m_frontMountOffset.x * syncCos - owner.m_frontMountOffset.y * syncSin),
+                                   owner.m_chassisPos.y +
+                                       (owner.m_frontMountOffset.x * syncSin + owner.m_frontMountOffset.y * syncCos));
+        owner.m_rearSuspensionLength = Vec2::dot(owner.m_rearWheelPos - rearMountWorld, syncDown);
+        owner.m_frontSuspensionLength = Vec2::dot(owner.m_frontWheelPos - frontMountWorld, syncDown);
         owner.m_rearSuspVel = (owner.m_rearSuspensionLength - rearLenBefore) / Box2DPhysics::kFixedDt;
         owner.m_frontSuspVel = (owner.m_frontSuspensionLength - frontLenBefore) / Box2DPhysics::kFixedDt;
 
@@ -977,7 +1014,8 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             float targetOmega = (m_wheelRadius > 0.001f) ? (surfSpeed / m_wheelRadius) : 0.0f;
 
             float normalForce = suspForceMag + m_wheelMass * gravity * std::max(0.3f, normal.y);
-            float maxFriction = std::max(300.0f, normalForce * terrain.getFriction() * m_config.baseGrip * tireGripMult * 1.35f * m_customFrictionMultiplier);
+            const SurfaceProperties wheelSurface = terrain.getSurfaceAt(wheelPos.x);
+            float maxFriction = std::max(300.0f, normalForce * wheelSurface.friction * m_config.baseGrip * tireGripMult * 1.35f * m_customFrictionMultiplier);
 
             // Unified Physics-Based Braking & Traction Model
             // Deceleration is generated entirely through tyre-ground contact forces (tractiveForce)
@@ -1067,7 +1105,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
             m_chassisAngularVel += (trqTractive / m_chassisInertia) * dt;
 
             // Rolling resistance on terrain
-            float rollResist = 0.014f * normalForce;
+            float rollResist = wheelSurface.rollingResistance * normalForce;
             if (std::abs(surfSpeed) > 0.05f && effectiveGas <= 0.01f && effectiveReverse <= 0.01f && m_brakePressure <= 0.01f) {
                 float rollDir = (surfSpeed > 0.0f) ? -1.0f : 1.0f;
                 m_chassisVel += tangent * (rollDir * rollResist / m_chassisMass * dt);
@@ -1309,7 +1347,7 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
                 float surfVel = Vec2::dot(ptVel, tangent);
                 float rCrossT = r.x * tangent.y - r.y * tangent.x;
                 float Kt = (1.0f / m_chassisMass) + (rCrossT * rCrossT) / m_chassisInertia;
-                float mu = terrain.getFriction() * 0.80f;
+                float mu = terrain.getSurfaceAt(pt.x).friction * 0.80f;
                 float Jt = -std::clamp(surfVel / Kt, -mu * Jn, mu * Jn);
 
                 m_chassisVel += tangent * (Jt / m_chassisMass);

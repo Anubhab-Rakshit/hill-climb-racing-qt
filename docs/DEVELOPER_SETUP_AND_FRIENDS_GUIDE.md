@@ -149,10 +149,13 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 # 5. Comprehensive 19-Test Vehicle & Suspension Physics Audit
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 
-# 6. Dynamic Realistic Audio Test Suite
+# 6. Terrain Topology & Surface Material Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
+
+# 7. Dynamic Realistic Audio Test Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 
-# 7. Full Smoke Test & Procedural Reachability Scan
+# 8. Full Smoke Test & Procedural Reachability Scan
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 

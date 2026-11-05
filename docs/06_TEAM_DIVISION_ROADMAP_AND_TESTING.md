@@ -88,7 +88,7 @@ graph LR
 #### 🧪 Member 5 (or Distributed): QA, Testing & Visual Polish Lead
 - **Scope**: Implements built-in automated CLI test suites, HUD telemetry gauges, responsive screen scaling, and project presentation.
 - **Primary Deliverables**:
-  - 7 comprehensive CLI verification suites (`--test-ui-layout`, `--test-box2d`, `--test-box2d-vehicles`, `--test-box2d-world`, `--test-physics`, `--test-audio`, `--smoke-test`).
+  - 8 comprehensive CLI verification suites (`--test-ui-layout`, `--test-box2d`, `--test-box2d-vehicles`, `--test-box2d-world`, `--test-physics`, `--test-terrain`, `--test-audio`, `--smoke-test`).
   - Responsive screen layouts for $960 \times 540$ and $1280 \times 720$ with zero element occlusion.
   - Analog needle gauges for RPM and Speedometer; segmented flashing fuel bar with low-fuel alert.
   - Automated physics regression verification (suspension stability, non-penetration audit).
@@ -149,7 +149,7 @@ To demonstrate elite software craftsmanship and deterministic physics guarantees
 > [!IMPORTANT]
 > The automated testing infrastructure is built with **custom deterministic CLI test runners** rather than the QTest library. This allows tests to run directly in headless/offscreen environments without GUI overhead using `QT_QPA_PLATFORM=offscreen`.
 
-### The 7 Automated Test Commands:
+### The 8 Automated Test Commands:
 
 ```bash
 # 1. Automated UI Layout Regression Suite
@@ -167,10 +167,13 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 # 5. Comprehensive 19-Test Vehicle & Suspension Physics Audit
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 
-# 6. Realistic Dynamic Audio Test Suite
+# 6. Terrain Topology & Surface Material Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
+
+# 7. Realistic Dynamic Audio Test Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 
-# 7. End-to-End Procedural Reachability & Smoke Test
+# 8. End-to-End Procedural Reachability & Smoke Test
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 
@@ -180,8 +183,9 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 3. **Vehicle Parity (`--test-box2d-vehicles`)**: Audits all 12 vehicles (Classic Off-Roader, Rally Racing Car, Modern Sports Coupe, Venom Hyper-V12, Heavy-Duty Pickup, Monster Truck, Desert Rally Raid, Formula Racing Car, Retro Muscle Car, Electric Off-Roader, Motocross Bike, and Quad Bike ATV) for idle stability, forward drive, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt.
 4. **World Integration (`--test-box2d-world`)**: Single-player driving distance, propulsion-only fuel drainage, dynamic suspension strut deformation, checkpoint triggers at 250m intervals, split-screen local multiplayer dual-vehicle physics, and neck-snap crash detection.
 5. **Suspension & Dynamics Audit (`--test-physics`)**: Evaluates 1.5m drop landing rebound oscillation, flat ground zero-spin, 60 km/h ground contact retention over undulations, 65m ski jump trajectory, steep mountain climb at x=950m, upside-down inverted crash non-penetration (< 0.005m), 80 km/h slope impact non-penetration, speedometer accuracy, propulsion-only fuel consumption, and surface friction scaling (glacial ice vs arctic snow vs countryside turf vs mountain rock).
-6. **Dynamic Audio Audit (`--test-audio`)**: Validates volume hierarchy, BGM crossfading, dynamic engine RPM pitch modulation (1000 to 8500 RPM), tire rolling audio, crash intensity scaling, environmental wind loop, and multi-channel anti-clipping limiter.
-7. **Procedural Reachability (`--smoke-test`)**: Validates procedural climbability (< 38° slopes) and fuel reachability (< 165m intervals) across all 6 biomes, verifies stage progression unlock chaining, stationary idle stability, and exports visual screen verification captures to `scratch/`.
+6. **Terrain & Materials (`--test-terrain`)**: Validates 9 track recipes, signature features, surface-zone coverage, flat starts, 5000m climbability/reachability, material registry and friction ordering, boundary blending, and Box2D/legacy braking-deceleration order across ice, mud, sand, grass, and rock.
+7. **Dynamic Audio Audit (`--test-audio`)**: Validates volume hierarchy, BGM crossfading, dynamic engine RPM pitch modulation (1000 to 8500 RPM), tire rolling audio, crash intensity scaling, environmental wind loop, and multi-channel anti-clipping limiter.
+8. **Procedural Reachability (`--smoke-test`)**: Validates procedural climbability (< 38° slopes) and fuel reachability (< 165m intervals) across all 6 biomes, verifies stage progression unlock chaining, stationary idle stability, and exports visual screen verification captures to `scratch/`.
 
 ---
 

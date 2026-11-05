@@ -9,6 +9,8 @@ All gameplay and UI pixels are written into a 32-bit ARGB `Framebuffer` and blit
 - `src/physics/PhysicsWorld.*` owns terrain, one or two `Vehicle` instances, pickups, checkpoints, stunts, and multiplayer rules.
 - `src/physics/Vehicle.*` is the vehicle facade. It contains the legacy custom solver and the Box2D backend.
 - `src/physics/Box2DPhysics.*` is the fixed-step Box2D 2.2.1 world wrapper.
+- `src/physics/TrackRecipe.*` owns the 9 authored 5000m track recipes and procedural feature composition.
+- `src/physics/SurfaceMaterial.*` owns the 12 surface materials, friction/rolling-resistance table, and boundary blending.
 - `third_party/Box2D` is the vendored Box2D 2.2.1 source.
 - `src/graphics/` is the software raster pipeline.
 - `src/ui/` contains all menu/HUD screens.
@@ -44,6 +46,15 @@ All gameplay and UI pixels are written into a 32-bit ARGB `Framebuffer` and blit
 - Box2D brake torque factor is `0.75 * baseBrakingTorque * brakeMultiplier * brakePressure`.
 - These changes are Box2D-only; the legacy solver is unchanged.
 
+## Terrain & Surface Materials
+- `TrackRecipeRegistry` provides 9 recipes: countryside, desert, arctic, mountain, moon, volcano, neon, super_countryside, and seasons.
+- Each recipe is 5000m with 26 ordered sections, authored `TerrainFeature` signatures, elevation offsets, and contiguous `SurfaceZone`s.
+- `TerrainGenerator::heightAt()` combines base sine, domain-warped FBM, ridged noise, and 0.5m/2m/8m roughness layers. The first 20m of every recipe is flat.
+- `Terrain::getSurfaceAt(x)` blends across zone boundaries and is used by both Box2D and legacy wheel friction.
+- `SurfaceMaterialRegistry` provides 12 materials with friction, rolling resistance, sinkage, deformation rate, max compression, restitution, and dust/top/body colors.
+- Box2D terrain strip fixtures use per-strip material friction; legacy wheels use per-contact material friction and rolling resistance.
+- `super_countryside` is tuned to `baseAmplitude=2.8`, `baseFrequency=0.015`, `roughness=0.65`; its max uphill is 37.5543°.
+
 ## Build
 ```bash
 CMAKE_BIN="/Users/anubhabrakshit/Qt/Tools/CMake/CMake.app/Contents/bin/cmake"
@@ -65,6 +76,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
@@ -83,6 +95,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 - `--test-box2d-vehicles`: all 12 vehicles passing idle, forward, reverse, brake, 15-degree slope, and air control.
 - `--test-box2d-world`: passing single-player drive, fuel drain, terrain deformation, pickup, checkpoint, crash detection, and multiplayer.
 - `--test-physics`: passing.
+- `--test-terrain`: passing all 9 recipes, material ordering, blending, and Box2D/legacy braking order.
 - `--test-audio`: passing.
 - `--smoke-test`: passing on Box2D.
 - `--smoke-test --legacy-physics`: passing on the legacy solver.
@@ -90,3 +103,6 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 
 ## Phase 3
 Completed. See `PHASE3.md`.
+
+## Phases 4–5
+Completed. Terrain topology overhaul and surface-material physics are implemented and covered by `--test-terrain`.

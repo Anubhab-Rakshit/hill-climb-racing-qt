@@ -259,10 +259,10 @@ TerrainValidator::ValidationResult TerrainValidator::validateBiome(const std::st
     std::ostringstream ss;
     ss << "=== TERRAIN VALIDATION REPORT FOR: " << biomeId << " ===\n";
 
-    // 1. Scan slopes across 0 to 2000 meters at 0.5m intervals
+    const float trackLength = terrain.getTrackLength();
     float maxUphill = 0.0f;
     float maxDownhill = 0.0f;
-    for (float x = 0.0f; x <= 2000.0f; x += 0.5f) {
+    for (float x = 0.0f; x <= trackLength; x += 0.5f) {
         float slope = terrain.getSlope(x);
         float deg = std::abs(std::atan(slope) * (180.0f / 3.14159265f));
         if (slope > 0.0f && deg > maxUphill) maxUphill = deg;
@@ -321,7 +321,7 @@ TerrainValidator::ValidationResult TerrainValidator::validateBiome(const std::st
     float currentX = 0.0f;
     size_t fuelIdx = 0;
 
-    while (currentX < 1800.0f) {
+    while (currentX < trackLength) {
         float dt = 0.05f;
         float slope = terrain.getSlope(currentX);
         // Vehicle speed modeled by grade resistance: calibrated frame speed (~10.5 m/s flat, ~6.6 m/s on climb)
@@ -347,7 +347,7 @@ TerrainValidator::ValidationResult TerrainValidator::validateBiome(const std::st
     result.minFuelRemainingPercent = minRemaining;
 
     if (minRemaining > 10.0f) {
-        ss << "PASS: Simulated run completed 1800m with min fuel buffer of " << minRemaining << "%.\n";
+        ss << "PASS: Simulated run completed " << trackLength << "m with min fuel buffer of " << minRemaining << "%.\n";
     } else if (result.valid) {
         ss << "WARN: Low fuel buffer (" << minRemaining << "%) but reachable.\n";
     }
