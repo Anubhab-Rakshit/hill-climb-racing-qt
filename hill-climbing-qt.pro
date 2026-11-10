@@ -1,8 +1,8 @@
-QT += core gui widgets multimedia
+QT += core gui widgets multimedia network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-CONFIG += c++17
+CONFIG += c++17 console
 DEFINES += _USE_MATH_DEFINES
 
 win32-msvc* {
@@ -21,7 +21,8 @@ INCLUDEPATH += \
     src/graphics \
     src/physics \
     src/ui \
-    src/audio
+    src/audio \
+    src/network
 
 SOURCES += \
     src/main.cpp \
@@ -55,6 +56,10 @@ SOURCES += \
     src/ui/PauseOverlay.cpp \
     src/ui/GameOverScreen.cpp \
     src/ui/UIComponents.cpp \
+    src/ui/LobbyScreen.cpp \
+    src/ui/MinimapRadar.cpp \
+    src/network/GameServer.cpp \
+    src/network/GameClient.cpp \
     src/audio/SoundManager.cpp
 
 HEADERS += \
@@ -92,6 +97,11 @@ HEADERS += \
     src/ui/StageSelectScreen.h \
     src/ui/PauseOverlay.h \
     src/ui/GameOverScreen.h \
+    src/ui/LobbyScreen.h \
+    src/ui/MinimapRadar.h \
+    src/network/NetworkTypes.h \
+    src/network/GameServer.h \
+    src/network/GameClient.h \
     src/audio/SoundManager.h
 
 RESOURCES += \

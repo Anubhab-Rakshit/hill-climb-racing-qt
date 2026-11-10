@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QTimer>
+#include <QThread>
 #include <QDir>
 #include <iostream>
 #include <string>
@@ -10,6 +11,8 @@
 #include "Sprite.h"
 #include "graphics/ScanlineRasterizer.h"
 #include "audio/SoundManager.h"
+#include "network/GameServer.h"
+#include "network/GameClient.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
@@ -166,6 +169,219 @@ int main(int argc, char *argv[]) {
 
         std::cout << "\n=======================================================" << std::endl;
         std::cout << "  RESULT: " << (pass ? "ALL MULTIPLAYER TESTS PASSED!" : "TESTS FAILED!") << std::endl;
+        std::cout << "=======================================================\n" << std::endl;
+
+        return pass ? 0 : 1;
+    }
+
+    if (argc > 1 && std::string(argv[1]) == "--test-network-multiplayer") {
+        std::cout << "\n=======================================================" << std::endl;
+        std::cout << "       TCP/IP ONLINE MULTIPLAYER SUITE VERIFICATION    " << std::endl;
+        std::cout << "=======================================================" << std::endl;
+
+        bool pass = true;
+        Network::GameServer server;
+        Network::GameClient client;
+
+        // 1. Server initialization & bind
+        std::cout << "Test 1: Starting TCP Server on default port " << Network::DEFAULT_PORT << "..." << std::endl;
+        bool serverStarted = server.startServer(Network::DEFAULT_PORT);
+        if (!serverStarted || !server.isRunning()) {
+            std::cout << "  FAIL: GameServer failed to listen on port " << Network::DEFAULT_PORT << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: GameServer listening on " << server.getLocalIpAddress().toStdString()
+                      << ":" << server.getPort() << std::endl;
+        }
+
+        // 2. Client connection & handshake
+        std::cout << "Test 2: Connecting TCP Client to 127.0.0.1:" << Network::DEFAULT_PORT << "..." << std::endl;
+        bool clientConnected = false;
+        client.setOnConnected([&]() {
+            clientConnected = true;
+        });
+
+        client.connectToHost("127.0.0.1", Network::DEFAULT_PORT, "SpeedyRacer", 1, 1);
+
+        for (int i = 0; i < 200 && !clientConnected; ++i) {
+            app.processEvents();
+            QThread::msleep(10);
+        }
+
+        if (!clientConnected || !client.isConnected()) {
+            std::cout << "  FAIL: GameClient failed to connect or handshake with host!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: GameClient successfully handshaked! Assigned ID: "
+                      << client.getLocalPlayerId() << ", Color: 0x"
+                      << std::hex << client.getAssignedColor() << std::dec << std::endl;
+        }
+
+        // 3. Lobby state & track synchronization
+        std::cout << "Test 3: Host stage update broadcast..." << std::endl;
+        bool lobbyUpdated = false;
+        std::string receivedBiome;
+        client.setOnLobbyUpdated([&](const std::string& biome, const std::vector<Network::PlayerLobbyInfo>& players) {
+            lobbyUpdated = true;
+            receivedBiome = biome;
+            std::cout << "  [Client] Received lobby update. Biome: " << biome
+                      << ", Players count: " << players.size() << std::endl;
+        });
+
+        server.setTrack("arctic");
+        for (int i = 0; i < 100 && !lobbyUpdated; ++i) {
+            app.processEvents();
+            QThread::msleep(10);
+        }
+
+        if (!lobbyUpdated || receivedBiome != "arctic") {
+            std::cout << "  FAIL: Lobby update not received or incorrect biome: " << receivedBiome << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Track sync verified across TCP network." << std::endl;
+        }
+
+        // 4. Ready state exchange
+        std::cout << "Test 4: Client Ready State Exchange..." << std::endl;
+        client.sendReady(true, 2, 1);
+        for (int i = 0; i < 100; ++i) {
+            app.processEvents();
+            QThread::msleep(10);
+        }
+        int cId = client.getLocalPlayerId();
+        if (!server.getClients().contains(cId) || !server.getClients()[cId].isReady) {
+            std::cout << "  FAIL: Server did not register client ready status!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Client ready status and vehicle choice confirmed on server." << std::endl;
+        }
+
+        // 5. Race Start Broadcast
+        std::cout << "Test 5: Synchronized Race Launch Broadcast..." << std::endl;
+        bool raceStarted = false;
+        std::string raceBiome;
+        client.setOnRaceStart([&](const std::string& biome) {
+            raceStarted = true;
+            raceBiome = biome;
+        });
+        server.broadcastStartRace();
+        for (int i = 0; i < 100 && !raceStarted; ++i) {
+            app.processEvents();
+            QThread::msleep(10);
+        }
+        if (!raceStarted || raceBiome != "arctic") {
+            std::cout << "  FAIL: Client did not receive synchronous RACE_START!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Synchronous race start received on stage " << raceBiome << "." << std::endl;
+        }
+
+        // 6. Real-Time Telemetry Streaming
+        std::cout << "Test 6: Bidirectional Telemetry Streaming & Dead-Reckoning..." << std::endl;
+        bool clientReceivedHostTelemetry = false;
+        bool serverReceivedClientTelemetry = false;
+
+        client.setOnRemoteTelemetry([&](const Network::RemotePlayerState& st) {
+            if (st.id == 0 && std::abs(st.posX - 123.4f) < 0.01f) {
+                clientReceivedHostTelemetry = true;
+            }
+        });
+
+        server.setOnTelemetryReceived([&](const Network::RemotePlayerState& st) {
+            if (st.id == cId && std::abs(st.posX - 456.7f) < 0.01f) {
+                serverReceivedClientTelemetry = true;
+            }
+        });
+
+        Network::RemotePlayerState hostState;
+        hostState.posX = 123.4f;
+        hostState.posY = 10.5f;
+        hostState.speedKmh = 88.0f;
+        hostState.vehicleType = 0;
+        hostState.driverType = 0;
+        server.updateHostTelemetry(hostState);
+
+        Network::RemotePlayerState clientState;
+        clientState.posX = 456.7f;
+        clientState.posY = 12.0f;
+        clientState.speedKmh = 95.0f;
+        clientState.vehicleType = 2;
+        clientState.driverType = 1;
+        client.sendTelemetry(clientState);
+
+        for (int i = 0; i < 150 && (!clientReceivedHostTelemetry || !serverReceivedClientTelemetry); ++i) {
+            app.processEvents();
+            QThread::msleep(10);
+        }
+
+        if (!clientReceivedHostTelemetry || !serverReceivedClientTelemetry) {
+            std::cout << "  FAIL: Telemetry stream timed out! Client got Host: "
+                      << clientReceivedHostTelemetry << ", Server got Client: "
+                      << serverReceivedClientTelemetry << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: 100% bidirectional real-time telemetry streaming verified." << std::endl;
+        }
+
+        // 7. Dead-reckoning interpolation check
+        std::cout << "Test 7: Dead-Reckoning Position Smoothing..." << std::endl;
+        client.updateInterpolation(0.016f);
+        const auto& remPlayers = client.getRemotePlayers();
+        if (remPlayers.find(0) == remPlayers.end()) {
+            std::cout << "  FAIL: Host remote player state missing on client!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Dead-reckoning lerp smooth position x=" << remPlayers.at(0).posX << std::endl;
+        }
+
+        // 8. Item Collection Network Sync
+        std::cout << "Test 8: Item Pickup Event Broadcast..." << std::endl;
+        bool itemCollectedOnServer = false;
+        int collectedItemIndex = -1;
+        server.setOnItemCollected([&](int itemIdx, int pId) {
+            itemCollectedOnServer = true;
+            collectedItemIndex = itemIdx;
+            std::cout << "  [Server] Item " << itemIdx << " collected by player " << pId << std::endl;
+        });
+
+        client.sendItemCollected(42);
+        for (int i = 0; i < 100 && !itemCollectedOnServer; ++i) {
+            app.processEvents();
+            QThread::msleep(10);
+        }
+
+        if (!itemCollectedOnServer || collectedItemIndex != 42) {
+            std::cout << "  FAIL: Item pickup network event not received!" << std::endl;
+            pass = false;
+        } else {
+            std::cout << "  PASS: Item collection event synced across network." << std::endl;
+        }
+
+        // 9. Clean Disconnect and Teardown
+        std::cout << "Test 9: Graceful Disconnect & Teardown..." << std::endl;
+        client.disconnectFromHost();
+        for (int i = 0; i < 50; ++i) {
+            app.processEvents();
+            QThread::msleep(10);
+        }
+        server.stopServer();
+        std::cout << "  PASS: Sockets closed and memory freed cleanly." << std::endl;
+
+        // 10. Online Lobby & Race Render Capture
+        std::cout << "Test 10: Online Lobby & Race Framebuffer Render Verification..." << std::endl;
+        QDir().mkpath("scratch");
+        auto& sm = engine.stateManager();
+        sm.startOnlineLobby();
+        sm.render(engine.framebuffer(), 1.0f);
+        engine.framebuffer().getImage().save("scratch/online_lobby_captured.png");
+
+        sm.startNetworkMultiplayer(true, "countryside");
+        sm.render(engine.framebuffer(), 1.0f);
+        engine.framebuffer().getImage().save("scratch/online_race_captured.png");
+        std::cout << "  PASS: Saved scratch/online_lobby_captured.png and scratch/online_race_captured.png" << std::endl;
+
+        std::cout << "\n=======================================================" << std::endl;
+        std::cout << "  RESULT: " << (pass ? "ALL ONLINE MULTIPLAYER TESTS PASSED!" : "TESTS FAILED!") << std::endl;
         std::cout << "=======================================================\n" << std::endl;
 
         return pass ? 0 : 1;

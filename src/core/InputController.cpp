@@ -11,6 +11,10 @@ void InputController::resetTransientActions() {
     m_state.restart = false;
     m_state.enter = false;
     m_state.multiplayer = false;
+    m_state.onlineMultiplayer = false;
+    m_state.keyTyped = false;
+    m_state.lastKey = 0;
+    m_state.lastText.clear();
     m_state.mouseJustPressed = false;
     m_state.mouseJustReleased = false;
     m_state.mouseMoved = false;
@@ -38,6 +42,10 @@ void InputController::updateCombinedInputs() {
 }
 
 void InputController::onKeyPress(QKeyEvent* event) {
+    m_state.keyTyped = true;
+    m_state.lastKey = event->key();
+    m_state.lastText = event->text().toStdString();
+
     if (event->isAutoRepeat()) return;
 
     int k = event->key();
@@ -63,6 +71,8 @@ void InputController::onKeyPress(QKeyEvent* event) {
         m_state.enter = true;
     } else if (k == Qt::Key_M) {
         m_state.multiplayer = true;
+    } else if (k == Qt::Key_O) {
+        m_state.onlineMultiplayer = true;
     }
 
     updateCombinedInputs();

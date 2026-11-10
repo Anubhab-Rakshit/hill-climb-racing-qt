@@ -6,6 +6,10 @@
 #include "ProfileManager.h"
 #include <QImage>
 
+namespace Network {
+struct RemotePlayerState;
+}
+
 namespace Graphics {
 
 /**
@@ -15,6 +19,8 @@ class SpriteRenderer {
 public:
     static void renderVehicle(Framebuffer& fb, const Camera& cam, const Physics::Vehicle& vehicle,
                               float alpha = 1.0f, float opacity = 1.0f);
+    static void renderRemoteVehicle(Framebuffer& fb, const Camera& cam, const Network::RemotePlayerState& state,
+                                    float opacity = 1.0f);
     static void renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile);
     static void renderGarageVehicle(Framebuffer& fb, int cx, int cy, float bounceY, const Core::ProfileManager& profile,
                                     Physics::VehicleType vType, Physics::DriverType dType, bool drawLift = true);

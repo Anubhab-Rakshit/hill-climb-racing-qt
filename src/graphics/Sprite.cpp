@@ -1,5 +1,6 @@
 #include "Sprite.h"
 #include "VehicleSprites.h"
+#include "NetworkTypes.h"
 #include "UITheme.h"
 #include <cmath>
 #include <algorithm>
@@ -197,6 +198,87 @@ void SpriteRenderer::renderVehicle(Framebuffer& fb, const Camera& cam, const Phy
     }
 
     // 6. Render Pixel-Art Chassis Body (Drawn on top so wheels sit inside wheel arches)
+    blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale, opacity);
+}
+
+void SpriteRenderer::renderRemoteVehicle(Framebuffer& fb, const Camera& cam, const Network::RemotePlayerState& state, float opacity) {
+    ensureLoaded();
+
+    Physics::VehicleType vType = static_cast<Physics::VehicleType>(std::clamp(state.vehicleType, 0, static_cast<int>(Physics::VehicleType::COUNT) - 1));
+    Physics::DriverType dType = static_cast<Physics::DriverType>(std::clamp(state.driverType, 0, static_cast<int>(Physics::DriverType::COUNT) - 1));
+
+    const auto& config = Physics::VehicleRegistry::getConfig(vType);
+    const QImage& chassisImg = VehicleSprites::getChassisSprite(vType);
+    const QImage& wheelImg = VehicleSprites::getWheelSprite(vType);
+    const QImage& driverImg = VehicleSprites::getDriverSprite(dType);
+
+    float zoom = cam.zoom();
+    float spriteScale = zoom / 80.25f;
+
+    Physics::Vec2 cPos(state.posX, state.posY);
+    float angle = state.chassisAngle;
+    Physics::Vec2 chassisScr = cam.worldToScreen(cPos);
+    float screenChassisAngle = -angle;
+
+    auto chassisPointToWorld = [&](const Physics::Vec2& local) -> Physics::Vec2 {
+        float cosW = std::cos(angle);
+        float sinW = std::sin(angle);
+        return {cPos.x + (local.x * cosW - local.y * sinW),
+                cPos.y + (local.x * sinW + local.y * cosW)};
+    };
+
+    Physics::Vec2 rearMountScr = cam.worldToScreen(chassisPointToWorld(config.rearMountOffset));
+    Physics::Vec2 frontMountScr = cam.worldToScreen(chassisPointToWorld(config.frontMountOffset));
+
+    float rSusp = (state.rearSuspLen > 0.02f) ? state.rearSuspLen : 0.2f;
+    float fSusp = (state.frontSuspLen > 0.02f) ? state.frontSuspLen : 0.2f;
+    Physics::Vec2 rearWheelWorld = chassisPointToWorld({config.rearMountOffset.x, config.rearMountOffset.y - rSusp});
+    Physics::Vec2 frontWheelWorld = chassisPointToWorld({config.frontMountOffset.x, config.frontMountOffset.y - fSusp});
+
+    Physics::Vec2 rearWheelScr = cam.worldToScreen(rearWheelWorld);
+    Physics::Vec2 frontWheelScr = cam.worldToScreen(frontWheelWorld);
+
+    // Colored Under-glow Aura in player's custom neon color
+    fb.fillCircle(static_cast<int>(chassisScr.x), static_cast<int>(chassisScr.y + 12), 24, (state.color & 0x00FFFFFF) | 0x44000000);
+
+    // Suspension Struts
+    auto drawStrut = [&](const Physics::Vec2& m, const Physics::Vec2& w) {
+        float dx = w.x - m.x;
+        float dy = w.y - m.y;
+        float len = std::hypot(dx, dy);
+        if (len < 1.0f) return;
+
+        int x0 = static_cast<int>(m.x);
+        int y0 = static_cast<int>(m.y);
+        int x1 = static_cast<int>(w.x);
+        int y1 = static_cast<int>(w.y);
+
+        fb.drawLine(x0, y0, x1, y1, 0xFFECEFF1);
+        fb.fillCircle(x1, y1, 6, 0xFF90A4AE);
+        fb.drawCircle(x1, y1, 6, 0xFF455A64);
+    };
+    drawStrut(rearMountScr, rearWheelScr);
+    drawStrut(frontMountScr, frontWheelScr);
+
+    // Render Wheels
+    float wheelScale = (config.wheelRadius * zoom) / config.wheelSpriteRadius;
+    float wAnchorX = wheelImg.width() * 0.5f;
+    float wAnchorY = wheelImg.height() * 0.5f;
+    blitRotated(fb, wheelImg, rearWheelScr.x, rearWheelScr.y, wAnchorX, wAnchorY, -state.rearWheelAngle, wheelScale, opacity);
+    blitRotated(fb, wheelImg, frontWheelScr.x, frontWheelScr.y, wAnchorX, wAnchorY, -state.frontWheelAngle, wheelScale, opacity);
+
+    // Driver head
+    if (!config.hasIntegratedDriver) {
+        Physics::Vec2 headLocal = config.driverSeatOffset + Physics::Vec2(0.0f, 0.18f);
+        Physics::Vec2 driverHeadScr = cam.worldToScreen(chassisPointToWorld(headLocal));
+        float driverHeadScreenAngle = screenChassisAngle + state.driverHeadAngle;
+        float driverScale = spriteScale * 0.52f;
+        float dAnchorX = driverImg.width() * 0.5f;
+        float dAnchorY = driverImg.height() * 0.88f;
+        blitRotated(fb, driverImg, driverHeadScr.x, driverHeadScr.y, dAnchorX, dAnchorY, driverHeadScreenAngle, driverScale, opacity);
+    }
+
+    // Chassis body
     blitRotated(fb, chassisImg, chassisScr.x, chassisScr.y, config.spriteAnchor.x, config.spriteAnchor.y, screenChassisAngle, spriteScale, opacity);
 }
 

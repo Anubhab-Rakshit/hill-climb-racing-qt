@@ -36,6 +36,10 @@ public:
         bool restart = false;
         bool enter = false;
         bool multiplayer = false;
+        bool onlineMultiplayer = false;
+        int lastKey = 0;
+        std::string lastText;
+        bool keyTyped = false;
         int mouseX = 0;
         int mouseY = 0;
         bool mouseDown = false;

@@ -11,6 +11,8 @@ enum class StateType {
     GARAGE,
     GAMEPLAY,
     MULTIPLAYER_RACE,
+    ONLINE_LOBBY,
+    ONLINE_RACE,
     PAUSED,
     GAME_OVER
 };

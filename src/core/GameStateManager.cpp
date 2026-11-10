@@ -4,6 +4,7 @@
 #include "UIComponents.h"
 #include "RasterFont.h"
 #include <QApplication>
+#include <iostream>
 #include <cmath>
 
 namespace Core {
@@ -60,6 +61,8 @@ void GameStateManager::setDimensions(int width, int height) {
     m_hud.setDimensions(width, height);
     m_pauseOverlay.setDimensions(width, height);
     m_gameOverScreen.setDimensions(width, height);
+    m_lobbyScreen.setDimensions(width, height);
+    m_minimapRadar.setDimensions(width / 2 - 210, 10, 420, 24);
 }
 
 void GameStateManager::setupUiCallbacks() {
@@ -74,6 +77,7 @@ void GameStateManager::setupUiCallbacks() {
     m_hud.setButtonSound(playClick);
     m_pauseOverlay.setButtonSound(playClick);
     m_gameOverScreen.setButtonSound(playClick);
+    m_lobbyScreen.setButtonSound(playClick);
 
     // 1. Main Menu
     m_mainMenu.setOnStart([this]() {
@@ -89,6 +93,9 @@ void GameStateManager::setupUiCallbacks() {
         m_garage.setP2Driver(Physics::DriverType::SARAH);
         changeState(StateType::GARAGE);
     });
+    m_mainMenu.setOnOnlineMultiplayer([this]() {
+        startOnlineLobby();
+    });
     m_mainMenu.setOnGarage([this]() {
         m_isMultiplayerFlow = false;
         m_garage.setMultiplayerMode(false);
@@ -102,6 +109,105 @@ void GameStateManager::setupUiCallbacks() {
     });
     m_mainMenu.setOnQuit([]() {
         QApplication::quit();
+    });
+
+    // 1.1 Online Lobby
+    m_lobbyScreen.setOnBack([this]() {
+        if (m_server.isRunning()) m_server.stopServer();
+        if (m_client.isConnected()) m_client.disconnectFromHost();
+        changeState(StateType::MAIN_MENU);
+    });
+    m_lobbyScreen.setOnHostCreate([this]() {
+        if (!m_server.isRunning()) {
+            m_server.startServer(Network::DEFAULT_PORT);
+        }
+        m_server.setHostPlayerInfo(m_lobbyScreen.getPlayerName(), m_lobbyScreen.getSelectedVehicle(), m_lobbyScreen.getSelectedDriver());
+        m_server.setTrack(m_lobbyScreen.getSelectedBiome());
+        std::cout << "[Host] Server listening on port " << Network::DEFAULT_PORT << " IP: " << m_server.getLocalIpAddress().toStdString() << std::endl;
+    });
+    m_lobbyScreen.setOnHostTrackChanged([this](const std::string& biomeId) {
+        if (m_server.isRunning()) {
+            m_server.setTrack(biomeId);
+        }
+    });
+    m_lobbyScreen.setOnHostVehicleChanged([this](int vehicle, int driver) {
+        if (m_server.isRunning()) {
+            m_server.setHostPlayerInfo(m_lobbyScreen.getPlayerName(), vehicle, driver);
+        }
+    });
+    m_lobbyScreen.setOnHostStart([this](const std::string& biomeId) {
+        m_server.setTrack(biomeId);
+        m_server.broadcastStartRace();
+        startNetworkMultiplayer(true, biomeId);
+    });
+    m_lobbyScreen.setOnClientConnect([this](const std::string& ip, quint16 port, const std::string& name, int vehicle, int driver) {
+        m_client.connectToHost(QString::fromStdString(ip), port, name, vehicle, driver);
+    });
+    m_lobbyScreen.setOnClientReady([this](bool isReady, int vehicle, int driver) {
+        m_client.sendReady(isReady, vehicle, driver);
+    });
+    m_lobbyScreen.setOnDisconnect([this]() {
+        if (m_server.isRunning()) m_server.stopServer();
+        if (m_client.isConnected()) m_client.disconnectFromHost();
+    });
+
+    // Server Network Events
+    m_server.setOnPlayerConnected([this](int id, const std::string& name) {
+        std::cout << "[Server] Player connected: ID " << id << " Name: " << name << std::endl;
+    });
+    m_server.setOnPlayerDisconnected([this](int id) {
+        std::cout << "[Server] Player disconnected: ID " << id << std::endl;
+        m_onlineOpponents.erase(id);
+    });
+    m_server.setOnTelemetryReceived([this](const Network::RemotePlayerState& st) {
+        m_onlineOpponents[st.id] = st;
+        checkOnlineRaceRules();
+    });
+    m_server.setOnPlayerCrashed([this](int playerId, float /*dist*/) {
+        m_onlineOpponents[playerId].isCrashed = true;
+        checkOnlineRaceRules();
+    });
+    m_server.setOnPlayerFinished([this](int playerId, float /*dist*/, float /*time*/) {
+        m_onlineOpponents[playerId].isFinished = true;
+        checkOnlineRaceRules();
+    });
+
+    // Client Network Events
+    m_client.setOnConnected([this]() {
+        m_lobbyScreen.setStatusMessage("CONNECTED TO HOST! SELECT VEHICLE & CLICK READY.");
+    });
+    m_client.setOnConnectionError([this](const std::string& err) {
+        m_lobbyScreen.setStatusMessage("CONNECTION FAILED: " + err);
+    });
+    m_client.setOnDisconnected([this]() {
+        m_lobbyScreen.setStatusMessage("DISCONNECTED FROM HOST.");
+        if (m_currentState == StateType::ONLINE_RACE) {
+            changeState(StateType::ONLINE_LOBBY);
+        }
+    });
+    m_client.setOnLobbyUpdated([this](const std::string& biomeId, const std::vector<Network::PlayerLobbyInfo>& /*players*/) {
+        m_lobbyScreen.setSelectedBiome(biomeId);
+    });
+    m_client.setOnRaceStart([this](const std::string& biomeId) {
+        startNetworkMultiplayer(false, biomeId);
+    });
+    m_client.setOnRematch([this](const std::string& biomeId) {
+        startNetworkMultiplayer(false, biomeId);
+    });
+    m_client.setOnReturnToLobby([this]() {
+        changeState(StateType::ONLINE_LOBBY);
+    });
+    m_client.setOnRemoteTelemetry([this](const Network::RemotePlayerState& st) {
+        m_onlineOpponents[st.id] = st;
+        checkOnlineRaceRules();
+    });
+    m_client.setOnRemotePlayerCrashed([this](int playerId, float /*dist*/) {
+        m_onlineOpponents[playerId].isCrashed = true;
+        checkOnlineRaceRules();
+    });
+    m_client.setOnRemotePlayerFinished([this](int playerId, float /*dist*/, float /*time*/) {
+        m_onlineOpponents[playerId].isFinished = true;
+        checkOnlineRaceRules();
     });
 
     // 2. Garage
@@ -309,6 +415,40 @@ void GameStateManager::startMultiplayerRace(const std::string& biomeId) {
     changeState(StateType::MULTIPLAYER_RACE);
 }
 
+void GameStateManager::startOnlineLobby() {
+    m_lobbyScreen.setMode(UI::LobbyMode::CHOOSE_ROLE);
+    m_lobbyScreen.setSelectedVehicle(static_cast<int>(m_profile.selectedVehicle()));
+    m_lobbyScreen.setSelectedDriver(static_cast<int>(m_profile.selectedDriver()));
+    changeState(StateType::ONLINE_LOBBY);
+}
+
+void GameStateManager::startNetworkMultiplayer(bool isHost, const std::string& biomeId) {
+    m_selectedBiome = biomeId;
+    m_isOnlineHost = isHost;
+    m_isOnlineClient = !isHost;
+    m_onlineOpponents.clear();
+    m_onlineWinnerId = -1;
+    m_onlineWinnerName.clear();
+    m_onlineWinReason.clear();
+    m_onlineRaceFinished = false;
+
+    // Dedicated Fullscreen for each laptop/player!
+    m_camera.setScreenSize(m_width, m_height);
+
+    Physics::VehicleType chosenVeh = static_cast<Physics::VehicleType>(m_lobbyScreen.getSelectedVehicle());
+    Physics::DriverType chosenDrv = static_cast<Physics::DriverType>(m_lobbyScreen.getSelectedDriver());
+
+    m_physics.reset(biomeId, chosenVeh, chosenDrv, false);
+    m_camera.reset(m_physics.vehicle().chassisPos());
+    m_particleSystem.clear();
+    m_gameTime = 0.0f;
+    m_smokeTimer = 0.0f;
+    m_onlineTelemetryTimer = 0.0f;
+    m_minimapRadar.setCourseLength(1500.0f);
+
+    changeState(StateType::ONLINE_RACE);
+}
+
 void GameStateManager::handleInput(const InputController::State& input) {
     int mx = input.mouseX;
     int my = input.mouseY;
@@ -323,6 +463,10 @@ void GameStateManager::handleInput(const InputController::State& input) {
             changeState(StateType::GARAGE);
             return;
         }
+        if (input.onlineMultiplayer) {
+            startOnlineLobby();
+            return;
+        }
         if (input.enter) {
             startRace(m_selectedBiome);
             return;
@@ -330,6 +474,13 @@ void GameStateManager::handleInput(const InputController::State& input) {
         if (input.mouseMoved) m_mainMenu.onMouseMove(mx, my);
         if (input.mouseJustPressed) m_mainMenu.onMouseDown(mx, my);
         if (input.mouseJustReleased) m_mainMenu.onMouseUp(mx, my);
+    } else if (m_currentState == StateType::ONLINE_LOBBY) {
+        if (input.mouseMoved) m_lobbyScreen.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_lobbyScreen.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_lobbyScreen.onMouseUp(mx, my);
+        if (input.keyTyped) {
+            m_lobbyScreen.onKeyPress(input.lastKey, input.lastText);
+        }
     } else if (m_currentState == StateType::GARAGE) {
         if (input.mouseMoved) m_garage.onMouseMove(mx, my);
         if (input.mouseJustPressed) m_garage.onMouseDown(mx, my, m_profile);
@@ -369,12 +520,23 @@ void GameStateManager::handleInput(const InputController::State& input) {
                                        brakeActive ? 1.0f : 0.0f,
                                        reverseActive ? 1.0f : 0.0f);
     } else if (m_currentState == StateType::MULTIPLAYER_RACE) {
+        if (m_physics.winner() != 0) {
+            if (input.restart || input.enter) {
+                startMultiplayerRace(m_selectedMpBiome);
+                return;
+            }
+            if (input.pause) {
+                m_isMultiplayerFlow = false;
+                changeState(StateType::MAIN_MENU);
+                return;
+            }
+        }
         if (input.pause) {
             changeState(StateType::PAUSED);
             return;
         }
         if (input.restart) {
-            startMultiplayerRace();
+            startMultiplayerRace(m_selectedMpBiome);
             return;
         }
 
@@ -391,6 +553,52 @@ void GameStateManager::handleInput(const InputController::State& input) {
                                         input.p2.reverse ? 1.0f : 0.0f,
                                         input.p2.tiltLeft ? 1.0f : 0.0f,
                                         input.p2.tiltRight ? 1.0f : 0.0f);
+    } else if (m_currentState == StateType::ONLINE_RACE) {
+        if (m_onlineRaceFinished) {
+            if (input.restart || input.enter) {
+                if (m_isOnlineHost) {
+                    m_server.broadcastRematch();
+                    startNetworkMultiplayer(true, m_selectedBiome);
+                    return;
+                }
+            }
+            if (input.pause) {
+                if (m_isOnlineHost) {
+                    m_server.broadcastReturnToLobby();
+                } else if (m_isOnlineClient) {
+                    m_client.sendReturnToLobby();
+                }
+                changeState(StateType::ONLINE_LOBBY);
+                return;
+            }
+        }
+        if (input.pause) {
+            if (m_isOnlineHost) {
+                m_server.broadcastReturnToLobby();
+            } else if (m_isOnlineClient) {
+                m_client.sendReturnToLobby();
+            }
+            changeState(StateType::ONLINE_LOBBY);
+            return;
+        }
+
+        if (input.mouseMoved) m_hud.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_hud.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_hud.onMouseUp(mx, my);
+
+        bool gasActive = input.gas || input.p1.gas || (input.mouseDown && m_hud.isGasPressed());
+        bool brakeActive = input.brake || input.p1.brake || (input.mouseDown && m_hud.isBrakePressed());
+        bool reverseActive = input.reverse || input.p1.reverse || (input.mouseDown && m_hud.isReversePressed());
+
+        m_hud.setGasVirtualPressed(gasActive);
+        m_hud.setBrakeVirtualPressed(brakeActive);
+        m_hud.setReverseVirtualPressed(reverseActive);
+
+        m_physics.vehicle().applyInput(gasActive ? 1.0f : 0.0f,
+                                       brakeActive ? 1.0f : 0.0f,
+                                       reverseActive ? 1.0f : 0.0f,
+                                       input.p1.tiltLeft ? 1.0f : 0.0f,
+                                       input.p1.tiltRight ? 1.0f : 0.0f);
     } else if (m_currentState == StateType::PAUSED) {
         if (input.pause || input.enter) {
             if (m_physics.isMultiplayer()) {
@@ -433,12 +641,15 @@ void GameStateManager::fixedUpdate(float dt) {
 
     bool isPaused = (m_currentState == StateType::PAUSED);
     if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE ||
+        m_currentState == StateType::ONLINE_RACE ||
         m_currentState == StateType::PAUSED || m_currentState == StateType::GAME_OVER) {
         m_terrainRasterizer.dayNightCycle().update(dt, isPaused);
     }
 
     if (m_currentState == StateType::MAIN_MENU) {
         m_mainMenu.update(dt);
+    } else if (m_currentState == StateType::ONLINE_LOBBY) {
+        m_lobbyScreen.update(dt);
     } else if (m_currentState == StateType::GARAGE) {
         m_garage.update(dt);
     } else if (m_currentState == StateType::STAGE_SELECT) {
@@ -586,6 +797,104 @@ void GameStateManager::fixedUpdate(float dt) {
         m_mpTachoP2.update(dt);
         m_mpFuelBarP2.setFuel(car2.fuel());
         m_mpFuelBarP2.update(dt);
+    } else if (m_currentState == StateType::ONLINE_RACE) {
+        m_gameTime += dt;
+
+        m_physics.step(dt, m_profile);
+
+        const auto& car = m_physics.vehicle();
+        m_camera.update(dt, car.chassisPos(), car.chassisVel().x);
+
+        // Interpolate remote opponent cars smoothly
+        m_client.updateInterpolation(dt);
+
+        const std::string& currentBiome = m_physics.terrain().getBiome();
+        bool isElectric = (car.vehicleType() == Physics::VehicleType::ELECTRIC_OFFROADER);
+        bool isVacuum = (currentBiome == "moon");
+
+        // Smoke particles
+        m_smokeTimer -= dt;
+        if (!isElectric && !isVacuum && car.fuel() > 0.0f && m_smokeTimer <= 0.0f) {
+            m_smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.045f : 0.09f;
+            float cosA = std::cos(car.chassisAngle());
+            float sinA = std::sin(car.chassisAngle());
+            Physics::Vec2 pipeLocal(car.rearMountOffset().x * 0.95f, car.rearMountOffset().y * 0.4f);
+            Physics::Vec2 pipeWorld = car.chassisPos() + Physics::Vec2(pipeLocal.x * cosA - pipeLocal.y * sinA,
+                                                                       pipeLocal.x * sinA + pipeLocal.y * cosA);
+            m_particleSystem.emitSmoke(pipeWorld, car.chassisVel());
+        }
+
+        // Wheel spray
+        if (car.isRearOnGround()) {
+            m_particleSystem.emitWheelSpray(car.rearWheelPos(), car.rearWheelRadius(),
+                                            car.rearContactTangent(), car.rearSlipSpeed(),
+                                            car.rearWheelAngularVel(), car.rearNormalForce(),
+                                            currentBiome);
+        }
+        if (car.isFrontOnGround()) {
+            m_particleSystem.emitWheelSpray(car.frontWheelPos(), car.frontWheelRadius(),
+                                            car.frontContactTangent(), car.frontSlipSpeed(),
+                                            car.frontWheelAngularVel(), car.frontNormalForce(),
+                                            currentBiome);
+        }
+        if (car.isChassisContact()) {
+            m_particleSystem.emitSparkles(car.chassisPos() + Physics::Vec2(0.0f, -0.2f));
+        }
+        m_particleSystem.update(dt);
+
+        // Update HUD Telemetry
+        m_hud.setFuel(car.fuel());
+        m_hud.setSpeed(car.getSpeedKmh());
+        m_hud.setRpm(car.getEngineRpm());
+        m_hud.setDistance(m_physics.distanceReached());
+        m_hud.setRecord(m_profile.getRecordDistance(m_selectedBiome));
+        m_hud.setCoins(m_profile.coins() + m_physics.coinsCollected());
+        m_hud.setCheckpointProgress(m_physics.currentCheckpoint(), 5);
+        const auto* nextCp = m_physics.terrain().getNextCheckpoint(m_physics.distanceReached());
+        if (nextCp) {
+            m_hud.setNextCheckpoint(nextCp->name, nextCp->distance);
+        }
+        m_hud.update(dt);
+
+        // Broadcast telemetry at ~30 Hz (every 0.033s)
+        m_onlineTelemetryTimer += dt;
+        if (m_onlineTelemetryTimer >= 0.033f) {
+            m_onlineTelemetryTimer = 0.0f;
+
+            Network::RemotePlayerState myState;
+            myState.id = m_isOnlineHost ? 0 : m_client.getLocalPlayerId();
+            myState.name = m_isOnlineHost ? "Host (You)" : m_client.getLocalPlayerName();
+            myState.color = m_isOnlineHost ? 0xFFFF3D00 : m_client.getAssignedColor();
+            myState.vehicleType = static_cast<int>(car.vehicleType());
+            myState.driverType = static_cast<int>(car.driverType());
+
+            myState.posX = car.chassisPos().x;
+            myState.posY = car.chassisPos().y;
+            myState.velX = car.chassisVel().x;
+            myState.velY = car.chassisVel().y;
+            myState.chassisAngle = car.chassisAngle();
+            myState.chassisAngularVel = car.chassisAngularVel();
+            myState.rearWheelAngle = car.rearWheelAngle();
+            myState.frontWheelAngle = car.frontWheelAngle();
+            myState.rearSuspLen = car.rearSuspensionCompression();
+            myState.frontSuspLen = car.frontSuspensionCompression();
+            myState.driverHeadAngle = car.driverHeadAngle();
+            myState.speedKmh = car.getSpeedKmh();
+            myState.fuel = car.fuel();
+            myState.distance = m_physics.distanceReached();
+            myState.isAirborne = car.isAirborne();
+            myState.isCrashed = m_physics.isGameOver();
+            myState.isFinished = (myState.distance >= 1500.0f);
+            myState.finishTime = m_gameTime;
+
+            if (m_isOnlineHost) {
+                m_server.updateHostTelemetry(myState);
+            } else if (m_isOnlineClient) {
+                m_client.sendTelemetry(myState);
+            }
+        }
+
+        checkOnlineRaceRules();
     }
 
     m_audio.update(dt, m_physics.vehicle(), m_physics.terrain(), m_currentState);
@@ -776,15 +1085,185 @@ void GameStateManager::renderMultiplayer(Graphics::Framebuffer& fb, float alpha)
     }
 }
 
+void GameStateManager::checkOnlineRaceRules() {
+    if (m_onlineRaceFinished) return;
+
+    const float FINISH_LINE = 1500.0f;
+    float myDist = m_physics.distanceReached();
+
+    // 1. Check if local player reached finish line
+    if (myDist >= FINISH_LINE) {
+        m_onlineRaceFinished = true;
+        m_onlineWinnerId = m_isOnlineHost ? 0 : m_client.getLocalPlayerId();
+        m_onlineWinnerName = m_isOnlineHost ? "YOU (HOST)" : m_client.getLocalPlayerName();
+        m_onlineWinnerColor = m_isOnlineHost ? 0xFFFF3D00 : m_client.getAssignedColor();
+        m_onlineWinReason = "CROSSES THE FINISH LINE FIRST!";
+        if (m_isOnlineClient) {
+            m_client.sendPlayerFinished(myDist, m_gameTime);
+        }
+        return;
+    }
+
+    // 2. Check if any remote opponent reached finish line
+    for (const auto& pair : m_onlineOpponents) {
+        const auto& opp = pair.second;
+        if (opp.isFinished || opp.distance >= FINISH_LINE) {
+            m_onlineRaceFinished = true;
+            m_onlineWinnerId = opp.id;
+            m_onlineWinnerName = opp.name;
+            m_onlineWinnerColor = opp.color;
+            m_onlineWinReason = "CROSSES THE FINISH LINE FIRST!";
+            return;
+        }
+    }
+
+    // 3. Check if all racers crashed or ran out of fuel
+    bool localCrashed = m_physics.isGameOver();
+    bool allOpponentsCrashed = !m_onlineOpponents.empty();
+    for (const auto& pair : m_onlineOpponents) {
+        if (!pair.second.isCrashed) {
+            allOpponentsCrashed = false;
+            break;
+        }
+    }
+
+    if (localCrashed && allOpponentsCrashed) {
+        m_onlineRaceFinished = true;
+        float maxDist = myDist;
+        int winId = m_isOnlineHost ? 0 : m_client.getLocalPlayerId();
+        std::string winName = m_isOnlineHost ? "YOU (HOST)" : m_client.getLocalPlayerName();
+        uint32_t winCol = m_isOnlineHost ? 0xFFFF3D00 : m_client.getAssignedColor();
+
+        for (const auto& pair : m_onlineOpponents) {
+            if (pair.second.distance > maxDist) {
+                maxDist = pair.second.distance;
+                winId = pair.second.id;
+                winName = pair.second.name;
+                winCol = pair.second.color;
+            }
+        }
+
+        m_onlineWinnerId = winId;
+        m_onlineWinnerName = winName;
+        m_onlineWinnerColor = winCol;
+        m_onlineWinReason = "GREATEST DISTANCE (" + std::to_string(static_cast<int>(maxDist)) + "m)";
+    }
+}
+
+void GameStateManager::renderOverheadTag(Graphics::Framebuffer& fb, const Graphics::Camera& cam,
+                                        const Physics::Vec2& worldPos, const std::string& name,
+                                        uint32_t color, float distDiff) {
+    Physics::Vec2 scr = cam.worldToScreen({worldPos.x, worldPos.y + 1.15f});
+    int sx = static_cast<int>(scr.x);
+    int sy = static_cast<int>(scr.y);
+
+    if (sx < 20 || sx > m_width - 20 || sy < 20 || sy > m_height - 20) return;
+
+    std::string tag = "[" + name + "]";
+    int tagW = Graphics::RasterFont::getTextWidth(tag, 1) + 12;
+    int tagH = 18;
+    int bx = sx - tagW / 2;
+    int by = sy - tagH - 4;
+
+    UI::UIComponents::drawArcadePanel(fb, bx, by, tagW, tagH, 0xEE090F1A, UI::Theme::CARD_BORDER, color, 1, false, true);
+    Graphics::RasterFont::drawStringCentered(fb, sx, by + 4, tag, color, 1);
+
+    std::string diffStr = (distDiff >= 0.0f ? "+" : "") + std::to_string(static_cast<int>(distDiff)) + "m";
+    uint32_t diffCol = (distDiff >= 0.0f) ? UI::Theme::GOLD : UI::Theme::CYAN_UPGRADE;
+    Graphics::RasterFont::drawStringCentered(fb, sx, by + 19, diffStr, diffCol, 1);
+}
+
+void GameStateManager::renderOnlineRace(Graphics::Framebuffer& fb, float alpha) {
+    m_camera.setRenderAlpha(alpha);
+
+    // 1. World Terrain & Parallax
+    m_terrainRasterizer.render(fb, m_camera, m_physics.terrain(), m_gameTime);
+
+    // 2. Particles
+    m_particleSystem.render(fb, m_camera);
+
+    // 3. Remote Opponent Vehicles
+    for (const auto& pair : m_onlineOpponents) {
+        const auto& opp = pair.second;
+        Graphics::SpriteRenderer::renderRemoteVehicle(fb, m_camera, opp, 0.95f);
+
+        float distDiff = opp.distance - m_physics.distanceReached();
+        renderOverheadTag(fb, m_camera, {opp.posX, opp.posY}, opp.name, opp.color, distDiff);
+
+        // Off-screen indicator arrows
+        Physics::Vec2 oppScr = m_camera.worldToScreen({opp.posX, opp.posY});
+        if (oppScr.x < 0 || oppScr.x > m_width) {
+            int indY = m_height / 2;
+            if (oppScr.x > m_width) {
+                std::string indStr = opp.name + " +" + std::to_string(static_cast<int>(distDiff)) + "m >";
+                int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+                UI::UIComponents::drawArcadePanel(fb, m_width - tw - 20, indY - 10, tw + 16, 20, 0xDD090F1A, UI::Theme::CARD_BORDER, opp.color, 0, false, true);
+                Graphics::RasterFont::drawString(fb, m_width - tw - 12, indY - 5, indStr, opp.color, 1);
+            } else {
+                std::string indStr = "< " + opp.name + " " + std::to_string(static_cast<int>(distDiff)) + "m";
+                int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+                UI::UIComponents::drawArcadePanel(fb, 10, indY - 10, tw + 16, 20, 0xDD090F1A, UI::Theme::CARD_BORDER, opp.color, 0, false, true);
+                Graphics::RasterFont::drawString(fb, 18, indY - 5, indStr, opp.color, 1);
+            }
+        }
+    }
+
+    // 4. Local Player Vehicle
+    Graphics::SpriteRenderer::renderVehicle(fb, m_camera, m_physics.vehicle(), alpha, 1.0f);
+
+    // 5. Minimap Radar Tracker at the top
+    std::vector<UI::RadarRacer> racers;
+    std::string myName = m_isOnlineHost ? "YOU (HOST)" : m_client.getLocalPlayerName();
+    uint32_t myCol = m_isOnlineHost ? 0xFFFF3D00 : m_client.getAssignedColor();
+    racers.push_back({myName, m_physics.distanceReached(), myCol, true, m_physics.isGameOver()});
+
+    for (const auto& pair : m_onlineOpponents) {
+        racers.push_back({pair.second.name, pair.second.distance, pair.second.color, false, pair.second.isCrashed});
+    }
+    m_minimapRadar.render(fb, racers);
+
+    // 6. HUD Telemetry
+    m_hud.render(fb);
+
+    // 7. Victory Overlay Banner
+    if (m_onlineRaceFinished) {
+        int cx = m_width / 2;
+        int vw = 520;
+        int vh = 160;
+        int vx = cx - vw / 2;
+        int vy = m_height / 2 - vh / 2;
+
+        UI::UIComponents::drawArcadePanel(fb, vx, vy, vw, vh, 0xF4080D18, UI::Theme::CARD_BORDER, m_onlineWinnerColor, 5, true, true);
+
+        std::string winTitle = m_onlineWinnerName + " WINS!";
+        Graphics::RasterFont::drawStringCentered(fb, cx, vy + 18, winTitle, m_onlineWinnerColor, 3);
+        Graphics::RasterFont::drawStringCentered(fb, cx, vy + 54, m_onlineWinReason, UI::Theme::TEXT_WHITE, 1);
+
+        int myD = static_cast<int>(m_physics.distanceReached());
+        std::string statStr = "YOUR DISTANCE: " + UI::UIComponents::formatNumber(myD) + "m";
+        Graphics::RasterFont::drawStringCentered(fb, cx, vy + 82, statStr, UI::Theme::GOLD, 2);
+
+        if (m_isOnlineHost) {
+            Graphics::RasterFont::drawStringCentered(fb, cx, vy + 124, "HOST: [R/ENTER] REMATCH  |  [ESC] RETURN TO LOBBY", UI::Theme::CYAN_UPGRADE, 1);
+        } else {
+            Graphics::RasterFont::drawStringCentered(fb, cx, vy + 124, "CLIENT: WAITING FOR HOST  |  [ESC] LEAVE TO LOBBY", UI::Theme::TEXT_MUTED, 1);
+        }
+    }
+}
+
 void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
     if (m_currentState == StateType::MAIN_MENU) {
         m_mainMenu.render(fb, m_profile);
+    } else if (m_currentState == StateType::ONLINE_LOBBY) {
+        m_lobbyScreen.render(fb, &m_server, &m_client);
     } else if (m_currentState == StateType::GARAGE) {
         m_garage.render(fb, m_profile);
     } else if (m_currentState == StateType::STAGE_SELECT) {
         m_stageSelect.render(fb, m_profile);
     } else if (m_currentState == StateType::MULTIPLAYER_RACE) {
         renderMultiplayer(fb, alpha);
+    } else if (m_currentState == StateType::ONLINE_RACE) {
+        renderOnlineRace(fb, alpha);
     } else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::PAUSED || m_currentState == StateType::GAME_OVER) {
         m_camera.setRenderAlpha(alpha);
 

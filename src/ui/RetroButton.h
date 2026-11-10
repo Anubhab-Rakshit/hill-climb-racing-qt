@@ -22,6 +22,7 @@ public:
     void setBaseColor(uint32_t color) { m_baseColor = color; }
     void setTextColor(uint32_t color) { m_textColor = color; }
     void setOnClick(std::function<void()> cb) { m_onClick = cb; }
+    void triggerClick() { if (m_onClick && m_enabled) { if (m_onSound) m_onSound(); m_onClick(); } }
     int x() const { return m_x; }
     int y() const { return m_y; }
     int width() const { return m_w; }

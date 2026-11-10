@@ -14,14 +14,16 @@ MainMenuScreen::MainMenuScreen()
     : m_width(Theme::VIRTUAL_WIDTH)
     , m_height(Theme::VIRTUAL_HEIGHT)
     , m_animTime(0.0f)
-    , m_btnStart(540, 126, 340, 46, "START SOLO RACE", Theme::GREEN_GAS)
-    , m_btnMultiplayer(540, 178, 340, 46, "2P MULTIPLAYER", 0xFFFF5722)
-    , m_btnGarage(540, 230, 340, 44, "GARAGE & TUNING", Theme::GOLD)
-    , m_btnStages(540, 280, 340, 44, "STAGE SELECT", Theme::CYAN_UPGRADE)
-    , m_btnQuit(540, 330, 340, 38, "QUIT GAME", 0xFF2A3A4E)
+    , m_btnStart(540, 112, 340, 42, "START SOLO RACE", Theme::GREEN_GAS)
+    , m_btnMultiplayer(540, 158, 340, 42, "2P LOCAL SPLIT-SCREEN", 0xFFFF5722)
+    , m_btnOnlineMultiplayer(540, 204, 340, 42, "ONLINE MULTIPLAYER (TCP)", Theme::CYAN_UPGRADE)
+    , m_btnGarage(540, 250, 340, 42, "GARAGE & TUNING", Theme::GOLD)
+    , m_btnStages(540, 296, 340, 42, "STAGE SELECT", 0xFF8E24AA)
+    , m_btnQuit(540, 342, 340, 38, "QUIT GAME", 0xFF2A3A4E)
 {
     m_btnStart.setKeyHint("ENTER");
     m_btnMultiplayer.setKeyHint("M");
+    m_btnOnlineMultiplayer.setKeyHint("O");
     m_btnGarage.setKeyHint("G");
     m_btnStages.setKeyHint("S");
     m_btnQuit.setKeyHint("ESC");
@@ -34,27 +36,31 @@ void MainMenuScreen::setDimensions(int width, int height) {
 
     int btnW = 340;
     int btnX = width - btnW - 70; // 550 on 960 canvas
-    int startY = 126;
+    int startY = 112;
 
     m_btnStart.setPosition(btnX, startY);
-    m_btnStart.setSize(btnW, 46);
+    m_btnStart.setSize(btnW, 42);
 
-    m_btnMultiplayer.setPosition(btnX, startY + 52);
-    m_btnMultiplayer.setSize(btnW, 46);
+    m_btnMultiplayer.setPosition(btnX, startY + 46);
+    m_btnMultiplayer.setSize(btnW, 42);
 
-    m_btnGarage.setPosition(btnX, startY + 104);
-    m_btnGarage.setSize(btnW, 44);
+    m_btnOnlineMultiplayer.setPosition(btnX, startY + 92);
+    m_btnOnlineMultiplayer.setSize(btnW, 42);
 
-    m_btnStages.setPosition(btnX, startY + 154);
-    m_btnStages.setSize(btnW, 44);
+    m_btnGarage.setPosition(btnX, startY + 138);
+    m_btnGarage.setSize(btnW, 42);
 
-    m_btnQuit.setPosition(btnX, startY + 204);
-    m_btnQuit.setSize(btnW, 38);
+    m_btnStages.setPosition(btnX, startY + 184);
+    m_btnStages.setSize(btnW, 42);
+
+    m_btnQuit.setPosition(btnX, startY + 230);
+    m_btnQuit.setSize(btnW, 36);
 }
 
 void MainMenuScreen::onMouseMove(int px, int py) {
     m_btnStart.onMouseMove(px, py);
     m_btnMultiplayer.onMouseMove(px, py);
+    m_btnOnlineMultiplayer.onMouseMove(px, py);
     m_btnGarage.onMouseMove(px, py);
     m_btnStages.onMouseMove(px, py);
     m_btnQuit.onMouseMove(px, py);
@@ -63,6 +69,7 @@ void MainMenuScreen::onMouseMove(int px, int py) {
 bool MainMenuScreen::onMouseDown(int px, int py) {
     if (m_btnStart.onMouseDown(px, py)) return true;
     if (m_btnMultiplayer.onMouseDown(px, py)) return true;
+    if (m_btnOnlineMultiplayer.onMouseDown(px, py)) return true;
     if (m_btnGarage.onMouseDown(px, py)) return true;
     if (m_btnStages.onMouseDown(px, py)) return true;
     if (m_btnQuit.onMouseDown(px, py)) return true;
@@ -72,6 +79,7 @@ bool MainMenuScreen::onMouseDown(int px, int py) {
 void MainMenuScreen::onMouseUp(int px, int py) {
     m_btnStart.onMouseUp(px, py);
     m_btnMultiplayer.onMouseUp(px, py);
+    m_btnOnlineMultiplayer.onMouseUp(px, py);
     m_btnGarage.onMouseUp(px, py);
     m_btnStages.onMouseUp(px, py);
     m_btnQuit.onMouseUp(px, py);
@@ -257,8 +265,14 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     uint32_t mpCol = UI::Theme::blend(0x00FF3D00, 0x88FF7043, mpPulse);
     fb.drawRect(m_btnMultiplayer.x() - 1, m_btnMultiplayer.y() - 1, m_btnMultiplayer.width() + 2, m_btnMultiplayer.height() + 2, mpCol);
 
+    // Dynamic glowing accent on ONLINE MULTIPLAYER button
+    float onlinePulse = (std::sin(m_animTime * 4.5f + 2.5f) * 0.5f + 0.5f);
+    uint32_t onlineCol = UI::Theme::blend(0x0000B0FF, 0x8800E5FF, onlinePulse);
+    fb.drawRect(m_btnOnlineMultiplayer.x() - 1, m_btnOnlineMultiplayer.y() - 1, m_btnOnlineMultiplayer.width() + 2, m_btnOnlineMultiplayer.height() + 2, onlineCol);
+
     m_btnStart.render(fb, 2);
     m_btnMultiplayer.render(fb, 2);
+    m_btnOnlineMultiplayer.render(fb, 2);
     m_btnGarage.render(fb, 2);
     m_btnStages.render(fb, 2);
     m_btnQuit.render(fb, 2);
@@ -266,8 +280,8 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     // Career Highlights Box beneath buttons
     int btnW = 340;
     int btnX = m_width - btnW - 70;
-    int tickY = 376;
-    int tickH = 88;
+    int tickY = 388;
+    int tickH = 80;
     UIComponents::drawArcadePanel(fb, btnX, tickY, btnW, tickH, 0xF00B1422, Theme::CARD_BORDER, Theme::CYAN_UPGRADE, 3, true, true);
 
     Graphics::RasterFont::drawString(fb, btnX + 14, tickY + 10, "CAREER HIGHLIGHTS", Theme::CYAN_UPGRADE, 1);

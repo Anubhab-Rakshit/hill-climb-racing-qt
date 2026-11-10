@@ -13,6 +13,10 @@
 #include "PauseOverlay.h"
 #include "GameOverScreen.h"
 #include "SoundManager.h"
+#include "LobbyScreen.h"
+#include "MinimapRadar.h"
+#include "GameServer.h"
+#include "GameClient.h"
 
 namespace Core {
 
@@ -30,6 +34,8 @@ public:
     StateType currentState() const { return m_currentState; }
     void startRace(const std::string& biomeId);
     void startMultiplayerRace(const std::string& biomeId = "countryside");
+    void startOnlineLobby();
+    void startNetworkMultiplayer(bool isHost, const std::string& biomeId);
 
     void handleInput(const InputController::State& input);
     void fixedUpdate(float dt);
@@ -46,6 +52,9 @@ public:
     Graphics::ScanlineRasterizer& terrainRasterizer() { return m_terrainRasterizer; }
     Graphics::ParticleSystem& particleSystem() { return m_particleSystem; }
     UI::HUD& hud() { return m_hud; }
+    UI::LobbyScreen& lobbyScreen() { return m_lobbyScreen; }
+    Network::GameServer& server() { return m_server; }
+    Network::GameClient& client() { return m_client; }
     float gameTime() const { return m_gameTime; }
 
 private:
@@ -93,9 +102,29 @@ private:
     UI::HUD m_hud;
     UI::PauseOverlay m_pauseOverlay;
     UI::GameOverScreen m_gameOverScreen;
+    UI::LobbyScreen m_lobbyScreen;
+    UI::MinimapRadar m_minimapRadar;
+
+    // Online Networking
+    Network::GameServer m_server;
+    Network::GameClient m_client;
+    bool m_isOnlineHost = false;
+    bool m_isOnlineClient = false;
+    float m_onlineTelemetryTimer = 0.0f;
+    std::map<int, Network::RemotePlayerState> m_onlineOpponents;
+    int m_onlineWinnerId = -1;
+    std::string m_onlineWinnerName;
+    uint32_t m_onlineWinnerColor = 0xFFFFD700;
+    std::string m_onlineWinReason;
+    bool m_onlineRaceFinished = false;
 
     void setupUiCallbacks();
     void renderMultiplayer(Graphics::Framebuffer& fb, float alpha);
+    void renderOnlineRace(Graphics::Framebuffer& fb, float alpha);
+    void renderOverheadTag(Graphics::Framebuffer& fb, const Graphics::Camera& cam,
+                           const Physics::Vec2& worldPos, const std::string& name,
+                           uint32_t color, float distDiff);
+    void checkOnlineRaceRules();
     void renderCompactHud(Graphics::Framebuffer& fb, const Physics::Vehicle& veh, float dist,
                           const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint,
                           UI::AnalogGauge& speedo, UI::AnalogGauge& tacho, UI::FuelBar& fuelBar);

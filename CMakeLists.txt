@@ -12,8 +12,8 @@ else()
 endif()
 
 # Find Qt packages (Supports both Qt 6 and Qt 5 seamlessly)
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Multimedia)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Multimedia)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Multimedia Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Multimedia Network)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -26,6 +26,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/physics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/network
 )
 
 set(SOURCES
@@ -63,6 +64,11 @@ set(SOURCES
     src/ui/PauseOverlay.cpp
     src/ui/GameOverScreen.cpp
     src/ui/UIComponents.cpp
+    src/ui/LobbyScreen.cpp
+    src/ui/MinimapRadar.cpp
+    # Network Layer
+    src/network/GameServer.cpp
+    src/network/GameClient.cpp
     # Audio
     src/audio/SoundManager.cpp
     # Vehicle & Driver Pixel Sprites
@@ -105,6 +111,11 @@ set(HEADERS
     src/ui/StageSelectScreen.h
     src/ui/PauseOverlay.h
     src/ui/GameOverScreen.h
+    src/ui/LobbyScreen.h
+    src/ui/MinimapRadar.h
+    src/network/NetworkTypes.h
+    src/network/GameServer.h
+    src/network/GameClient.h
     src/audio/SoundManager.h
 )
 
@@ -115,4 +126,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt${QT_VERSION_MAJOR}::Gui
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Multimedia
+    Qt${QT_VERSION_MAJOR}::Network
 )
