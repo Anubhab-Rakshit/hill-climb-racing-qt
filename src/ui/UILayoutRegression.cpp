@@ -2,6 +2,7 @@
 #include "Framebuffer.h"
 #include "ProfileManager.h"
 #include "MainMenuScreen.h"
+#include "AchievementsScreen.h"
 #include "GarageScreen.h"
 #include "StageSelectScreen.h"
 #include "HUD.h"
@@ -59,7 +60,7 @@ struct ResolutionLayout {
         return {0, 0, width, height};
     }
 
-    // Main Menu Buttons (8 buttons)
+    // Main Menu Buttons (9 buttons)
     std::vector<Rect> getMainMenuButtons() const {
         int btnW = (width >= 1200) ? 350 : 320;
         int btnX = width - btnW - (width >= 1200 ? 75 : 60);
@@ -76,8 +77,9 @@ struct ResolutionLayout {
         btns.push_back({btnX, startY + gap * 3, btnW, btnHSmall});                 // Garage
         btns.push_back({btnX, startY + gap * 3 + gapSmall, btnW, btnHSmall});      // Stages
         btns.push_back({btnX, startY + gap * 3 + gapSmall * 2, btnW, btnHSmall});  // Account
-        btns.push_back({btnX, startY + gap * 3 + gapSmall * 3, btnW, btnHSmall});  // Evaluator
-        btns.push_back({btnX, startY + gap * 3 + gapSmall * 4, btnW, (height >= 700) ? 34 : 32}); // Quit
+        btns.push_back({btnX, startY + gap * 3 + gapSmall * 4, btnW, btnHSmall});  // Achievements
+        btns.push_back({btnX, startY + gap * 3 + gapSmall * 5, btnW, btnHSmall});  // Evaluator
+        btns.push_back({btnX, startY + gap * 3 + gapSmall * 6, btnW, (height >= 700) ? 34 : 32}); // Quit
         return btns;
     }
 
@@ -239,7 +241,7 @@ int UILayoutRegression::run() {
 
     Core::ProfileManager profile;
 
-    // 1. Render and capture all 6 screens at both resolutions (12 total captures)
+    // 1. Render and capture all 7 screens at both resolutions (14 total captures)
     int captureCount = 0;
     for (const auto& [w, h] : resolutions) {
         // MainMenuScreen
@@ -249,6 +251,14 @@ int UILayoutRegression::run() {
             Graphics::Framebuffer fb(w, h);
             screen.render(fb, profile);
             QString path = QString("scratch/ui_regression/%1x%2_MainMenuScreen.png").arg(w).arg(h);
+            if (fb.getImage().save(path)) captureCount++;
+        }
+        {
+            AchievementsScreen screen;
+            screen.setDimensions(w, h);
+            Graphics::Framebuffer fb(w, h);
+            screen.render(fb);
+            QString path = QString("scratch/ui_regression/%1x%2_AchievementsScreen.png").arg(w).arg(h);
             if (fb.getImage().save(path)) captureCount++;
         }
         // GarageScreen
@@ -308,8 +318,8 @@ int UILayoutRegression::run() {
         }
     }
 
-    std::cout << "[CAPTURE] Wrote " << captureCount << " screenshots (Target: 12) to scratch/ui_regression/" << std::endl;
-    bool allPassed = (captureCount == 12);
+    std::cout << "[CAPTURE] Wrote " << captureCount << " screenshots (Target: 14) to scratch/ui_regression/" << std::endl;
+    bool allPassed = (captureCount == 14);
 
     // 2. CHECK 1: SCREEN BOUNDS CONTAINMENT
     std::cout << "\n--- CHECK 1: SCREEN BOUNDS CONTAINMENT (960x540 & 1280x720) ---" << std::endl;
@@ -368,7 +378,7 @@ int UILayoutRegression::run() {
             }
         }
         std::cout << "  " << w << "x" << h << " Menu Buttons Non-Overlap: "
-                  << (!resOverlap ? "PASS (0 overlaps among 8 buttons)" : "FAIL") << std::endl;
+                  << (!resOverlap ? "PASS (0 overlaps among 9 buttons)" : "FAIL") << std::endl;
         if (resOverlap) check2Pass = false;
     }
     if (!check2Pass) allPassed = false;

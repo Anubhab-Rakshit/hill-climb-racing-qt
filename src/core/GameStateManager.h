@@ -14,6 +14,8 @@
 #include "GameOverScreen.h"
 #include "SoundManager.h"
 #include "AccountScreen.h"
+#include "AchievementManager.h"
+#include "AchievementsScreen.h"
 #include "LobbyScreen.h"
 #include "ChallengeScreen.h"
 #include "EvaluatorOverlay.h"
@@ -74,10 +76,13 @@ private:
     float m_smokeTimer;
     float m_smokeTimer2 = 0.0f;
     float m_netTelemetryTimer = 0.0f;
+    float m_achievementToastTimer = 0.0f;
+    std::string m_achievementToastTitle;
     std::string m_selectedBiome;
 
     // Subsystems
     ProfileManager m_profile;
+    AchievementManager m_achievements;
     Physics::PhysicsWorld m_physics;
     Graphics::Camera m_camera;
     Graphics::Camera m_camera2;
@@ -112,6 +117,7 @@ private:
     UI::PauseOverlay m_pauseOverlay;
     UI::GameOverScreen m_gameOverScreen;
     UI::AccountScreen m_accountScreen;
+    UI::AchievementsScreen m_achievementsScreen;
     UI::LobbyScreen m_lobbyScreen;
     UI::ChallengeScreen m_challengeScreen;
     UI::EvaluatorOverlay m_evaluatorOverlay;
@@ -120,6 +126,8 @@ private:
     bool m_showDevOverlay = false;
 
     void setupUiCallbacks();
+    void syncAchievementProfileStats();
+    void pushAchievementToast(const AchievementDefinition& def);
     void setupNetworkCallbacks();
     void renderMultiplayer(Graphics::Framebuffer& fb, float alpha);
     void renderNetworkRace(Graphics::Framebuffer& fb, float alpha);

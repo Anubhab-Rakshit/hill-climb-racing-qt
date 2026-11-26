@@ -21,6 +21,8 @@ public:
 
     void setOnBack(std::function<void()> cb) { m_btnBack.setOnClick(cb); }
     void setOnDrive(std::function<void()> cb) { m_btnDrive.setOnClick(cb); }
+    void setOnUpgradePurchased(std::function<void()> cb) { m_onUpgradePurchased = cb; }
+    void setOnVehicleUnlocked(std::function<void()> cb) { m_onVehicleUnlocked = cb; }
     void setButtonSound(std::function<void()> cb);
 
     void onMouseMove(int px, int py);
@@ -44,6 +46,8 @@ private:
 
     Physics::VehicleType m_viewedVehicle;
     int m_activeTab; // 0 = Powertrain & Traction, 1 = Handling & Chassis
+    std::function<void()> m_onUpgradePurchased;
+    std::function<void()> m_onVehicleUnlocked;
 
     // Navigation & Actions
     RetroButton m_btnBack;

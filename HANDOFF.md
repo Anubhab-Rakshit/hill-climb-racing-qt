@@ -78,6 +78,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 ```
@@ -97,6 +98,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 - `--test-physics`: passing.
 - `--test-terrain`: passing all 9 recipes, material ordering, blending, and Box2D/legacy braking order.
 - `--test-audio`: passing.
+- `--test-achievements`: passing all 12 definitions, one-time rewards, persistence, and profile-count sync.
 - `--smoke-test`: passing on Box2D.
 - `--smoke-test --legacy-physics`: passing on the legacy solver.
 - `--test-ui-layout`: passing automated layout regression and screenshot capture at 960x540 and 1280x720.
@@ -106,3 +108,6 @@ Completed. See `PHASE3.md`.
 
 ## Phases 4–5
 Completed. Terrain topology overhaul and surface-material physics are implemented and covered by `--test-terrain`.
+
+## Phase 6
+Completed. Per-account achievements, lifetime stats, unlock toasts, results summary, and the Achievements screen are implemented and covered by `--test-achievements`.

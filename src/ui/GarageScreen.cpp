@@ -200,6 +200,7 @@ void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
             m_carBounceVel = -220.0f;
             m_flashCardIdx = 99;
             m_flashTimer = 0.5f;
+            if (m_onVehicleUnlocked) m_onVehicleUnlocked();
         }
     }
     m_btnUnlockVeh.onMouseUp(px, py);
@@ -241,6 +242,7 @@ void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
                     m_carBounceVel = -150.0f;
                     m_flashCardIdx = i;
                     m_flashTimer = 0.4f;
+                    if (m_onUpgradePurchased) m_onUpgradePurchased();
                 }
             }
         }

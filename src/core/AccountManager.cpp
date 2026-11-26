@@ -73,6 +73,16 @@ void AccountManager::load() {
             acc.records[rit.key().toStdString()] = static_cast<float>(rit.value().toDouble(0.0));
         }
 
+        QJsonObject statsObj = accJson["stats"].toObject();
+        for (auto sit = statsObj.begin(); sit != statsObj.end(); ++sit) {
+            acc.stats[sit.key().toStdString()] = sit.value().toDouble(0.0);
+        }
+
+        QJsonArray achArr = accJson["achievements"].toArray();
+        for (const auto& a : achArr) {
+            acc.achievements.insert(a.toString().toStdString());
+        }
+
         m_accounts[acc.username] = acc;
     }
 
@@ -113,6 +123,18 @@ void AccountManager::save() const {
             recObj[QString::fromStdString(r.first)] = r.second;
         }
         accJson["records"] = recObj;
+
+        QJsonObject statsObj;
+        for (const auto& s : acc.stats) {
+            statsObj[QString::fromStdString(s.first)] = s.second;
+        }
+        accJson["stats"] = statsObj;
+
+        QJsonArray achArr;
+        for (const auto& a : acc.achievements) {
+            achArr.append(QString::fromStdString(a));
+        }
+        accJson["achievements"] = achArr;
 
         accountsObj[QString::fromStdString(acc.username)] = accJson;
     }
@@ -324,6 +346,50 @@ float AccountManager::getRecordDistance(const std::string& stageId) const {
     auto it = recs.find(stageId);
     if (it != recs.end()) return it->second;
     return 0.0f;
+}
+
+double AccountManager::getStat(const std::string& key) const {
+    const auto& stats = activeAccount()->stats;
+    auto it = stats.find(key);
+    if (it != stats.end()) return it->second;
+    return 0.0;
+}
+
+void AccountManager::addToStat(const std::string& key, double amount) {
+    if (amount <= 0.0) return;
+    UserAccount* acc = activeAccount();
+    acc->stats[key] = getStat(key) + amount;
+    save();
+}
+
+void AccountManager::recordMaxStat(const std::string& key, double value) {
+    if (value <= getStat(key)) return;
+    UserAccount* acc = activeAccount();
+    acc->stats[key] = value;
+    save();
+}
+
+void AccountManager::setStat(const std::string& key, double value) {
+    UserAccount* acc = activeAccount();
+    acc->stats[key] = value;
+    save();
+}
+
+bool AccountManager::hasAchievement(const std::string& id) const {
+    const auto& achievements = activeAccount()->achievements;
+    return achievements.find(id) != achievements.end();
+}
+
+void AccountManager::unlockAchievement(const std::string& id) {
+    activeAccount()->achievements.insert(id);
+    save();
+}
+
+void AccountManager::resetAchievementsForTesting() {
+    UserAccount* acc = activeAccount();
+    acc->stats.clear();
+    acc->achievements.clear();
+    save();
 }
 
 } // namespace Core

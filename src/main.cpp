@@ -9,6 +9,8 @@
 #include <set>
 #include <vector>
 #include "GameEngine.h"
+#include "core/AccountManager.h"
+#include "core/AchievementManager.h"
 #include "physics/TerrainConfig.h"
 #include "physics/Box2DPhysics.h"
 #include "Sprite.h"
@@ -27,6 +29,58 @@ int main(int argc, char *argv[]) {
         if (std::string(argv[i]) == "--test-ui-layout" || std::string(argv[i]) == "--ui-layout-test") {
             return UI::UILayoutRegression::run();
         }
+    }
+
+    if (argc > 1 && (std::string(argv[1]) == "--test-achievements" ||
+                     std::string(argv[1]) == "--achievements-test")) {
+        Core::AccountManager& accounts = Core::AccountManager::instance();
+        accounts.logout();
+        Core::AchievementManager mgr;
+        mgr.resetForTesting();
+
+        bool ok = true;
+        auto check = [&ok](bool condition, const std::string& label) {
+            std::cout << (condition ? "[PASS] " : "[FAIL] ") << label << std::endl;
+            if (!condition) ok = false;
+        };
+
+        check(mgr.definitions().size() == 12, "12 achievements registered");
+        check(mgr.snapshot().size() == 12, "snapshot exposes 12 cards");
+        check(mgr.unlockedCount() == 0, "all achievements start locked");
+
+        mgr.set(Core::AchievementStat::TOTAL_COINS, 1000.0, false);
+        auto firstUnlock = mgr.evaluate();
+        check(accounts.hasAchievement("coin_hoarder"), "coin milestone unlocks");
+        int coinsAfterFirst = accounts.activeAccount()->coins;
+        check(mgr.evaluate().empty(), "repeat evaluation unlocks nothing");
+        check(accounts.activeAccount()->coins == coinsAfterFirst, "rewards paid exactly once");
+        check(!firstUnlock.empty(), "unlock callback payload produced");
+
+        mgr.resetForTesting();
+        mgr.recordMax(Core::AchievementStat::BEST_RUN_DISTANCE, 1000.0, false);
+        mgr.addTo(Core::AchievementStat::TOTAL_DISTANCE, 5000.0, false);
+        mgr.addTo(Core::AchievementStat::TOTAL_COINS, 1000.0, false);
+        mgr.addTo(Core::AchievementStat::TOTAL_FLIPS, 10.0, false);
+        mgr.addTo(Core::AchievementStat::TOTAL_AIR_TIME, 10.0, false);
+        mgr.addTo(Core::AchievementStat::CHECKPOINTS_CLEARED, 25.0, false);
+        mgr.addTo(Core::AchievementStat::STAGES_COMPLETED, 6.0, false);
+        mgr.addTo(Core::AchievementStat::MOON_COMPLETIONS, 1.0, false);
+        mgr.set(Core::AchievementStat::VEHICLES_UNLOCKED, 5.0, false);
+        mgr.set(Core::AchievementStat::UPGRADES_PURCHASED, 10.0, false);
+        mgr.set(Core::AchievementStat::GRAND_PRIX_TROPHIES, 1.0, false);
+        auto allUnlocks = mgr.evaluate();
+        check(allUnlocks.size() == 12, "all 12 achievements unlock at targets");
+        check(mgr.unlockedCount() == 12, "unlock state persists on active account");
+
+        mgr.resetForTesting();
+        mgr.syncProfileCounts(5, 10, 1);
+        check(accounts.hasAchievement("garage_collector"), "garage unlock synced from profile");
+        check(accounts.hasAchievement("tuner"), "upgrade unlock synced from profile");
+        check(accounts.hasAchievement("gp_champion"), "grand prix unlock synced from profile");
+        mgr.resetForTesting();
+
+        std::cout << "\n=== ACHIEVEMENTS TEST " << (ok ? "ALL PASSED" : "FAILED") << " ===" << std::endl;
+        return ok ? 0 : 1;
     }
 
     for (int i = 1; i < argc; ++i) {

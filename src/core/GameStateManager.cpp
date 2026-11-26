@@ -59,6 +59,7 @@ void GameStateManager::setDimensions(int width, int height) {
     m_pauseOverlay.setDimensions(width, height);
     m_gameOverScreen.setDimensions(width, height);
     m_accountScreen.setDimensions(width, height);
+    m_achievementsScreen.setDimensions(width, height);
     m_lobbyScreen.setDimensions(width, height);
     m_challengeScreen.setDimensions(width, height);
     m_evaluatorOverlay.setDimensions(width, height);
@@ -80,6 +81,7 @@ void GameStateManager::setupUiCallbacks() {
     m_pauseOverlay.setButtonSound(playClick);
     m_gameOverScreen.setButtonSound(playClick);
     m_accountScreen.setButtonSound(playClick);
+    m_achievementsScreen.setButtonSound(playClick);
     m_lobbyScreen.setButtonSound(playClick);
     m_challengeScreen.setButtonSound(playClick);
 
@@ -103,6 +105,10 @@ void GameStateManager::setupUiCallbacks() {
     m_mainMenu.setOnAccount([this]() {
         changeState(StateType::ACCOUNT_PROFILE);
     });
+    m_mainMenu.setOnAchievements([this]() {
+        syncAchievementProfileStats();
+        changeState(StateType::ACHIEVEMENTS);
+    });
     m_mainMenu.setOnEvaluator([this]() {
         startEvaluatorMode();
     });
@@ -116,6 +122,11 @@ void GameStateManager::setupUiCallbacks() {
     });
     m_accountScreen.setOnLoggedIn([this](const std::string& user) {
         (void)user;
+        syncAchievementProfileStats();
+        changeState(StateType::MAIN_MENU);
+    });
+
+    m_achievementsScreen.setOnClose([this]() {
         changeState(StateType::MAIN_MENU);
     });
 
@@ -215,6 +226,12 @@ void GameStateManager::setupUiCallbacks() {
     m_garage.setOnDrive([this]() {
         changeState(StateType::STAGE_SELECT);
     });
+    m_garage.setOnUpgradePurchased([this]() {
+        syncAchievementProfileStats();
+    });
+    m_garage.setOnVehicleUnlocked([this]() {
+        syncAchievementProfileStats();
+    });
 
     // 7. HUD
     m_hud.setOnPauseClicked([this]() {
@@ -270,6 +287,7 @@ void GameStateManager::setupUiCallbacks() {
             type == Physics::ItemType::COIN_GOLD) {
             m_profile.addCoins(value);
             AccountManager::instance().addCoins(value);
+            m_achievements.addTo(AchievementStat::TOTAL_COINS, value);
             m_audio.playCoinPickup();
             uint32_t col = (type == Physics::ItemType::COIN_GOLD) ? UI::Theme::GOLD :
                            (type == Physics::ItemType::COIN_SILVER) ? 0xFFCFD8DC : 0xFFCD7F32;
@@ -297,6 +315,7 @@ void GameStateManager::setupUiCallbacks() {
 
     m_physics.setOnCheckpoint([this](const Physics::CheckpointInfo& cp) {
         m_hud.triggerStunt(cp.name, cp.coinReward);
+        m_achievements.addTo(AchievementStat::CHECKPOINTS_CLEARED, 1);
         m_profile.recordStageCheckpoint(m_selectedBiome, cp.index);
         m_profile.addCoins(cp.coinReward);
         AccountManager::instance().addCoins(cp.coinReward);
@@ -304,12 +323,47 @@ void GameStateManager::setupUiCallbacks() {
         m_audio.playStuntCheer();
         if (cp.isFinishLine) {
             m_profile.setStageCompleted(m_selectedBiome, true);
+            m_achievements.addTo(AchievementStat::STAGES_COMPLETED, 1);
+            if (m_selectedBiome == "moon") {
+                m_achievements.addTo(AchievementStat::MOON_COMPLETIONS, 1);
+            }
         }
+    });
+
+    m_achievements.setOnUnlock([this](const AchievementDefinition& def) {
+        pushAchievementToast(def);
+        m_gameOverScreen.addUnlockedAchievement(def.title);
     });
 
     m_devOverlay.setOnClose([this]() {
         m_showDevOverlay = false;
     });
+
+    syncAchievementProfileStats();
+}
+
+void GameStateManager::syncAchievementProfileStats() {
+    int vehicles = 0;
+    for (int i = 0; i < static_cast<int>(Physics::VehicleType::COUNT); ++i) {
+        if (m_profile.isVehicleUnlocked(static_cast<Physics::VehicleType>(i))) ++vehicles;
+    }
+
+    int upgrades = 0;
+    for (int v = 0; v < static_cast<int>(Physics::VehicleType::COUNT); ++v) {
+        for (int u = 0; u < ProfileManager::UPGRADE_COUNT; ++u) {
+            upgrades += m_profile.getUpgradeLevel(static_cast<Physics::VehicleType>(v),
+                                                  static_cast<ProfileManager::UpgradeType>(u));
+        }
+    }
+
+    m_achievements.syncProfileCounts(vehicles, upgrades,
+                                     AccountManager::instance().activeAccount()->grandPrixTrophies);
+}
+
+void GameStateManager::pushAchievementToast(const AchievementDefinition& def) {
+    m_achievementToastTitle = def.title;
+    m_achievementToastTimer = 3.2f;
+    m_audio.playStuntCheer();
 }
 
 void GameStateManager::setupNetworkCallbacks() {
@@ -423,7 +477,8 @@ void GameStateManager::changeState(StateType newState) {
 
     if (m_currentState == StateType::MAIN_MENU || m_currentState == StateType::GARAGE ||
         m_currentState == StateType::STAGE_SELECT || m_currentState == StateType::ACCOUNT_PROFILE ||
-        m_currentState == StateType::NETWORK_LOBBY || m_currentState == StateType::GRAND_PRIX_CHALLENGE) {
+        m_currentState == StateType::ACHIEVEMENTS || m_currentState == StateType::NETWORK_LOBBY ||
+        m_currentState == StateType::GRAND_PRIX_CHALLENGE) {
         m_audio.setTargetMusic(Audio::MusicTrack::MENU);
     } else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE) {
         m_audio.setTargetMusic(Audio::MusicTrack::RACE);
@@ -443,7 +498,9 @@ void GameStateManager::startRace(const std::string& biomeId) {
     m_camera.reset(m_physics.vehicle().chassisPos());
     m_particleSystem.clear();
     m_gameTime = 0.0f;
+    m_gameOverScreen.clearUnlockedAchievements();
     m_minimapRadar.setCourseLength(1750.0f);
+    syncAchievementProfileStats();
     changeState(StateType::GAMEPLAY);
 }
 
@@ -480,7 +537,9 @@ void GameStateManager::startNetworkMultiplayer(bool isHost, const std::string& b
     m_gameTime = 0.0f;
     m_smokeTimer = 0.0f;
     m_netTelemetryTimer = 0.0f;
+    m_gameOverScreen.clearUnlockedAchievements();
     m_minimapRadar.setCourseLength(1750.0f);
+    syncAchievementProfileStats();
     changeState(StateType::MULTIPLAYER_RACE);
 }
 
@@ -514,6 +573,7 @@ void GameStateManager::advanceGrandPrixRound() {
         AccountManager::instance().addCoins(15000);
         AccountManager::instance().addXP(1000);
         AccountManager::instance().save();
+        syncAchievementProfileStats();
         changeState(StateType::MAIN_MENU);
     }
 }
@@ -605,6 +665,15 @@ void GameStateManager::handleInput(const InputController::State& input) {
         if (input.mouseJustPressed) m_accountScreen.onMouseDown(mx, my);
         if (input.mouseJustReleased) m_accountScreen.onMouseUp(mx, my);
     }
+    else if (m_currentState == StateType::ACHIEVEMENTS) {
+        if (input.pause || input.enter) {
+            changeState(StateType::MAIN_MENU);
+            return;
+        }
+        if (input.mouseMoved) m_achievementsScreen.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_achievementsScreen.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_achievementsScreen.onMouseUp(mx, my);
+    }
     else if (m_currentState == StateType::NETWORK_LOBBY) {
         if (input.mouseMoved) m_lobbyScreen.onMouseMove(mx, my);
         if (input.mouseJustPressed) m_lobbyScreen.onMouseDown(mx, my);
@@ -692,6 +761,9 @@ void GameStateManager::fixedUpdate(float dt) {
     if (m_transitionTimer > 0.0f) {
         m_transitionTimer = std::max(0.0f, m_transitionTimer - dt);
     }
+    if (m_achievementToastTimer > 0.0f) {
+        m_achievementToastTimer = std::max(0.0f, m_achievementToastTimer - dt);
+    }
 
     bool isPaused = (m_currentState == StateType::PAUSED);
     if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE ||
@@ -707,6 +779,8 @@ void GameStateManager::fixedUpdate(float dt) {
         m_stageSelect.update(dt);
     } else if (m_currentState == StateType::ACCOUNT_PROFILE) {
         m_accountScreen.update(dt);
+    } else if (m_currentState == StateType::ACHIEVEMENTS) {
+        m_achievementsScreen.update(dt);
     } else if (m_currentState == StateType::NETWORK_LOBBY) {
         m_lobbyScreen.update(dt);
     } else if (m_currentState == StateType::GRAND_PRIX_CHALLENGE) {
@@ -771,6 +845,12 @@ void GameStateManager::fixedUpdate(float dt) {
             m_profile.recordDistance(m_selectedBiome, dist);
             AccountManager::instance().recordDistance(m_selectedBiome, dist);
             AccountManager::instance().addXP(static_cast<int>(dist));
+
+            m_achievements.recordMax(AchievementStat::BEST_RUN_DISTANCE, dist, false);
+            m_achievements.addTo(AchievementStat::TOTAL_DISTANCE, dist, false);
+            m_achievements.addTo(AchievementStat::TOTAL_FLIPS, m_physics.flipsCompleted(), false);
+            m_achievements.addTo(AchievementStat::TOTAL_AIR_TIME, m_physics.totalAirTime(), false);
+            m_achievements.evaluate();
 
             if (m_isGrandPrix) {
                 // Award points for this round
@@ -904,6 +984,12 @@ void GameStateManager::fixedUpdate(float dt) {
             m_profile.recordDistance(m_selectedBiome, dist);
             AccountManager::instance().recordDistance(m_selectedBiome, dist);
             AccountManager::instance().addXP(static_cast<int>(dist));
+
+            m_achievements.recordMax(AchievementStat::BEST_RUN_DISTANCE, dist, false);
+            m_achievements.addTo(AchievementStat::TOTAL_DISTANCE, dist, false);
+            m_achievements.addTo(AchievementStat::TOTAL_FLIPS, m_physics.flipsCompleted(), false);
+            m_achievements.addTo(AchievementStat::TOTAL_AIR_TIME, m_physics.totalAirTime(), false);
+            m_achievements.evaluate();
 
             if (m_isGrandPrix) {
                 int pts = (dist >= 1500.0f) ? 10 : (dist > 1000.0f) ? 8 : (dist > 500.0f) ? 6 : 4;
@@ -1046,6 +1132,8 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
         m_mainMenu.render(fb, m_profile);
     } else if (m_currentState == StateType::ACCOUNT_PROFILE) {
         m_accountScreen.render(fb);
+    } else if (m_currentState == StateType::ACHIEVEMENTS) {
+        m_achievementsScreen.render(fb);
     } else if (m_currentState == StateType::NETWORK_LOBBY) {
         m_lobbyScreen.render(fb, &m_server, &m_client);
     } else if (m_currentState == StateType::GRAND_PRIX_CHALLENGE) {
@@ -1110,6 +1198,21 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
         float frac = m_transitionTimer / 0.12f;
         uint32_t a = static_cast<uint32_t>(frac * 160.0f);
         fb.fillRect(0, 0, m_width, m_height, (a << 24) | 0x060A12);
+    }
+
+    if (m_achievementToastTimer > 0.0f && !m_achievementToastTitle.empty()) {
+        int toastW = std::min(460, m_width - 40);
+        int toastH = 62;
+        int toastX = (m_width - toastW) / 2;
+        int toastY = 62;
+        float fade = std::min(1.0f, m_achievementToastTimer / 0.6f);
+        uint32_t bg = (static_cast<uint32_t>(fade * 0xE8) << 24) | 0x11263A;
+        UI::UIComponents::drawArcadePanel(fb, toastX, toastY, toastW, toastH,
+                                          bg, Theme::GOLD, Theme::GOLD, 3);
+        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, toastY + 8,
+                                                 "* ACHIEVEMENT UNLOCKED *", Theme::GOLD);
+        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, toastY + 28,
+                                                 m_achievementToastTitle, Theme::TEXT_WHITE, 2);
     }
 }
 

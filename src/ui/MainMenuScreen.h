@@ -24,6 +24,7 @@ public:
     void setOnGarage(std::function<void()> cb) { m_btnGarage.setOnClick(cb); }
     void setOnStages(std::function<void()> cb) { m_btnStages.setOnClick(cb); }
     void setOnAccount(std::function<void()> cb) { m_btnAccount.setOnClick(cb); }
+    void setOnAchievements(std::function<void()> cb) { m_btnAchievements.setOnClick(cb); }
     void setOnEvaluator(std::function<void()> cb) { m_btnEvaluator.setOnClick(cb); }
     void setOnQuit(std::function<void()> cb) { m_btnQuit.setOnClick(cb); }
     void setButtonSound(std::function<void()> cb) {
@@ -33,6 +34,7 @@ public:
         m_btnGarage.setOnSound(cb);
         m_btnStages.setOnSound(cb);
         m_btnAccount.setOnSound(cb);
+        m_btnAchievements.setOnSound(cb);
         m_btnEvaluator.setOnSound(cb);
         m_btnQuit.setOnSound(cb);
     }
@@ -56,6 +58,7 @@ private:
     RetroButton m_btnGarage;
     RetroButton m_btnStages;
     RetroButton m_btnAccount;
+    RetroButton m_btnAchievements;
     RetroButton m_btnEvaluator;
     RetroButton m_btnQuit;
 };

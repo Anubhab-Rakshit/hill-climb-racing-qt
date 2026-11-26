@@ -3,6 +3,7 @@
 #include "Framebuffer.h"
 #include "RetroButton.h"
 #include <string>
+#include <vector>
 #include <functional>
 
 namespace UI {
@@ -18,6 +19,8 @@ public:
 
     void setCrashReason(const std::string& reason) { m_reason = reason; }
     void setStats(float distance, int coins, int flips, float airTime, bool isNewRecord);
+    void clearUnlockedAchievements() { m_unlockedAchievements.clear(); }
+    void addUnlockedAchievement(const std::string& title) { m_unlockedAchievements.push_back(title); }
 
     void setOnRetry(std::function<void()> cb) { m_btnRetry.setOnClick(cb); }
     void setOnGarage(std::function<void()> cb) { m_btnGarage.setOnClick(cb); }
@@ -45,6 +48,7 @@ private:
     int m_flips;
     float m_airTime;
     bool m_isNewRecord;
+    std::vector<std::string> m_unlockedAchievements;
 
     RetroButton m_btnRetry;
     RetroButton m_btnGarage;

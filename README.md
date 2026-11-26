@@ -120,17 +120,18 @@ Launch with legacy analytical physics engine:
 
 ## 🧪 Automated Testing & Verification
 
-The project includes **8 comprehensive, deterministic CLI test suites**. Note that tests use built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
+The project includes **9 comprehensive, deterministic CLI test suites**. Note that tests use built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
 
 | Test Command | Scope & Invariants Verified |
 | :--- | :--- |
-| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout` | Automated UI layout regression mode: validates screen bounds containment, button non-overlap, real HUD telemetry vs minimap radar clearance, modal panel containment, and exports 12 reference captures (6 screens x 2 resolutions) to `scratch/ui_regression/`. |
+| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout` | Automated UI layout regression mode: validates screen bounds containment, button non-overlap, real HUD telemetry vs minimap radar clearance, modal panel containment, and exports 14 reference captures (7 screens x 2 resolutions) to `scratch/ui_regression/`. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d` | Verifies Box2D 2.2.1 integration: edge-chain collider, fixed-step 60Hz accumulator, substep clamp, deterministic simulation, idle stability, 12° slope brake hold, reverse drive, and in-air pitch torque. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles` | Evaluates all 12 vehicles for idle stability, forward acceleration, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world` | Full world integration: single-player drive, fuel drainage, suspension deformation, checkpoint crossings, split-screen multiplayer dual-vehicle physics, and neck-snap crash detection. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics` | Comprehensive 19-test physics audit: drop landings, rebound oscillations, 60 km/h ground contact retention, ski jump trajectories, extreme tumble non-penetration (< 0.005m), speedometer accuracy, brake upgrades, and surface friction scaling (ice vs snow vs turf vs rock). |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain` | Validates all 9 track recipes, signature features and surface zones, 5000m reachability, material registry/friction ordering, boundary blending, and Box2D/legacy braking order across ice, mud, sand, grass, and rock. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio` | Validates volume hierarchy, BGM state crossfading, dynamic RPM pitch modulation, wheel rolling SFX, impact scaling, and multi-channel clipping limiter. |
+| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements` | Validates 12 achievement definitions, per-account unlock persistence, lifetime stat thresholds, one-time coin/XP rewards, duplicate unlock protection, and profile-count synchronization for vehicles, upgrades, and Grand Prix trophies. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test` | End-to-end procedural terrain scan (fuel reachability across all biomes), stage progression unlocks, stationary idle check, checkpoint crossing, and visual screenshot generation. |
 
 Run all tests together:
@@ -142,6 +143,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 
@@ -172,6 +174,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
   - *Inferno Peaks* (Extreme gradients and lava pits)
 - **Multiplayer Mode**: Two-player local split-screen with independent cameras, vehicle choices, and race rankings.
 - **Garage & Upgrade Economy**: Collect coins to level up 8 mechanical categories (Engine, Suspension, Tires, 4WD, Brakes, Gearbox, Chassis, Aerodynamics).
+- **Achievements & Meta-Progression**: 12 per-account achievements track lifetime driving, coins, stunts, checkpoints, stages, garage progress, and Grand Prix trophies with coin/XP rewards, unlock toasts, and a dedicated screen.
 - **Audio & SFX**: Synthesized engine revving, tire skids, coin pickups, and CC0 background music tracks.
 
 ---

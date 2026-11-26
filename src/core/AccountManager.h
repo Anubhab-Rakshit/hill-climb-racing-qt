@@ -17,6 +17,8 @@ struct UserAccount {
     std::set<std::string> unlockedVehicles = {"offroader"};
     std::set<std::string> unlockedStages = {"countryside"};
     std::map<std::string, float> records;
+    std::map<std::string, double> stats;
+    std::set<std::string> achievements;
     int grandPrixTrophies = 0;
 };
 
@@ -60,6 +62,14 @@ public:
 
     void recordDistance(const std::string& stageId, float dist);
     float getRecordDistance(const std::string& stageId) const;
+
+    double getStat(const std::string& key) const;
+    void addToStat(const std::string& key, double amount);
+    void recordMaxStat(const std::string& key, double value);
+    void setStat(const std::string& key, double value);
+    bool hasAchievement(const std::string& id) const;
+    void unlockAchievement(const std::string& id);
+    void resetAchievementsForTesting();
 
 private:
     AccountManager();

@@ -3,6 +3,7 @@
 #include "UITheme.h"
 #include "UIComponents.h"
 #include "LocalizationManager.h"
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -205,6 +206,26 @@ void GameOverScreen::render(Graphics::Framebuffer& fb) {
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(1) << m_airTime << " s";
     drawRow(tableY + rowGap * 3, "TOTAL AIR TIME", ss.str(), Theme::GREEN_GAS, true);
+
+    if (!m_unlockedAchievements.empty()) {
+        int achW = boxW - 100;
+        int achH = 64;
+        int achX = boxX + 50;
+        int achY = boxY + (m_height >= 700 ? 276 : 254);
+        UIComponents::drawArcadePanel(fb, achX, achY, achW, achH, 0xFF10263A, Theme::GOLD, Theme::GOLD, 2);
+        Graphics::RasterFont::drawString(fb, achX + 12, achY + 7, "NEW ACHIEVEMENTS!", Theme::GOLD);
+
+        int shown = std::min(2, static_cast<int>(m_unlockedAchievements.size()));
+        for (int i = 0; i < shown; ++i) {
+            std::string label = "* " + m_unlockedAchievements[i];
+            Graphics::RasterFont::drawString(fb, achX + 12, achY + 22 + i * 14, label, Theme::TEXT_WHITE);
+        }
+        if (m_unlockedAchievements.size() > static_cast<size_t>(shown)) {
+            std::string more = "+ " + std::to_string(m_unlockedAchievements.size() - shown) + " MORE";
+            int moreW = Graphics::RasterFont::getTextWidth(more);
+            Graphics::RasterFont::drawString(fb, achX + achW - moreW - 12, achY + 36, more, Theme::GOLD);
+        }
+    }
 
     // Action Buttons
     float pulseAlpha = (std::sin(m_animTime * 4.0f) * 0.5f + 0.5f);

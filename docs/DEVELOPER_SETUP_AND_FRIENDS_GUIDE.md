@@ -155,7 +155,10 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
 # 7. Dynamic Realistic Audio Test Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 
-# 8. Full Smoke Test & Procedural Reachability Scan
+# 8. Achievements & Meta-Progression Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements
+
+# 9. Full Smoke Test & Procedural Reachability Scan
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 

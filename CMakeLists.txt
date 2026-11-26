@@ -44,6 +44,7 @@ set(SOURCES
     src/core/InputController.cpp
     src/core/ProfileManager.cpp
     src/core/AccountManager.cpp
+    src/core/AchievementManager.cpp
     src/core/LocalizationManager.cpp
     # Networking
     src/network/GameServer.cpp
@@ -74,6 +75,7 @@ set(SOURCES
     src/ui/StuntBanner.cpp
     src/ui/HUD.cpp
     src/ui/MainMenuScreen.cpp
+    src/ui/AchievementsScreen.cpp
     src/ui/GarageScreen.cpp
     src/ui/StageSelectScreen.cpp
     src/ui/PauseOverlay.cpp
@@ -101,6 +103,7 @@ set(HEADERS
     src/core/InputController.h
     src/core/ProfileManager.h
     src/core/AccountManager.h
+    src/core/AchievementManager.h
     src/core/LocalizationManager.h
     src/network/NetworkTypes.h
     src/network/GameServer.h
@@ -132,6 +135,7 @@ set(HEADERS
     src/ui/StuntBanner.h
     src/ui/HUD.h
     src/ui/MainMenuScreen.h
+    src/ui/AchievementsScreen.h
     src/ui/GarageScreen.h
     src/ui/StageSelectScreen.h
     src/ui/PauseOverlay.h

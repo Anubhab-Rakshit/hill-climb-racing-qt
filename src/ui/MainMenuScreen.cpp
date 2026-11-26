@@ -22,8 +22,9 @@ MainMenuScreen::MainMenuScreen()
     , m_btnGarage(540, 230, 340, 38, "GARAGE & TUNING", 0xFFFFB300)
     , m_btnStages(540, 273, 340, 38, "STAGE SELECT", Theme::CYAN_UPGRADE)
     , m_btnAccount(540, 316, 340, 38, "RACER PROFILE & LEVEL", 0xFF7C4DFF)
-    , m_btnEvaluator(540, 359, 340, 38, "VIP EVALUATOR MODE", 0xFF00B0FF)
-    , m_btnQuit(540, 402, 340, 34, "QUIT GAME", 0xFF2A3A4E)
+    , m_btnAchievements(540, 359, 340, 38, "ACHIEVEMENTS", 0xFF00E5FF)
+    , m_btnEvaluator(540, 402, 340, 38, "VIP EVALUATOR MODE", 0xFF00B0FF)
+    , m_btnQuit(540, 445, 340, 34, "QUIT GAME", 0xFF2A3A4E)
 {
     m_btnStart.setKeyHint("ENTER");
     m_btnMultiplayer.setKeyHint("M");
@@ -31,6 +32,7 @@ MainMenuScreen::MainMenuScreen()
     m_btnGarage.setKeyHint("G");
     m_btnStages.setKeyHint("S");
     m_btnAccount.setKeyHint("P");
+    m_btnAchievements.setKeyHint("A");
     m_btnEvaluator.setKeyHint("E");
     m_btnQuit.setKeyHint("ESC");
     setDimensions(m_width, m_height);
@@ -66,10 +68,13 @@ void MainMenuScreen::setDimensions(int width, int height) {
     m_btnAccount.setPosition(btnX, startY + gap * 3 + gapSmall * 2);
     m_btnAccount.setSize(btnW, btnHSmall);
 
-    m_btnEvaluator.setPosition(btnX, startY + gap * 3 + gapSmall * 3);
+    m_btnAchievements.setPosition(btnX, startY + gap * 3 + gapSmall * 4);
+    m_btnAchievements.setSize(btnW, btnHSmall);
+
+    m_btnEvaluator.setPosition(btnX, startY + gap * 3 + gapSmall * 5);
     m_btnEvaluator.setSize(btnW, btnHSmall);
 
-    m_btnQuit.setPosition(btnX, startY + gap * 3 + gapSmall * 4);
+    m_btnQuit.setPosition(btnX, startY + gap * 3 + gapSmall * 6);
     m_btnQuit.setSize(btnW, (height >= 700) ? 34 : 32);
 }
 
@@ -80,6 +85,7 @@ void MainMenuScreen::onMouseMove(int px, int py) {
     m_btnGarage.onMouseMove(px, py);
     m_btnStages.onMouseMove(px, py);
     m_btnAccount.onMouseMove(px, py);
+    m_btnAchievements.onMouseMove(px, py);
     m_btnEvaluator.onMouseMove(px, py);
     m_btnQuit.onMouseMove(px, py);
 }
@@ -91,6 +97,7 @@ bool MainMenuScreen::onMouseDown(int px, int py) {
     if (m_btnGarage.onMouseDown(px, py)) return true;
     if (m_btnStages.onMouseDown(px, py)) return true;
     if (m_btnAccount.onMouseDown(px, py)) return true;
+    if (m_btnAchievements.onMouseDown(px, py)) return true;
     if (m_btnEvaluator.onMouseDown(px, py)) return true;
     if (m_btnQuit.onMouseDown(px, py)) return true;
     return false;
@@ -103,6 +110,7 @@ void MainMenuScreen::onMouseUp(int px, int py) {
     m_btnGarage.onMouseUp(px, py);
     m_btnStages.onMouseUp(px, py);
     m_btnAccount.onMouseUp(px, py);
+    m_btnAchievements.onMouseUp(px, py);
     m_btnEvaluator.onMouseUp(px, py);
     m_btnQuit.onMouseUp(px, py);
 }
