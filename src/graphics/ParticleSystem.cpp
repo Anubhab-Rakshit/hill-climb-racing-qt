@@ -177,6 +177,57 @@ void ParticleSystem::emitSparkles(const Physics::Vec2& worldPos, uint32_t color)
     }
 }
 
+void ParticleSystem::emitNitroFlame(const Physics::Vec2& worldPos, const Physics::Vec2& carDir, const Physics::Vec2& carVel) {
+    if (m_particles.size() >= MAX_PARTICLES) return;
+
+    // High velocity backward jet spray
+    Physics::Vec2 jetDir = -carDir;
+    for (int i = 0; i < 3; ++i) {
+        if (m_particles.size() >= MAX_PARTICLES) break;
+        Particle p;
+        p.pos = worldPos + Physics::Vec2((randomFloat() - 0.5f) * 0.12f, (randomFloat() - 0.5f) * 0.12f);
+        float speed = 7.0f + randomFloat() * 8.0f;
+        float jitterX = (randomFloat() - 0.5f) * 1.4f;
+        float jitterY = (randomFloat() - 0.5f) * 1.4f;
+        p.vel = {jetDir.x * speed + carVel.x * 0.3f + jitterX, jetDir.y * speed + carVel.y * 0.3f + jitterY};
+        p.life = 0.0f;
+        p.maxLife = 0.18f + randomFloat() * 0.14f;
+        p.size = (i == 0) ? 2.5f : 1.8f;
+        // Electric Cyan, Neon Blue, and Brilliant Orange core colors
+        p.color = (i == 0) ? 0xFF00E5FF : ((i == 1) ? 0xFF00B0FF : 0xFFFF9100);
+        p.type = ParticleType::NITRO_FLAME;
+        m_particles.push_back(p);
+    }
+}
+
+void ParticleSystem::emitCrashExplosion(const Physics::Vec2& worldPos, int count) {
+    for (int i = 0; i < count; ++i) {
+        if (m_particles.size() >= MAX_PARTICLES) break;
+        Particle p;
+        p.pos = worldPos;
+        float angle = randomFloat() * 6.28318f;
+        float speed = 2.5f + randomFloat() * 9.5f;
+        p.vel = {std::cos(angle) * speed, std::sin(angle) * speed + 2.5f};
+        p.life = 0.0f;
+        p.maxLife = 0.40f + randomFloat() * 0.45f;
+        p.size = 1.0f + randomFloat() * 2.2f;
+        p.angle = randomFloat() * 6.28f;
+        p.angularVel = (randomFloat() - 0.5f) * 18.0f;
+
+        if (i % 3 == 0) {
+            p.type = ParticleType::DEBRIS;
+            p.color = (i % 2 == 0) ? 0xFF37474F : 0xFFCFD8DC; // Metallic metal shards
+        } else if (i % 3 == 1) {
+            p.type = ParticleType::SPARKLE;
+            p.color = (i % 2 == 0) ? 0xFFFF3D00 : 0xFFFFD600; // Fiery sparks
+        } else {
+            p.type = ParticleType::SMOKE;
+            p.color = 0xAA263238; // Acrid black crash smoke
+        }
+        m_particles.push_back(p);
+    }
+}
+
 void ParticleSystem::update(float dt) {
     for (size_t i = 0; i < m_particles.size(); ) {
         m_particles[i].life += dt;
@@ -210,6 +261,14 @@ void ParticleSystem::update(float dt) {
                 break;
             case ParticleType::SPARKLE:
                 p.vel *= 0.86f;
+                break;
+            case ParticleType::NITRO_FLAME:
+                p.vel *= 0.82f;
+                p.size = std::max(0.6f, p.size - 3.5f * dt);
+                break;
+            case ParticleType::DEBRIS:
+                p.vel.y -= 26.0f * dt; // Strong gravity
+                p.vel.x *= 0.95f;
                 break;
         }
 
@@ -275,6 +334,23 @@ void ParticleSystem::render(Framebuffer& fb, const Camera& cam) {
                 fb.blendPixelFast(sx + 1, sy, col);
             } else {
                 fb.blendPixelFast(sx, sy + 1, col);
+            }
+        } else if (p.type == ParticleType::NITRO_FLAME) {
+            // Intense glowing rocket flame core
+            fb.blendPixelFast(sx, sy, col);
+            fb.blendPixelFast(sx + 1, sy, (col & 0x00FFFFFF) | ((a * 2 / 3) << 24));
+            fb.blendPixelFast(sx - 1, sy, (col & 0x00FFFFFF) | ((a * 2 / 3) << 24));
+            fb.blendPixelFast(sx, sy + 1, (col & 0x00FFFFFF) | ((a * 2 / 3) << 24));
+            fb.blendPixelFast(sx, sy - 1, (col & 0x00FFFFFF) | ((a * 2 / 3) << 24));
+            if (p.life < p.maxLife * 0.4f) {
+                fb.blendPixelFast(sx, sy, 0xFFFFFFFF); // White-hot plasma core
+            }
+        } else if (p.type == ParticleType::DEBRIS) {
+            // Spinning metal shards from crash impact
+            fb.blendPixelFast(sx, sy, col);
+            int sz = static_cast<int>(p.size);
+            for (int dx = 0; dx <= sz; ++dx) {
+                fb.blendPixelFast(sx + dx, sy, col);
             }
         } else {
             // Sparkling star glint

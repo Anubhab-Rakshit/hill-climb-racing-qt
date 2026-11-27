@@ -19,6 +19,7 @@ HUD::HUD()
     , m_brakePedal(24, 445, 115, 80, "BRAKE", Theme::RED_BRAKE)
     , m_reversePedal(148, 445, 115, 80, "REVERSE", 0xFFFF6D00)
     , m_gasPedal(821, 445, 115, 80, "GAS", Theme::GREEN_GAS)
+    , m_boostPedal(821, 385, 115, 54, "BOOST", 0xFF00E5FF)
     , m_pauseButton(902, 12, 42, 36, "||", 0xFF2A3644)
     , m_distance(0.0f)
     , m_recordDistance(500.0f)
@@ -31,6 +32,7 @@ HUD::HUD()
     m_brakePedal.setKeyHint("[A]");
     m_reversePedal.setKeyHint("[S]");
     m_gasPedal.setKeyHint("[D]");
+    m_boostPedal.setKeyHint("SHIFT");
     m_pauseButton.setKeyHint("ESC");
     setDimensions(m_width, m_height);
 }
@@ -46,6 +48,8 @@ void HUD::setDimensions(int width, int height) {
     m_brakePedal.setPosition(24, m_height - 95);
     m_reversePedal.setPosition(148, m_height - 95);
     m_gasPedal.setPosition(m_width - 139, m_height - 95);
+    m_boostPedal.setPosition(m_width - 139, m_height - 156);
+    m_boostPedal.setSize(115, 54);
     m_pauseButton.setPosition(m_width - 16 - 42, 12);
     m_pauseButton.setSize(42, 36);
 }
@@ -60,6 +64,10 @@ void HUD::setReverseVirtualPressed(bool pressed) {
 
 void HUD::setGasVirtualPressed(bool pressed) {
     m_gasPedal.setPressed(pressed);
+}
+
+void HUD::setBoostVirtualPressed(bool pressed) {
+    m_boostPedal.setPressed(pressed);
 }
 
 void HUD::addFloatingText(const std::string& text, float x, float y, uint32_t color) {
@@ -77,11 +85,13 @@ void HUD::onMouseMove(int px, int py) {
     m_brakePedal.onMouseMove(px, py);
     m_reversePedal.onMouseMove(px, py);
     m_gasPedal.onMouseMove(px, py);
+    m_boostPedal.onMouseMove(px, py);
     m_pauseButton.onMouseMove(px, py);
 }
 
 bool HUD::onMouseDown(int px, int py) {
     if (m_pauseButton.onMouseDown(px, py)) return true;
+    if (m_boostPedal.onMouseDown(px, py)) return true;
     if (m_brakePedal.onMouseDown(px, py)) return true;
     if (m_reversePedal.onMouseDown(px, py)) return true;
     if (m_gasPedal.onMouseDown(px, py)) return true;
@@ -93,6 +103,7 @@ void HUD::onMouseUp(int px, int py) {
     m_brakePedal.onMouseUp(px, py);
     m_reversePedal.onMouseUp(px, py);
     m_gasPedal.onMouseUp(px, py);
+    m_boostPedal.onMouseUp(px, py);
 }
 
 void HUD::update(float dt) {
@@ -225,6 +236,46 @@ void HUD::render(Graphics::Framebuffer& fb) {
     // 1. Top Left: Fuel Gauge Pod
     m_fuelBar.render(fb);
 
+    // 1b. NOS Nitro Boost Reservoir Pod (Directly below Fuel Bar)
+    {
+        int nosX = 16;
+        int nosY = 48;
+        int nosW = 168;
+        int nosH = 22;
+
+        uint32_t borderCol = m_isBoosting ? 0xFFFFFFFF : 0xFF00E5FF;
+        uint32_t bgCol = m_isBoosting ? 0xEE092036 : 0xDD090E18;
+        UIComponents::drawArcadePanel(fb, nosX, nosY, nosW, nosH, bgCol, Theme::CARD_BORDER, borderCol, 1, false, true);
+
+        // Label
+        Graphics::RasterFont::drawString(fb, nosX + 8, nosY + 6, "NOS", 0xFF00E5FF, 1);
+
+        // Segmented LED meter
+        int meterX = nosX + 38;
+        int meterY = nosY + 5;
+        int meterW = nosW - 84;
+        int meterH = nosH - 10;
+        fb.fillRect(meterX, meterY, meterW, meterH, 0xFF101924);
+
+        int totalSegments = 10;
+        int activeSegments = static_cast<int>(std::round((m_nitro / 100.0f) * totalSegments));
+        int segW = (meterW - (totalSegments - 1) * 2) / totalSegments;
+
+        for (int s = 0; s < totalSegments; ++s) {
+            int sx = meterX + s * (segW + 2);
+            if (s < activeSegments) {
+                uint32_t segCol = m_isBoosting ? 0xFFFFFFFF : (s > 7 ? 0xFF00E5FF : 0xFF00B0FF);
+                fb.fillRect(sx, meterY + 1, segW, meterH - 2, segCol);
+            } else {
+                fb.fillRect(sx, meterY + 1, segW, meterH - 2, 0xFF1C2836);
+            }
+        }
+
+        // Percentage Text
+        std::string nitroStr = std::to_string(static_cast<int>(m_nitro)) + "%";
+        Graphics::RasterFont::drawString(fb, nosX + nosW - 40, nosY + 6, nitroStr, Theme::TEXT_WHITE, 1);
+    }
+
     // 2. Top Center: Unified Rally Stage Telemetry & Odometer Module
     int distCardW = (m_width >= 1200) ? 380 : 320;
     int distCardH = 48;
@@ -341,6 +392,49 @@ void HUD::render(Graphics::Framebuffer& fb) {
     drawArcadeRacingPedal(fb, m_width - 139, m_height - 95, 115, 80,
                          gasText, "[D]", Theme::GREEN_GAS,
                          m_gasPedal.isPressed(), m_gasPedal.isHovered(), 2);
+
+    // Boost Pedal (Mounted directly above the Gas Pedal)
+    drawArcadeRacingPedal(fb, m_width - 139, m_height - 156, 115, 54,
+                         "BOOST", "SHIFT", 0xFF00E5FF,
+                         m_boostPedal.isPressed() || m_isBoosting, m_boostPedal.isHovered(), 2);
+
+    // 7b. In-Run Active Bounty Challenge Card (Top Right, underneath Coins/Pause)
+    if (!m_bountyTitle.empty()) {
+        int bW = 210;
+        int bH = 34;
+        int bX = m_width - 16 - bW;
+        int bY = 54;
+
+        UIComponents::drawArcadePanel(fb, bX, bY, bW, bH, 0xEE090E18, Theme::CARD_BORDER, Theme::GOLD, 1, false, true);
+        Graphics::RasterFont::drawString(fb, bX + 8, bY + 4, "[BOUNTY]", Theme::GOLD, 1);
+        std::string rewStr = "+" + std::to_string(m_bountyReward) + "C";
+        Graphics::RasterFont::drawString(fb, bX + bW - Graphics::RasterFont::getTextWidth(rewStr, 1) - 8, bY + 4, rewStr, Theme::GOLD, 1);
+        std::string fullDesc = m_bountyTitle + " (" + m_bountyProgress + ")";
+        Graphics::RasterFont::drawString(fb, bX + 8, bY + 18, fullDesc, Theme::TEXT_WHITE, 1);
+    }
+
+    // 7c. Real-Time Surface Grip Badge (Placed above or below central telemetry)
+    if (!m_surfaceName.empty()) {
+        std::string surfBadge = "[SURFACE: " + m_surfaceName + "]";
+        int sW = Graphics::RasterFont::getTextWidth(surfBadge, 1) + 16;
+        int sX = (m_width - sW) / 2;
+        int sY = distCardY + distCardH + 4;
+        UIComponents::drawArcadePanel(fb, sX, sY, sW, 16, 0xDD090E18, Theme::CARD_BORDER, m_surfaceColor, 0, false, true);
+        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, sY + 3, surfBadge, m_surfaceColor, 1);
+    }
+
+    // 7d. Dynamic Rollover / Neck-Snap Danger Alert
+    if (m_rolloverWarning) {
+        int warnW = 260;
+        int warnH = 26;
+        int warnX = (m_width - warnW) / 2;
+        int warnY = distCardY + distCardH + 24;
+
+        // Pulsing urgent amber-red flash
+        uint32_t flashBg = ((static_cast<int>(m_animTime * 12.0f) % 2 == 0) ? 0xF0D50000 : 0xF0FF6D00);
+        UIComponents::drawArcadePanel(fb, warnX, warnY, warnW, warnH, flashBg, 0xFFFFFFFF, 0xFFFFFFFF, 2, false, true);
+        Graphics::RasterFont::drawStringCentered(fb, m_width / 2, warnY + 6, "! ROLLOVER HAZARD !", 0xFFFFFFFF, 2);
+    }
 
     // 8. Stunt Notifications Banner (Top-Center floating)
     m_stuntBanner.render(fb);

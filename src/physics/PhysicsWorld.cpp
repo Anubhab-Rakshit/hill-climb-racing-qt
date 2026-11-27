@@ -421,6 +421,7 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
 
             if (items[i].type == ItemType::FUEL_CANISTER) {
                 veh.addFuel(100.0f);
+                veh.addNitro(50.0f);
             } else {
                 if (isP1) {
                     m_coinsCollected += items[i].value;
@@ -499,10 +500,11 @@ void PhysicsWorld::updateStuntsForVehicle(Vehicle& veh, float dt, float& airTime
             flips++;
             cumulativeRotation -= 2.0f * static_cast<float>(M_PI);
             veh.addFuel(15.0f); // Bonus fuel reward for daring stunts!
+            veh.addNitro(30.0f);
             if (isP1) {
                 m_coinsCollected += 1000;
                 if (m_onStunt) {
-                    m_onStunt("BACKFLIP! +15% FUEL", 1000);
+                    m_onStunt("BACKFLIP! +15% FUEL +30% NOS", 1000);
                 }
             }
         }
@@ -511,10 +513,11 @@ void PhysicsWorld::updateStuntsForVehicle(Vehicle& veh, float dt, float& airTime
             flips++;
             cumulativeRotation += 2.0f * static_cast<float>(M_PI);
             veh.addFuel(20.0f); // Bonus fuel reward for frontflip!
+            veh.addNitro(40.0f);
             if (isP1) {
                 m_coinsCollected += 1500;
                 if (m_onStunt) {
-                    m_onStunt("FRONTFLIP! +20% FUEL", 1500);
+                    m_onStunt("FRONTFLIP! +20% FUEL +40% NOS", 1500);
                 }
             }
         }
@@ -523,9 +526,10 @@ void PhysicsWorld::updateStuntsForVehicle(Vehicle& veh, float dt, float& airTime
         if (airTimer >= 1.2f && isP1) {
             int airBonus = static_cast<int>(airTimer * 180.0f);
             m_coinsCollected += airBonus;
+            veh.addNitro(airTimer * 10.0f);
             if (m_onStunt) {
-                char buf[32];
-                std::snprintf(buf, sizeof(buf), "AIR TIME: %.1fs", airTimer);
+                char buf[48];
+                std::snprintf(buf, sizeof(buf), "AIR TIME: %.1fs +NOS", airTimer);
                 m_onStunt(buf, airBonus);
             }
         }
@@ -537,10 +541,11 @@ void PhysicsWorld::updateStuntsForVehicle(Vehicle& veh, float dt, float& airTime
             wheelieTimer += dt;
             if (wheelieTimer >= 1.2f) {
                 veh.addFuel(8.0f);
+                veh.addNitro(20.0f);
                 if (isP1) {
                     m_coinsCollected += 400;
                     if (m_onStunt) {
-                        m_onStunt("WHEELIE! +8% FUEL", 400);
+                        m_onStunt("WHEELIE! +8% FUEL +20% NOS", 400);
                     }
                 }
                 wheelieTimer = 0.0f;

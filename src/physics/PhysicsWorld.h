@@ -44,6 +44,7 @@ public:
     // Run telemetry P1
     float distanceReached() const { return m_distance; }
     int coinsCollected() const { return m_coinsCollected; }
+    void addCoins(int amount) { m_coinsCollected += amount; }
     int flipsCompleted() const { return m_flips; }
     float totalAirTime() const { return m_totalAirTime; }
     bool isGameOver() const { return m_gameOver; }

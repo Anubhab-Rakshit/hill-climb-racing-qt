@@ -387,6 +387,14 @@ struct Vehicle::Box2DVehicleSim {
                 chassis->ApplyTorque(-airPitchTorque * pitchForward);
             }
         }
+
+        // High-Octane Nitro Rocket Boost
+        if (owner.m_isBoosting && !owner.m_driverDown && owner.m_fuel > 0.0f) {
+            const float angle = chassis->GetAngle();
+            const b2Vec2 forwardDir(std::cos(angle), std::sin(angle));
+            const float boostForce = 1.75f * cfg.mass * 9.81f;
+            chassis->ApplyForceToCenter(boostForce * forwardDir);
+        }
     }
 
     void applyAerodynamics(const Terrain& terrain, const Core::ProfileManager& profile) {
@@ -736,14 +744,18 @@ void Vehicle::reset(float startX, float startY, float startAngle) {
     m_prevDriverHeadAngle = m_driverHeadAngle;
     m_prevDriverHeadShiftY = m_driverHeadShiftY;
     m_brakePressure = 0.0f;
+    m_nitro = 100.0f;
+    m_isBoosting = false;
+    m_boostInput = 0.0f;
 }
 
-void Vehicle::applyInput(float gas, float brake, float reverse, float tiltLeft, float tiltRight) {
+void Vehicle::applyInput(float gas, float brake, float reverse, float tiltLeft, float tiltRight, float boost) {
     m_tiltLeftInput = std::clamp(tiltLeft, 0.0f, 1.0f);
     m_tiltRightInput = std::clamp(tiltRight, 0.0f, 1.0f);
     m_gasInput = std::clamp(gas, 0.0f, 1.0f);
     m_brakeInput = std::clamp(brake, 0.0f, 1.0f);
     m_reverseInput = std::clamp(reverse, 0.0f, 1.0f);
+    m_boostInput = std::clamp(boost, 0.0f, 1.0f);
 }
 
 void Vehicle::addFuel(float amount) {
@@ -796,6 +808,14 @@ void Vehicle::stepBox2D(float dt, const Terrain& terrain, const Core::ProfileMan
         const float load = std::clamp(0.6f + std::abs(slope) * 1.5f + (1.0f - speedRatio * 0.35f), 0.5f, 1.5f);
         const float drainRate = activeThrottle * (3.3f + 0.9f * load) * 0.60f * m_fuelBurnMultiplier;
         m_fuel = std::max(0.0f, m_fuel - drainRate * dt);
+    }
+
+    if (m_boostInput > 0.1f && m_nitro > 0.0f && !m_driverDown && m_fuel > 0.0f) {
+        m_isBoosting = true;
+        m_nitro = std::max(0.0f, m_nitro - 28.0f * dt);
+        m_fuel = std::max(0.0f, m_fuel - 1.2f * dt);
+    } else {
+        m_isBoosting = false;
     }
 
     m_box2d->step(dt, terrain, profile, effectiveGas, effectiveBrake,
@@ -858,6 +878,18 @@ void Vehicle::step(float dt, const Terrain& terrain, const Core::ProfileManager&
         float load = std::clamp(0.6f + std::abs(slope) * 1.5f + (1.0f - speedRatio * 0.35f), 0.5f, 1.5f);
         float drainRate = activeThrottle * (3.3f + 0.9f * load) * 0.60f * m_fuelBurnMultiplier;
         m_fuel = std::max(0.0f, m_fuel - drainRate * dt);
+    }
+
+    if (m_boostInput > 0.1f && m_nitro > 0.0f && !m_driverDown && m_fuel > 0.0f) {
+        m_isBoosting = true;
+        m_nitro = std::max(0.0f, m_nitro - 28.0f * dt);
+        m_fuel = std::max(0.0f, m_fuel - 1.2f * dt);
+        float cosA = std::cos(m_chassisAngle);
+        float sinA = std::sin(m_chassisAngle);
+        m_chassisVel.x += cosA * 15.0f * dt;
+        m_chassisVel.y += sinA * 15.0f * dt;
+    } else {
+        m_isBoosting = false;
     }
 
     // Apply mass tuning

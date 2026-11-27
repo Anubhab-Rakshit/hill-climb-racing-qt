@@ -22,7 +22,7 @@ public:
     Vehicle& operator=(const Vehicle&) = delete;
 
     void reset(float startX = 5.0f, float startY = 3.0f, float startAngle = 0.0f);
-    void applyInput(float gas, float brake, float reverse = 0.0f, float tiltLeft = 0.0f, float tiltRight = 0.0f);
+    void applyInput(float gas, float brake, float reverse = 0.0f, float tiltLeft = 0.0f, float tiltRight = 0.0f, float boost = 0.0f);
 
     void step(float dt, const Terrain& terrain, const Core::ProfileManager& profile);
 
@@ -72,6 +72,13 @@ public:
     void addFuel(float amount);
     void setFuel(float fuel) { m_fuel = std::clamp(fuel, 0.0f, 100.0f); }
     void consumeFuel(float amount) { m_fuel = std::max(0.0f, m_fuel - amount); }
+
+    // Nitro / Boost System
+    float nitro() const { return m_nitro; }
+    bool isBoosting() const { return m_isBoosting; }
+    void addNitro(float amount) { m_nitro = std::clamp(m_nitro + amount, 0.0f, 100.0f); }
+    void setNitro(float n) { m_nitro = std::clamp(n, 0.0f, 100.0f); }
+
     float reverseInput() const { return m_reverseInput; }
     float brakePressure() const { return m_brakePressure; }
 
@@ -188,13 +195,16 @@ private:
     float m_driverHeadShiftYVel;
     float m_spawnGraceTimer;
 
-    // Fuel & Controls
+    // Fuel, Nitro & Controls
     float m_fuel;
+    float m_nitro = 100.0f;
+    bool m_isBoosting = false;
     float m_gasInput;
     float m_brakeInput;
     float m_reverseInput;
     float m_tiltLeftInput;
     float m_tiltRightInput;
+    float m_boostInput = 0.0f;
 
     bool m_rearContact;
     bool m_frontContact;

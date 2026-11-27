@@ -116,6 +116,41 @@ private:
     // Evaluator Sandbox
     bool m_isEvaluatorMode = false;
 
+    // Dramatic Crash Slow-Mo Sequence
+    float m_crashSequenceTimer = 0.0f;
+    bool m_inCrashSequence = false;
+    std::string m_crashBannerText;
+    std::string m_crashBannerSubtext;
+
+    // In-Run Dynamic Micro-Bounties
+    struct InRunBounty {
+        std::string title;
+        std::string desc;
+        float target;
+        float current = 0.0f;
+        int reward = 250;
+        bool completed = false;
+    };
+    std::vector<InRunBounty> m_bounties;
+    size_t m_currentBountyIdx = 0;
+
+    // Personal Best Ghost Racer
+    struct GhostFrame {
+        float x = 0.0f;
+        float y = 0.0f;
+        float angle = 0.0f;
+        float speedKmh = 0.0f;
+        float rearSuspLen = 0.0f;
+        float frontSuspLen = 0.0f;
+        float rearWheelAngle = 0.0f;
+        float frontWheelAngle = 0.0f;
+    };
+    std::vector<GhostFrame> m_currentRunGhost;
+    std::vector<GhostFrame> m_bestRunGhost;
+    float m_ghostRecordDist = 0.0f;
+    float m_ghostSampleTimer = 0.0f;
+    std::string m_ghostBiome;
+
     // UI Screens
     UI::MainMenuScreen m_mainMenu;
     UI::GarageScreen m_garage;
@@ -148,6 +183,12 @@ private:
                            const std::string& name, uint32_t color, float distDiff);
     void checkNetworkRaceFinish();
     void broadcastLocalRaceOutcome(bool crashed, float distance, float time);
+
+    void initRunBounties();
+    void updateRunBounties(float dt);
+    void renderSpeedStreaks(Graphics::Framebuffer& fb, float intensity);
+    void renderCrashSequenceOverlay(Graphics::Framebuffer& fb);
+    void renderGhostVehicle(Graphics::Framebuffer& fb, const Graphics::Camera& cam);
 };
 
 } // namespace Core

@@ -17,8 +17,24 @@
 #include "graphics/ScanlineRasterizer.h"
 #include "audio/SoundManager.h"
 #include "ui/UILayoutRegression.h"
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 int main(int argc, char *argv[]) {
+#ifdef _WIN32
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        DWORD fileType = GetFileType(GetStdHandle(STD_OUTPUT_HANDLE));
+        if (fileType == FILE_TYPE_UNKNOWN || fileType == 0) {
+            FILE* fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stdout);
+            freopen_s(&fp, "CONOUT$", "w", stderr);
+        }
+    }
+#endif
     QApplication app(argc, argv);
     app.setApplicationName("HillClimbRacingQt");
     app.setOrganizationName("HillClimbQtTeam");

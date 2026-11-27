@@ -21,6 +21,7 @@ void InputController::updateCombinedInputs() {
     m_state.gas = m_state.p1.gas || m_state.p2.gas;
     m_state.brake = m_state.p1.brake || m_state.p2.brake;
     m_state.reverse = m_state.p1.reverse || m_state.p2.reverse;
+    m_state.boost = m_state.p1.boost || m_state.p2.boost;
 }
 
 void InputController::onKeyPress(QKeyEvent* event) {
@@ -32,7 +33,7 @@ void InputController::onKeyPress(QKeyEvent* event) {
 
     int k = event->key();
 
-    // Player 1 (WASD)
+    // Player 1 (WASD + Shift/Space for Boost)
     if (k == Qt::Key_W) {
         m_state.p1.gas = true;
     } else if (k == Qt::Key_S) {
@@ -42,9 +43,11 @@ void InputController::onKeyPress(QKeyEvent* event) {
         m_state.p1.tiltLeft = true;
     } else if (k == Qt::Key_D) {
         m_state.p1.tiltRight = true;
+    } else if (k == Qt::Key_Shift || k == Qt::Key_Space) {
+        m_state.p1.boost = true;
     }
 
-    // Player 2 (Arrow Keys)
+    // Player 2 (Arrow Keys + Control/0 for Boost)
     if (k == Qt::Key_Up) {
         m_state.p2.gas = true;
     } else if (k == Qt::Key_Down) {
@@ -54,6 +57,8 @@ void InputController::onKeyPress(QKeyEvent* event) {
         m_state.p2.tiltLeft = true;
     } else if (k == Qt::Key_Right) {
         m_state.p2.tiltRight = true;
+    } else if (k == Qt::Key_Control || k == Qt::Key_0) {
+        m_state.p2.boost = true;
     }
 
     // Navigation / Global Shortcuts
@@ -87,6 +92,8 @@ void InputController::onKeyRelease(QKeyEvent* event) {
         m_state.p1.tiltLeft = false;
     } else if (k == Qt::Key_D) {
         m_state.p1.tiltRight = false;
+    } else if (k == Qt::Key_Shift || k == Qt::Key_Space) {
+        m_state.p1.boost = false;
     }
 
     // Player 2 (Arrow Keys)
@@ -99,6 +106,8 @@ void InputController::onKeyRelease(QKeyEvent* event) {
         m_state.p2.tiltLeft = false;
     } else if (k == Qt::Key_Right) {
         m_state.p2.tiltRight = false;
+    } else if (k == Qt::Key_Control || k == Qt::Key_0) {
+        m_state.p2.boost = false;
     }
 
     updateCombinedInputs();

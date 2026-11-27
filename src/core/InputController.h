@@ -18,19 +18,21 @@ public:
         bool reverse = false;
         bool tiltLeft = false;
         bool tiltRight = false;
+        bool boost = false;
     };
 
     struct State {
-        // Player 1 controls (W = gas, S = brake/rev, A = tilt left, D = tilt right)
+        // Player 1 controls (W = gas, S = brake/rev, A = tilt left, D = tilt right, Shift/Space = boost)
         PlayerControls p1;
 
-        // Player 2 controls (Up = gas, Down = brake/rev, Left = tilt left, Right = tilt right)
+        // Player 2 controls (Up = gas, Down = brake/rev, Left = tilt left, Right = tilt right, Ctrl/0 = boost)
         PlayerControls p2;
 
         // Single Player combined convenience flags
         bool gas = false;
         bool brake = false;
         bool reverse = false;
+        bool boost = false;
 
         bool pause = false;
         bool restart = false;
