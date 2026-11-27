@@ -659,6 +659,25 @@ void GameStateManager::startRace(const std::string& biomeId) {
     m_gameOverScreen.clearUnlockedAchievements();
     m_minimapRadar.setCourseLength(1750.0f);
     syncAchievementProfileStats();
+
+    // Initialize dynamic in-run bounties & personal best ghost tracker
+    initRunBounties();
+    m_inCrashSequence = false;
+    m_crashSequenceTimer = 0.0f;
+    m_hud.setNitro(100.0f);
+    m_hud.setBoosting(false);
+    m_hud.setBoostVirtualPressed(false);
+    m_hud.setBountyInfo("", "", 0);
+    m_hud.setSurfaceInfo("", 0xFFFFFFFF);
+    m_hud.setRolloverWarning(false);
+    if (m_selectedBiome != m_ghostBiome) {
+        m_bestRunGhost.clear();
+        m_ghostRecordDist = 0.0f;
+        m_ghostBiome = m_selectedBiome;
+    }
+    m_currentRunGhost.clear();
+    m_ghostSampleTimer = 0.0f;
+
     changeState(StateType::GAMEPLAY);
 }
 
@@ -695,6 +714,16 @@ void GameStateManager::startLocalMultiplayerRace(const std::string& biomeId) {
     m_gameOverScreen.clearUnlockedAchievements();
     m_minimapRadar.setCourseLength(1750.0f);
     syncAchievementProfileStats();
+    m_inCrashSequence = false;
+    m_crashSequenceTimer = 0.0f;
+    m_hud.setNitro(100.0f);
+    m_hud.setBoosting(false);
+    m_hud.setBoostVirtualPressed(false);
+    m_hud.setBountyInfo("", "", 0);
+    m_hud.setSurfaceInfo("", 0xFFFFFFFF);
+    m_hud.setRolloverWarning(false);
+    m_currentRunGhost.clear();
+    m_ghostSampleTimer = 0.0f;
     changeState(StateType::MULTIPLAYER_RACE);
 }
 
@@ -735,6 +764,16 @@ void GameStateManager::startNetworkMultiplayer(bool isHost, const std::string& b
     m_gameOverScreen.clearUnlockedAchievements();
     m_minimapRadar.setCourseLength(1750.0f);
     syncAchievementProfileStats();
+    m_inCrashSequence = false;
+    m_crashSequenceTimer = 0.0f;
+    m_hud.setNitro(100.0f);
+    m_hud.setBoosting(false);
+    m_hud.setBoostVirtualPressed(false);
+    m_hud.setBountyInfo("", "", 0);
+    m_hud.setSurfaceInfo("", 0xFFFFFFFF);
+    m_hud.setRolloverWarning(false);
+    m_currentRunGhost.clear();
+    m_ghostSampleTimer = 0.0f;
     changeState(StateType::ONLINE_RACE);
 }
 
@@ -911,14 +950,19 @@ void GameStateManager::handleInput(const InputController::State& input) {
         bool gasActive = input.gas || (input.mouseDown && m_hud.isGasPressed());
         bool brakeActive = input.brake || (input.mouseDown && m_hud.isBrakePressed());
         bool reverseActive = input.reverse || (input.mouseDown && m_hud.isReversePressed());
+        bool boostActive = input.p1.boost || (input.mouseDown && m_hud.isBoostPressed());
 
         m_hud.setGasVirtualPressed(gasActive);
         m_hud.setBrakeVirtualPressed(brakeActive);
         m_hud.setReverseVirtualPressed(reverseActive);
+        m_hud.setBoostVirtualPressed(boostActive);
 
         m_physics.vehicle().applyInput(gasActive ? 1.0f : 0.0f,
                                        brakeActive ? 1.0f : 0.0f,
-                                       reverseActive ? 1.0f : 0.0f);
+                                       reverseActive ? 1.0f : 0.0f,
+                                       input.p1.tiltLeft ? 1.0f : 0.0f,
+                                       input.p1.tiltRight ? 1.0f : 0.0f,
+                                       boostActive ? 1.0f : 0.0f);
     }
     else if (m_currentState == StateType::MULTIPLAYER_RACE) {
         if (input.pause) {
@@ -934,10 +978,10 @@ void GameStateManager::handleInput(const InputController::State& input) {
         const auto& p2 = input.p2;
         m_physics.vehicle().applyInput(p1.gas ? 1.0f : 0.0f, p1.brake ? 1.0f : 0.0f,
                                        p1.reverse ? 1.0f : 0.0f, p1.tiltLeft ? 1.0f : 0.0f,
-                                       p1.tiltRight ? 1.0f : 0.0f);
+                                       p1.tiltRight ? 1.0f : 0.0f, p1.boost ? 1.0f : 0.0f);
         m_physics.vehicle2().applyInput(p2.gas ? 1.0f : 0.0f, p2.brake ? 1.0f : 0.0f,
                                         p2.reverse ? 1.0f : 0.0f, p2.tiltLeft ? 1.0f : 0.0f,
-                                        p2.tiltRight ? 1.0f : 0.0f);
+                                        p2.tiltRight ? 1.0f : 0.0f, p2.boost ? 1.0f : 0.0f);
     }
     else if (m_currentState == StateType::ONLINE_RACE) {
         if (m_onlineResultShown) {
@@ -973,16 +1017,19 @@ void GameStateManager::handleInput(const InputController::State& input) {
         bool gasActive = input.p1.gas || (input.mouseDown && m_hud.isGasPressed());
         bool brakeActive = input.p1.brake || (input.mouseDown && m_hud.isBrakePressed());
         bool reverseActive = input.p1.reverse || (input.mouseDown && m_hud.isReversePressed());
+        bool boostActive = input.p1.boost || (input.mouseDown && m_hud.isBoostPressed());
 
         m_hud.setGasVirtualPressed(gasActive);
         m_hud.setBrakeVirtualPressed(brakeActive);
         m_hud.setReverseVirtualPressed(reverseActive);
+        m_hud.setBoostVirtualPressed(boostActive);
 
         m_physics.vehicle().applyInput(gasActive ? 1.0f : 0.0f,
                                        brakeActive ? 1.0f : 0.0f,
                                        reverseActive ? 1.0f : 0.0f,
                                        input.p1.tiltLeft ? 1.0f : 0.0f,
-                                       input.p1.tiltRight ? 1.0f : 0.0f);
+                                       input.p1.tiltRight ? 1.0f : 0.0f,
+                                       boostActive ? 1.0f : 0.0f);
     }
     else if (m_currentState == StateType::PAUSED) {
         if (input.pause || input.enter) {
@@ -1051,6 +1098,11 @@ void GameStateManager::fixedUpdate(float dt) {
             effectiveDt *= 0.5f;
         }
 
+        // True 4x Slow Motion during dramatic crash tumble
+        if (m_inCrashSequence) {
+            effectiveDt *= 0.25f;
+        }
+
         m_gameTime += effectiveDt;
 
         if (m_isEvaluatorMode && m_evaluatorOverlay.isInfiniteFuel()) {
@@ -1062,15 +1114,22 @@ void GameStateManager::fixedUpdate(float dt) {
         const auto& car = m_physics.vehicle();
         m_camera.update(effectiveDt, car.chassisPos(), car.chassisVel().x);
 
-        // Exhaust smoke
+        // Exhaust smoke / Rocket nitro boost flames
         m_smokeTimer -= effectiveDt;
         if (car.fuel() > 0.0f && m_smokeTimer <= 0.0f) {
-            m_smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
             float cosA = std::cos(car.chassisAngle());
             float sinA = std::sin(car.chassisAngle());
             Physics::Vec2 pLocal(car.rearMountOffset().x * 0.95f, car.rearMountOffset().y * 0.4f);
             Physics::Vec2 pWorld = car.chassisPos() + Physics::Vec2(pLocal.x * cosA - pLocal.y * sinA, pLocal.x * sinA + pLocal.y * cosA);
-            m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+
+            if (car.isBoosting()) {
+                m_smokeTimer = 0.02f;
+                m_particleSystem.emitNitroFlame(pWorld, Physics::Vec2(cosA, sinA), car.chassisVel());
+                m_camera.addTrauma(0.04f);
+            } else {
+                m_smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
+                m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+            }
         }
 
         // Wheel spray
@@ -1088,61 +1147,111 @@ void GameStateManager::fixedUpdate(float dt) {
 
         m_particleSystem.update(effectiveDt);
 
+        // Update Surface info and Rollover Hazard
+        const auto& surf = m_physics.terrain().getSurfaceAt(car.chassisPos().x);
+        const auto& mat = Physics::SurfaceMaterialRegistry::get(surf.type);
+        m_hud.setSurfaceInfo(Physics::SurfaceMaterialRegistry::name(surf.type), mat.topColor);
+        float cosPitch = std::cos(car.chassisAngle());
+        bool rolloverRisk = (cosPitch < 0.25f && car.chassisVel().length() > 3.0f && !m_physics.isGameOver());
+        m_hud.setRolloverWarning(rolloverRisk);
+
+        // Update Bounties
+        updateRunBounties(effectiveDt);
+
+        // Sample Ghost Frame every 0.08s
+        m_ghostSampleTimer += effectiveDt;
+        if (m_ghostSampleTimer >= 0.08f) {
+            m_ghostSampleTimer = 0.0f;
+            GhostFrame gf;
+            gf.x = car.chassisPos().x;
+            gf.y = car.chassisPos().y;
+            gf.angle = car.chassisAngle();
+            gf.speedKmh = car.getSpeedKmh();
+            gf.rearSuspLen = car.rearSuspensionCompression();
+            gf.frontSuspLen = car.frontSuspensionCompression();
+            gf.rearWheelAngle = car.rearWheelAngle();
+            gf.frontWheelAngle = car.frontWheelAngle();
+            m_currentRunGhost.push_back(gf);
+        }
+
         // Update HUD Telemetry (Speedometer, Tachometer, Fuel Bar, Distance, Coins)
         m_hud.setSpeed(car.getSpeedKmh());
         m_hud.setRpm(car.getEngineRpm());
         m_hud.setFuel(car.fuel());
+        m_hud.setNitro(car.nitro());
+        m_hud.setBoosting(car.isBoosting());
         m_hud.setDistance(m_physics.distanceReached());
         m_hud.setCoins(m_profile.coins());
         m_hud.setRecord(m_profile.getRecordDistance(m_selectedBiome));
         m_hud.update(effectiveDt);
 
-        if (m_physics.isGameOver()) {
-            float dist = m_physics.distanceReached();
-            int coinsEarned = m_physics.coinsCollected();
-            bool isNewRec = dist > m_profile.getRecordDistance(m_selectedBiome);
-
-            m_profile.recordDistance(m_selectedBiome, dist);
-            AccountManager::instance().recordDistance(m_selectedBiome, dist);
-            AccountManager::instance().addXP(static_cast<int>(dist));
-
-            m_achievements.recordMax(AchievementStat::BEST_RUN_DISTANCE, dist, false);
-            m_achievements.addTo(AchievementStat::TOTAL_DISTANCE, dist, false);
-            m_achievements.addTo(AchievementStat::TOTAL_FLIPS, m_physics.flipsCompleted(), false);
-            m_achievements.addTo(AchievementStat::TOTAL_AIR_TIME, m_physics.totalAirTime(), false);
-            m_achievements.evaluate();
-
-            if (m_isGrandPrix) {
-                // Award points for this round
-                int pts = (dist > 1500.0f) ? 10 : (dist > 1000.0f) ? 8 : (dist > 500.0f) ? 6 : 4;
-                m_gpStandings[0].points += pts;
-                m_gpStandings[0].bestDistance = std::max(m_gpStandings[0].bestDistance, dist);
-                if (pts == 10) m_gpStandings[0].wins++;
-
-                // Simulate AI competitor scores
-                m_gpStandings[1].points += 8;
-                m_gpStandings[1].bestDistance = 1420.0f;
-                m_gpStandings[2].points += 6;
-                m_gpStandings[2].bestDistance = 1250.0f;
-                m_gpStandings[3].points += 4;
-                m_gpStandings[3].bestDistance = 980.0f;
-
-                bool isLast = (m_gpRound >= static_cast<int>(s_gpCircuit.size()));
-                std::string nextTrk = isLast ? "FINALE" : s_gpCircuit[m_gpRound];
-                m_challengeScreen.setStandings(m_gpStandings, m_gpRound, static_cast<int>(s_gpCircuit.size()),
-                                               m_selectedBiome, nextTrk, isLast);
-                changeState(StateType::GRAND_PRIX_CHALLENGE);
-                return;
-            }
-
-            m_gameOverScreen.setStats(dist, coinsEarned, m_physics.flipsCompleted(), m_physics.totalAirTime(), isNewRec);
-            m_camera.addTrauma(0.9f);
+        // Dramatic Crash / Driver Down Slow-Mo Handling
+        if (m_physics.isGameOver() && !m_inCrashSequence) {
+            m_inCrashSequence = true;
+            m_crashSequenceTimer = 1.25f;
+            m_crashBannerText = (m_physics.gameOverReason() == "DRIVER DOWN!" ? "DRIVER DOWN!" : (m_physics.gameOverReason() == "OUT OF FUEL!" ? "OUT OF FUEL!" : "WRECKED!"));
+            m_crashBannerSubtext = (m_physics.gameOverReason() == "DRIVER DOWN!" ? "FATAL IMPACT - REPAIR VEHICLE" : (m_physics.gameOverReason() == "OUT OF FUEL!" ? "TANK DRIED OUT" : "TOTAL LOSS"));
+            m_camera.addTrauma(1.0f);
+            m_particleSystem.emitCrashExplosion(car.chassisPos(), 32);
             if (m_physics.gameOverReason() == "DRIVER DOWN!") {
                 m_audio.playNeckCrunch();
             } else {
                 m_audio.playCrash();
             }
-            changeState(StateType::GAME_OVER);
+        }
+
+        if (m_inCrashSequence) {
+            m_crashSequenceTimer -= dt;
+            m_camera.addTrauma(0.15f);
+            if (m_crashSequenceTimer <= 0.0f) {
+                m_inCrashSequence = false;
+
+                // Save Ghost Run if new distance record
+                float dist = m_physics.distanceReached();
+                if (dist > m_ghostRecordDist) {
+                    m_bestRunGhost = m_currentRunGhost;
+                    m_ghostRecordDist = dist;
+                }
+
+                int coinsEarned = m_physics.coinsCollected();
+                bool isNewRec = dist > m_profile.getRecordDistance(m_selectedBiome);
+
+                m_profile.recordDistance(m_selectedBiome, dist);
+                AccountManager::instance().recordDistance(m_selectedBiome, dist);
+                AccountManager::instance().addXP(static_cast<int>(dist));
+
+                m_achievements.recordMax(AchievementStat::BEST_RUN_DISTANCE, dist, false);
+                m_achievements.addTo(AchievementStat::TOTAL_DISTANCE, dist, false);
+                m_achievements.addTo(AchievementStat::TOTAL_FLIPS, m_physics.flipsCompleted(), false);
+                m_achievements.addTo(AchievementStat::TOTAL_AIR_TIME, m_physics.totalAirTime(), false);
+                m_achievements.evaluate();
+
+                if (m_isGrandPrix) {
+                    // Award points for this round
+                    int pts = (dist > 1500.0f) ? 10 : (dist > 1000.0f) ? 8 : (dist > 500.0f) ? 6 : 4;
+                    m_gpStandings[0].points += pts;
+                    m_gpStandings[0].bestDistance = std::max(m_gpStandings[0].bestDistance, dist);
+                    if (pts == 10) m_gpStandings[0].wins++;
+
+                    // Simulate AI competitor scores
+                    m_gpStandings[1].points += 8;
+                    m_gpStandings[1].bestDistance = 1420.0f;
+                    m_gpStandings[2].points += 6;
+                    m_gpStandings[2].bestDistance = 1250.0f;
+                    m_gpStandings[3].points += 4;
+                    m_gpStandings[3].bestDistance = 980.0f;
+
+                    bool isLast = (m_gpRound >= static_cast<int>(s_gpCircuit.size()));
+                    std::string nextTrk = isLast ? "FINALE" : s_gpCircuit[m_gpRound];
+                    m_challengeScreen.setStandings(m_gpStandings, m_gpRound, static_cast<int>(s_gpCircuit.size()),
+                                                   m_selectedBiome, nextTrk, isLast);
+                    changeState(StateType::GRAND_PRIX_CHALLENGE);
+                    return;
+                }
+
+                m_gameOverScreen.setStats(dist, coinsEarned, m_physics.flipsCompleted(), m_physics.totalAirTime(), isNewRec);
+                changeState(StateType::GAME_OVER);
+            }
         }
     }
     else if (m_currentState == StateType::MULTIPLAYER_RACE) {
@@ -1154,16 +1263,22 @@ void GameStateManager::fixedUpdate(float dt) {
         m_camera.update(dt, car1.chassisPos(), car1.chassisVel().x);
         m_camera2.update(dt, car2.chassisPos(), car2.chassisVel().x);
 
-        auto emitVehicleParticles = [this, dt](const Physics::Vehicle& car, float& smokeTimer) {
+        auto emitVehicleParticles = [this, dt](const Physics::Vehicle& car, float& smokeTimer, Graphics::Camera& cam) {
             smokeTimer -= dt;
             if (car.fuel() > 0.0f && smokeTimer <= 0.0f) {
-                smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
                 float cosA = std::cos(car.chassisAngle());
                 float sinA = std::sin(car.chassisAngle());
                 Physics::Vec2 pLocal(car.rearMountOffset().x * 0.95f, car.rearMountOffset().y * 0.4f);
                 Physics::Vec2 pWorld = car.chassisPos() + Physics::Vec2(pLocal.x * cosA - pLocal.y * sinA,
                                                                        pLocal.x * sinA + pLocal.y * cosA);
-                m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+                if (car.isBoosting()) {
+                    smokeTimer = 0.02f;
+                    m_particleSystem.emitNitroFlame(pWorld, Physics::Vec2(cosA, sinA), car.chassisVel());
+                    cam.addTrauma(0.04f);
+                } else {
+                    smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
+                    m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+                }
             }
             const std::string& biome = m_physics.terrain().getBiome();
             if (car.isRearOnGround()) {
@@ -1178,8 +1293,8 @@ void GameStateManager::fixedUpdate(float dt) {
             }
         };
 
-        emitVehicleParticles(car1, m_smokeTimer);
-        emitVehicleParticles(car2, m_smokeTimer2);
+        emitVehicleParticles(car1, m_smokeTimer, m_camera);
+        emitVehicleParticles(car2, m_smokeTimer2, m_camera2);
         m_particleSystem.update(dt);
 
         m_hud.setSpeed(car1.getSpeedKmh());
@@ -1222,13 +1337,19 @@ void GameStateManager::fixedUpdate(float dt) {
 
         m_smokeTimer -= dt;
         if (car.fuel() > 0.0f && m_smokeTimer <= 0.0f) {
-            m_smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
             float cosA = std::cos(car.chassisAngle());
             float sinA = std::sin(car.chassisAngle());
             Physics::Vec2 pLocal(car.rearMountOffset().x * 0.95f, car.rearMountOffset().y * 0.4f);
             Physics::Vec2 pWorld = car.chassisPos() + Physics::Vec2(pLocal.x * cosA - pLocal.y * sinA,
                                                                    pLocal.x * sinA + pLocal.y * cosA);
-            m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+            if (car.isBoosting()) {
+                m_smokeTimer = 0.02f;
+                m_particleSystem.emitNitroFlame(pWorld, Physics::Vec2(cosA, sinA), car.chassisVel());
+                m_camera.addTrauma(0.04f);
+            } else {
+                m_smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
+                m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+            }
         }
 
         const std::string& currentBiome = m_physics.terrain().getBiome();
@@ -1246,6 +1367,8 @@ void GameStateManager::fixedUpdate(float dt) {
         m_hud.setSpeed(car.getSpeedKmh());
         m_hud.setRpm(car.getEngineRpm());
         m_hud.setFuel(car.fuel());
+        m_hud.setNitro(car.nitro());
+        m_hud.setBoosting(car.isBoosting());
         m_hud.setDistance(m_physics.distanceReached());
         m_hud.setCoins(m_profile.coins());
         m_hud.setRecord(m_profile.getRecordDistance(m_selectedBiome));
@@ -1449,6 +1572,8 @@ void GameStateManager::renderCompactHud(Graphics::Framebuffer& fb, const Physics
     Graphics::RasterFont::drawString(fb, 36, 17, pLabel, UI::Theme::TEXT_WHITE, 1);
 
     Graphics::RasterFont::drawString(fb, 14, 40, ctrlHint, 0xBBFFFFFF, 1);
+    std::string nosStr = "NOS " + std::to_string(static_cast<int>(veh.nitro())) + "%" + (veh.isBoosting() ? "  BOOST!" : "");
+    Graphics::RasterFont::drawString(fb, 14, 63, nosStr, veh.isBoosting() ? 0xFF00E5FF : 0xBBFFFFFF, 1);
 
     // 2. Speedometer
     int speedKmh = static_cast<int>(veh.getSpeedKmh());
@@ -1501,7 +1626,7 @@ void GameStateManager::renderLocalMultiplayerRace(Graphics::Framebuffer& fb, flo
     }
     std::string vehName1 = m_physics.vehicle().config().name;
     renderCompactHud(m_fbP1, m_physics.vehicle(), m_physics.distanceReached(),
-                     "P1 - " + vehName1, 0xFFFF3D00, "P1: [W/D] GAS  [S/A] BRK/REV");
+                     "P1 - " + vehName1, 0xFFFF3D00, "P1: [W/D] GAS  [S/A] BRK/REV  [SHIFT] NOS");
 
     m_terrainRasterizer.render(m_fbP2, m_camera2, m_physics.terrain(), m_gameTime, &m_physics.itemsCollectedP2());
     m_particleSystem.render(m_fbP2, m_camera2);
@@ -1526,7 +1651,7 @@ void GameStateManager::renderLocalMultiplayerRace(Graphics::Framebuffer& fb, flo
     }
     std::string vehName2 = m_physics.vehicle2().config().name;
     renderCompactHud(m_fbP2, m_physics.vehicle2(), m_physics.distanceReached2(),
-                     "P2 - " + vehName2, 0xFF00E5FF, "P2: [UP/DN] GAS  [LT/RT] BRK/REV");
+                     "P2 - " + vehName2, 0xFF00E5FF, "P2: [UP/DN] GAS  [LT/RT] BRK/REV  [0] NOS");
 
     fb.blit(0, 0, m_fbP1);
     fb.blit(0, 274, m_fbP2);
@@ -1600,11 +1725,34 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
 
             m_terrainRasterizer.render(fb, m_camera, m_physics.terrain(), m_gameTime);
             m_particleSystem.render(fb, m_camera);
+
+            // Render Personal Best Ghost Racer
+            renderGhostVehicle(fb, m_camera);
+
             Graphics::SpriteRenderer::renderVehicle(fb, m_camera, m_physics.vehicle(), alpha);
+
+            // Speed Warp Streaks when boosting at velocity
+            if (m_physics.vehicle().isBoosting() && m_physics.vehicle().getSpeedKmh() > 40.0f) {
+                renderSpeedStreaks(fb, std::clamp(m_physics.vehicle().getSpeedKmh() / 110.0f, 0.4f, 1.0f));
+            }
+
+            // Dramatic Crash Slow-Mo Sequence Overlay
+            if (m_inCrashSequence) {
+                renderCrashSequenceOverlay(fb);
+            }
 
             std::vector<UI::RadarRacer> racers;
             std::string myName = AccountManager::instance().activeAccount()->username;
             racers.push_back({myName, m_physics.distanceReached(), Theme::GOLD, true, m_physics.isGameOver()});
+
+            // If ghost exists, track ghost on radar
+            if (!m_bestRunGhost.empty()) {
+                float sampleIndexF = m_gameTime / 0.08f;
+                size_t gIdx = static_cast<size_t>(sampleIndexF);
+                if (gIdx < m_bestRunGhost.size()) {
+                    racers.push_back({"RECORD", m_bestRunGhost[gIdx].x, 0xFF00E5FF, false, false});
+                }
+            }
 
             if (m_isGrandPrix) {
                 for (size_t i = 1; i < m_gpStandings.size(); ++i) {
@@ -1655,6 +1803,163 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
         Graphics::RasterFont::drawStringCentered(fb, m_width / 2, toastY + 28,
                                                  m_achievementToastTitle, Theme::TEXT_WHITE, 2);
     }
+}
+
+void GameStateManager::initRunBounties() {
+    m_bounties.clear();
+    m_currentBountyIdx = 0;
+    m_bounties.push_back({"AIRTIME PRO", "Stay airborne for 2.0s", 2.0f, 0.0f, 300, false});
+    m_bounties.push_back({"SPEED DEMON", "Hit 75 KM/H", 75.0f, 0.0f, 350, false});
+    m_bounties.push_back({"STUNT MASTER", "Perform 1 Flip", 1.0f, 0.0f, 500, false});
+    m_bounties.push_back({"NITRO ROCKET", "Boost for 2.5s", 2.5f, 0.0f, 400, false});
+    m_bounties.push_back({"WHEELIE KING", "Hold a 1.2s Wheelie", 1.2f, 0.0f, 300, false});
+    m_bounties.push_back({"ENDURANCE", "Reach 600m", 600.0f, 0.0f, 600, false});
+    m_bounties.push_back({"HIGH VELOCITY", "Hit 95 KM/H", 95.0f, 0.0f, 500, false});
+    m_bounties.push_back({"MARATHON", "Reach 1200m", 1200.0f, 0.0f, 1000, false});
+}
+
+void GameStateManager::updateRunBounties(float dt) {
+    if (m_currentBountyIdx >= m_bounties.size()) {
+        m_hud.setBountyInfo("ALL CLEAR!", "DONE", 0);
+        return;
+    }
+
+    auto& b = m_bounties[m_currentBountyIdx];
+    const auto& car = m_physics.vehicle();
+    char progBuf[32];
+
+    switch (m_currentBountyIdx) {
+        case 0: // Airtime 2.0s
+            if (car.isAirborne()) b.current += dt;
+            else if (car.isRearOnGround() || car.isFrontOnGround()) b.current = 0.0f;
+            std::snprintf(progBuf, sizeof(progBuf), "%.1fs / %.1fs", b.current, b.target);
+            break;
+        case 1: // Speed 75 km/h
+            b.current = std::max(b.current, car.getSpeedKmh());
+            std::snprintf(progBuf, sizeof(progBuf), "%d / %d KM/H", static_cast<int>(b.current), static_cast<int>(b.target));
+            break;
+        case 2: // Stunt flips
+            b.current = static_cast<float>(m_physics.flipsCompleted());
+            std::snprintf(progBuf, sizeof(progBuf), "%d / %d", static_cast<int>(b.current), static_cast<int>(b.target));
+            break;
+        case 3: // Nitro Boost 2.5s
+            if (car.isBoosting()) b.current += dt;
+            std::snprintf(progBuf, sizeof(progBuf), "%.1fs / %.1fs", b.current, b.target);
+            break;
+        case 4: // Wheelie 1.2s
+            if (car.isRearOnGround() && !car.isFrontOnGround() && car.getSpeedKmh() > 18.0f) b.current += dt;
+            else b.current = 0.0f;
+            std::snprintf(progBuf, sizeof(progBuf), "%.1fs / %.1fs", b.current, b.target);
+            break;
+        case 5: // Distance 600m
+            b.current = m_physics.distanceReached();
+            std::snprintf(progBuf, sizeof(progBuf), "%dm / %dm", static_cast<int>(b.current), static_cast<int>(b.target));
+            break;
+        case 6: // Speed 95 km/h
+            b.current = std::max(b.current, car.getSpeedKmh());
+            std::snprintf(progBuf, sizeof(progBuf), "%d / %d KM/H", static_cast<int>(b.current), static_cast<int>(b.target));
+            break;
+        case 7: // Distance 1200m
+            b.current = m_physics.distanceReached();
+            std::snprintf(progBuf, sizeof(progBuf), "%dm / %dm", static_cast<int>(b.current), static_cast<int>(b.target));
+            break;
+        default:
+            std::snprintf(progBuf, sizeof(progBuf), "ACTIVE");
+            break;
+    }
+
+    m_hud.setBountyInfo(b.title, progBuf, b.reward);
+
+    if (b.current >= b.target && !b.completed) {
+        b.completed = true;
+        m_profile.addCoins(b.reward);
+        AccountManager::instance().addCoins(b.reward);
+        m_physics.addCoins(b.reward);
+        m_hud.triggerStunt("BOUNTY: " + b.title, b.reward, Theme::GOLD);
+        m_particleSystem.emitSparkles(car.chassisPos(), Theme::GOLD);
+        m_currentBountyIdx++;
+    }
+}
+
+void GameStateManager::renderSpeedStreaks(Graphics::Framebuffer& fb, float intensity) {
+    int W = fb.width();
+    int H = fb.height();
+    int numStreaks = static_cast<int>(intensity * 16.0f);
+    for (int i = 0; i < numStreaks; ++i) {
+        int y = (i * 39 + static_cast<int>(m_gameTime * 380.0f)) % H;
+        int len = 45 + (i * 21) % 95;
+        int x = (i % 2 == 0) ? (i * 29) % (W / 4) : W - len - (i * 27) % (W / 4);
+        uint32_t col = (i % 3 == 0) ? 0x6600E5FF : 0x44FFFFFF;
+        fb.drawLine(x, y, x + len, y, col);
+    }
+}
+
+void GameStateManager::renderCrashSequenceOverlay(Graphics::Framebuffer& fb) {
+    if (!m_inCrashSequence) return;
+    int W = fb.width();
+    int H = fb.height();
+
+    // Red pulsating cinematic vignette around screen edges
+    float pulse = 0.5f + 0.5f * std::sin(m_crashSequenceTimer * 16.0f);
+    uint32_t vigA = static_cast<uint32_t>(pulse * 90.0f + 50.0f);
+    uint32_t vigCol = (vigA << 24) | 0x00D50000;
+
+    int borderThickness = 12;
+    fb.fillRect(0, 0, W, borderThickness, vigCol);
+    fb.fillRect(0, H - borderThickness, W, borderThickness, vigCol);
+    fb.fillRect(0, 0, borderThickness, H, vigCol);
+    fb.fillRect(W - borderThickness, 0, borderThickness, H, vigCol);
+
+    // Large high-impact center banner
+    int bannerW = std::min(560, W - 40);
+    int bannerH = 74;
+    int bx = (W - bannerW) / 2;
+    int by = H / 2 - 45;
+
+    UI::UIComponents::drawArcadePanel(fb, bx, by, bannerW, bannerH, 0xF2090F1A, UI::Theme::CARD_BORDER, 0xFFFF3D00, 3, false, true);
+    Graphics::RasterFont::drawStringCentered(fb, W / 2, by + 12, m_crashBannerText, 0xFFFF3D00, 3);
+    Graphics::RasterFont::drawStringCentered(fb, W / 2, by + 46, m_crashBannerSubtext, UI::Theme::TEXT_WHITE, 1);
+}
+
+void GameStateManager::renderGhostVehicle(Graphics::Framebuffer& fb, const Graphics::Camera& cam) {
+    if (m_bestRunGhost.empty()) return;
+
+    float sampleIndexF = m_gameTime / 0.08f;
+    size_t idx0 = static_cast<size_t>(sampleIndexF);
+    if (idx0 >= m_bestRunGhost.size()) return;
+
+    size_t idx1 = std::min(idx0 + 1, m_bestRunGhost.size() - 1);
+    float frac = sampleIndexF - static_cast<float>(idx0);
+
+    const auto& f0 = m_bestRunGhost[idx0];
+    const auto& f1 = m_bestRunGhost[idx1];
+
+    float gX = f0.x + (f1.x - f0.x) * frac;
+    float gY = f0.y + (f1.y - f0.y) * frac;
+    float gAngle = f0.angle + (f1.angle - f0.angle) * frac;
+    float gRearSusp = f0.rearSuspLen + (f1.rearSuspLen - f0.rearSuspLen) * frac;
+    float gFrontSusp = f0.frontSuspLen + (f1.frontSuspLen - f0.frontSuspLen) * frac;
+    float gRearWheel = f0.rearWheelAngle + (f1.rearWheelAngle - f0.rearWheelAngle) * frac;
+    float gFrontWheel = f0.frontWheelAngle + (f1.frontWheelAngle - f0.frontWheelAngle) * frac;
+
+    Network::RemotePlayerState ghostState;
+    ghostState.id = -1;
+    ghostState.name = "BEST RECORD";
+    ghostState.color = 0x8800E5FF; // Ethereal glowing cyan!
+    ghostState.vehicleType = static_cast<int>(m_profile.selectedVehicle());
+    ghostState.driverType = static_cast<int>(m_profile.selectedDriver());
+    ghostState.posX = gX;
+    ghostState.posY = gY;
+    ghostState.chassisAngle = gAngle;
+    ghostState.rearSuspLen = gRearSusp;
+    ghostState.frontSuspLen = gFrontSusp;
+    ghostState.rearWheelAngle = gRearWheel;
+    ghostState.frontWheelAngle = gFrontWheel;
+
+    Graphics::SpriteRenderer::renderRemoteVehicle(fb, cam, ghostState);
+
+    float distDiff = gX - m_physics.distanceReached();
+    renderOverheadTag(fb, cam, {gX, gY}, "PERSONAL BEST", 0xFF00E5FF, distDiff);
 }
 
 } // namespace Core

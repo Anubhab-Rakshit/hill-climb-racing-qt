@@ -13,7 +13,9 @@ enum class ParticleType {
     DIRT_CLOD,
     GRASS_FLECK,
     DUST_PUFF,
-    SPARKLE
+    SPARKLE,
+    NITRO_FLAME,
+    DEBRIS
 };
 
 struct Particle {
@@ -43,6 +45,8 @@ public:
                         float wheelAngVel, float normalForce,
                         const std::string& biomeId);
     void emitSparkles(const Physics::Vec2& worldPos, uint32_t color = 0xFFFFD54F);
+    void emitNitroFlame(const Physics::Vec2& worldPos, const Physics::Vec2& carDir, const Physics::Vec2& carVel);
+    void emitCrashExplosion(const Physics::Vec2& worldPos, int count = 28);
 
     void update(float dt);
     void render(Framebuffer& fb, const Camera& cam);

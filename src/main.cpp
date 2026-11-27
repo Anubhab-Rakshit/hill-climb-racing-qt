@@ -17,8 +17,24 @@
 #include "graphics/ScanlineRasterizer.h"
 #include "audio/SoundManager.h"
 #include "ui/UILayoutRegression.h"
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 int main(int argc, char *argv[]) {
+#ifdef _WIN32
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        DWORD fileType = GetFileType(GetStdHandle(STD_OUTPUT_HANDLE));
+        if (fileType == FILE_TYPE_UNKNOWN || fileType == 0) {
+            FILE* fp = nullptr;
+            freopen_s(&fp, "CONOUT$", "w", stdout);
+            freopen_s(&fp, "CONOUT$", "w", stderr);
+        }
+    }
+#endif
     QApplication app(argc, argv);
     app.setApplicationName("HillClimbRacingQt");
     app.setOrganizationName("HillClimbQtTeam");
@@ -1054,6 +1070,28 @@ int main(int argc, char *argv[]) {
                       << ", reason=\"" << world.gameOverReason() << "\""
                       << " -> " << (crashOk ? "PASS" : "FAIL") << std::endl;
             if (!crashOk) allWorldPassed = false;
+        }
+
+        std::cout << "\n--- WORLD TEST 5: NITRO BOOST CONSUMPTION ---" << std::endl;
+        {
+            Physics::PhysicsWorld world;
+            world.setUseBox2D(true);
+            world.reset("countryside", Physics::VehicleType::OFFROADER,
+                        Physics::DriverType::BILL, false);
+            for (int tick = 0; tick < 120; ++tick) {
+                world.step(DT, profile);
+            }
+            for (int tick = 0; tick < 240; ++tick) {
+                world.vehicle().applyInput(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+                world.step(DT, profile);
+            }
+            const auto& vehicle = world.vehicle();
+            const bool nitroOk = vehicle.nitro() < 90.0f && vehicle.isBoosting() &&
+                                 vehicle.getSpeedKmh() > 10.0f && !world.isGameOver();
+            std::cout << "  Nitro: " << vehicle.nitro() << "%, speed=" << vehicle.getSpeedKmh()
+                      << " km/h, boosting=" << (vehicle.isBoosting() ? "YES" : "no")
+                      << " -> " << (nitroOk ? "PASS" : "FAIL") << std::endl;
+            if (!nitroOk) allWorldPassed = false;
         }
 
         std::cout << "\n=======================================================" << std::endl;

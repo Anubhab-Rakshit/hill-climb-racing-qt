@@ -111,10 +111,12 @@ Launch with legacy analytical physics engine:
 | **Brake / Reverse** | `S` | `Down Arrow` | — |
 | **Tilt Back (Air Pitch Up)** | `A` | `Left Arrow` | — |
 | **Tilt Forward (Air Pitch Down)** | `D` | `Right Arrow` | — |
+| **Nitro / Boost** | `Shift` | `Ctrl` or `0` | BOOST pedal |
 | **Pause / Resume** | — | — | `Esc` or `P` |
 | **Quick Restart** | — | — | `R` |
 | **Select / Confirm / Click** | — | — | `Enter` or `Space` |
-| **Toggle Multiplayer Mode** | — | — | `M` (on Menu screen) |
+| **Toggle Local Multiplayer Mode** | — | — | `M` (on Menu screen) |
+| **Toggle Online Multiplayer** | — | — | `N` (on Menu screen) |
 
 ---
 
@@ -127,7 +129,7 @@ The project includes **10 comprehensive, deterministic CLI test suites**. Note t
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout` | Automated UI layout regression mode: validates screen bounds containment, button non-overlap, real HUD telemetry vs minimap radar clearance, modal panel containment, and exports 14 reference captures (7 screens x 2 resolutions) to `scratch/ui_regression/`. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d` | Verifies Box2D 2.2.1 integration: edge-chain collider, fixed-step 60Hz accumulator, substep clamp, deterministic simulation, idle stability, 12° slope brake hold, reverse drive, and in-air pitch torque. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-vehicles` | Evaluates all 12 vehicles for idle stability, forward acceleration, reverse speed, dynamic braking, 15° slope climb, and mid-air attitude tilt. |
-| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world` | Full world integration: single-player drive, fuel drainage, suspension deformation, checkpoint crossings, split-screen multiplayer dual-vehicle physics, and neck-snap crash detection. |
+| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-box2d-world` | Full world integration: single-player drive, fuel drainage, suspension deformation, checkpoint crossings, nitro boost consumption, split-screen multiplayer dual-vehicle physics, and neck-snap crash detection. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics` | Comprehensive 19-test physics audit: drop landings, rebound oscillations, 60 km/h ground contact retention, ski jump trajectories, extreme tumble non-penetration (< 0.005m), speedometer accuracy, brake upgrades, and surface friction scaling (ice vs snow vs turf vs rock). |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain` | Validates all 9 track recipes, signature features and surface zones, 5000m reachability, material registry/friction ordering, boundary blending, and Box2D/legacy braking order across ice, mud, sand, grass, and rock. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio` | Validates volume hierarchy, BGM state crossfading, dynamic RPM pitch modulation, wheel rolling SFX, impact scaling, and multi-channel clipping limiter. |
@@ -174,7 +176,8 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
   - *Mountain Ridge* (Steep rocky inclines)
   - *The Moon* (Low gravity, extended airtime)
   - *Inferno Peaks* (Extreme gradients and lava pits)
-- **Multiplayer Mode**: Two-player local split-screen with independent cameras, vehicle choices, and race rankings.
+- **Multiplayer Mode**: Two-player local split-screen with independent cameras, vehicle choices, and race rankings, plus LAN online races with result overlay and rematch/lobby flow.
+- **Boost & Run Challenges**: NOS boost with pickups/stunt refills, sequential in-run bounties, personal-best ghost racer, cinematic crash sequence, and surface/rollover HUD telemetry.
 - **Garage & Upgrade Economy**: Collect coins to level up 8 mechanical categories (Engine, Suspension, Tires, 4WD, Brakes, Gearbox, Chassis, Aerodynamics).
 - **Achievements & Meta-Progression**: 12 per-account achievements track lifetime driving, coins, stunts, checkpoints, stages, garage progress, and Grand Prix trophies with coin/XP rewards, unlock toasts, and a dedicated screen.
 - **Audio & SFX**: Synthesized engine revving, tire skids, coin pickups, and CC0 background music tracks.

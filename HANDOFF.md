@@ -31,6 +31,7 @@ All gameplay and UI pixels are written into a 32-bit ARGB `Framebuffer` and blit
   - `S` brake/reverse
   - `A` tilt left (air)
   - `D` tilt right (air)
+  - `Shift` nitro boost (Player 2: `Ctrl`/`0`)
   - Arrow keys for Player 2
   - `Esc`/`P` pause, `R` restart, `Enter`/`Space` select, `M` local split-screen, `N` online multiplayer
 - Box2D motor direction was fixed so `W` drives +X and `S` drives -X.

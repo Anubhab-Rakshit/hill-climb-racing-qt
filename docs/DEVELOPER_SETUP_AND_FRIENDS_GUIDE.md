@@ -62,10 +62,12 @@ Run with legacy analytical physics engine (Fallback):
 | **Brake / Reverse** | `S` | `Down Arrow` | — |
 | **Tilt Back (Air Pitch Up)** | `A` | `Left Arrow` | — |
 | **Tilt Forward (Air Pitch Down)** | `D` | `Right Arrow` | — |
+| **Nitro / Boost** | `Shift` | `Ctrl` or `0` | BOOST pedal |
 | **Pause / Resume** | — | — | `Esc` or `P` |
 | **Quick Restart** | — | — | `R` |
 | **Select / Confirm / Click** | — | — | `Enter` or `Space` |
-| **Toggle Multiplayer Mode** | — | — | `M` (on Menu screen) |
+| **Toggle Local Multiplayer Mode** | — | — | `M` (on Menu screen) |
+| **Toggle Online Multiplayer** | — | — | `N` (on Menu screen) |
 
 ---
 

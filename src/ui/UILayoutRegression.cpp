@@ -218,6 +218,8 @@ struct ResolutionLayout {
              hudWidget.reversePedal().width(), hudWidget.reversePedal().height()},
             {hudWidget.gasPedal().x(), hudWidget.gasPedal().y(),
              hudWidget.gasPedal().width(), hudWidget.gasPedal().height()},
+            {hudWidget.boostPedal().x(), hudWidget.boostPedal().y(),
+             hudWidget.boostPedal().width(), hudWidget.boostPedal().height()},
             {hudWidget.pauseButton().x(), hudWidget.pauseButton().y(),
              hudWidget.pauseButton().width(), hudWidget.pauseButton().height()}
         };
