@@ -23,7 +23,10 @@ INCLUDEPATH += \
     src/physics \
     src/ui \
     src/audio \
-    src/network
+    src/network \
+    third_party
+
+include(third_party/Box2D/Box2D.pri)
 
 SOURCES += \
     src/main.cpp \
@@ -32,6 +35,7 @@ SOURCES += \
     src/core/InputController.cpp \
     src/core/ProfileManager.cpp \
     src/core/AccountManager.cpp \
+    src/core/AchievementManager.cpp \
     src/core/LocalizationManager.cpp \
     src/network/GameServer.cpp \
     src/network/GameClient.cpp \
@@ -45,17 +49,21 @@ SOURCES += \
     src/graphics/Camera.cpp \
     src/graphics/ParticleSystem.cpp \
     src/graphics/VehicleSprites.cpp \
+    src/physics/SurfaceMaterial.cpp \
+    src/physics/TrackRecipe.cpp \
     src/physics/TerrainConfig.cpp \
     src/physics/Terrain.cpp \
     src/physics/VehicleConfig.cpp \
     src/physics/Vehicle.cpp \
     src/physics/PhysicsWorld.cpp \
+    src/physics/Box2DPhysics.cpp \
     src/ui/RetroButton.cpp \
     src/ui/AnalogGauge.cpp \
     src/ui/FuelBar.cpp \
     src/ui/StuntBanner.cpp \
     src/ui/HUD.cpp \
     src/ui/MainMenuScreen.cpp \
+    src/ui/AchievementsScreen.cpp \
     src/ui/GarageScreen.cpp \
     src/ui/StageSelectScreen.cpp \
     src/ui/PauseOverlay.cpp \
@@ -67,6 +75,7 @@ SOURCES += \
     src/ui/EvaluatorOverlay.cpp \
     src/ui/MinimapRadar.cpp \
     src/ui/DeveloperOverlay.cpp \
+    src/ui/UILayoutRegression.cpp \
     src/audio/SoundManager.cpp
 
 HEADERS += \
@@ -76,6 +85,7 @@ HEADERS += \
     src/core/InputController.h \
     src/core/ProfileManager.h \
     src/core/AccountManager.h \
+    src/core/AchievementManager.h \
     src/core/LocalizationManager.h \
     src/network/NetworkTypes.h \
     src/network/GameServer.h \
@@ -92,11 +102,14 @@ HEADERS += \
     src/graphics/Camera.h \
     src/graphics/ParticleSystem.h \
     src/physics/PhysicsTypes.h \
+    src/physics/SurfaceMaterial.h \
+    src/physics/TrackRecipe.h \
     src/physics/TerrainConfig.h \
     src/physics/Terrain.h \
     src/physics/VehicleConfig.h \
     src/physics/Vehicle.h \
     src/physics/PhysicsWorld.h \
+    src/physics/Box2DPhysics.h \
     src/ui/UITheme.h \
     src/ui/UIComponents.h \
     src/ui/RetroButton.h \
@@ -105,6 +118,7 @@ HEADERS += \
     src/ui/StuntBanner.h \
     src/ui/HUD.h \
     src/ui/MainMenuScreen.h \
+    src/ui/AchievementsScreen.h \
     src/ui/GarageScreen.h \
     src/ui/StageSelectScreen.h \
     src/ui/PauseOverlay.h \
@@ -115,6 +129,7 @@ HEADERS += \
     src/ui/EvaluatorOverlay.h \
     src/ui/MinimapRadar.h \
     src/ui/DeveloperOverlay.h \
+    src/ui/UILayoutRegression.h \
     src/audio/SoundManager.h
 
 RESOURCES += \
