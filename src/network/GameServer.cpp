@@ -273,6 +273,7 @@ void GameServer::processPacket(QTcpSocket* socket, const QByteArray& packetData)
         st.isAirborne = obj["air"].toBool();
         st.isCrashed = obj["crash"].toBool();
         st.isFinished = obj["fin"].toBool();
+        st.finishTime = static_cast<float>(obj["finTime"].toDouble());
 
         if (m_clients.contains(id)) {
             m_clients[id].lastState = st;
@@ -294,6 +295,29 @@ void GameServer::processPacket(QTcpSocket* socket, const QByteArray& packetData)
         }
 
         // Rebroadcast so all players see the item collected and removed
+        broadcastPacket(packetData, socket);
+    }
+    else if (type == PacketType::PLAYER_CRASHED) {
+        int pId = obj["playerId"].toInt();
+        float dist = static_cast<float>(obj["dist"].toDouble());
+        if (m_onPlayerCrashed) {
+            m_onPlayerCrashed(pId, dist);
+        }
+        broadcastPacket(packetData, socket);
+    }
+    else if (type == PacketType::PLAYER_FINISHED) {
+        int pId = obj["playerId"].toInt();
+        float dist = static_cast<float>(obj["dist"].toDouble());
+        float time = static_cast<float>(obj["time"].toDouble());
+        if (m_onPlayerFinished) {
+            m_onPlayerFinished(pId, dist, time);
+        }
+        broadcastPacket(packetData, socket);
+    }
+    else if (type == PacketType::RETURN_TO_LOBBY) {
+        if (m_onReturnToLobby) {
+            m_onReturnToLobby();
+        }
         broadcastPacket(packetData, socket);
     }
 }
@@ -325,6 +349,7 @@ void GameServer::updateHostTelemetry(const RemotePlayerState& hostState) {
     obj["air"] = hostState.isAirborne;
     obj["crash"] = hostState.isCrashed;
     obj["fin"] = hostState.isFinished;
+    obj["finTime"] = hostState.finishTime;
 
     broadcastPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
@@ -341,6 +366,36 @@ void GameServer::broadcastStartRace() {
     QJsonObject obj;
     obj["type"] = static_cast<int>(PacketType::RACE_START);
     obj["biomeId"] = QString::fromStdString(m_biomeId);
+    broadcastPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+void GameServer::broadcastRematch() {
+    QJsonObject obj;
+    obj["type"] = static_cast<int>(PacketType::REMATCH);
+    obj["biomeId"] = QString::fromStdString(m_biomeId);
+    broadcastPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+void GameServer::broadcastReturnToLobby() {
+    QJsonObject obj;
+    obj["type"] = static_cast<int>(PacketType::RETURN_TO_LOBBY);
+    broadcastPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+void GameServer::broadcastPlayerCrashed(int playerId, float distance) {
+    QJsonObject obj;
+    obj["type"] = static_cast<int>(PacketType::PLAYER_CRASHED);
+    obj["playerId"] = playerId;
+    obj["dist"] = distance;
+    broadcastPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+void GameServer::broadcastPlayerFinished(int playerId, float distance, float time) {
+    QJsonObject obj;
+    obj["type"] = static_cast<int>(PacketType::PLAYER_FINISHED);
+    obj["playerId"] = playerId;
+    obj["dist"] = distance;
+    obj["time"] = time;
     broadcastPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
 

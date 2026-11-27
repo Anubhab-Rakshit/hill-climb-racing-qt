@@ -44,6 +44,10 @@ public:
     const std::string& getTrack() const { return m_biomeId; }
 
     void broadcastStartRace();
+    void broadcastRematch();
+    void broadcastReturnToLobby();
+    void broadcastPlayerCrashed(int playerId, float distance);
+    void broadcastPlayerFinished(int playerId, float distance, float time);
     void broadcastNextRound(const std::string& nextBiome, int roundNumber);
     void sendItemCollected(int itemIndex, int collectedByPlayerId);
 
@@ -52,6 +56,9 @@ public:
     void setOnPlayerDisconnected(std::function<void(int id)> cb) { m_onPlayerDisconnected = cb; }
     void setOnTelemetryReceived(std::function<void(const RemotePlayerState& state)> cb) { m_onTelemetryReceived = cb; }
     void setOnItemCollected(std::function<void(int itemIdx, int playerId)> cb) { m_onItemCollected = cb; }
+    void setOnPlayerFinished(std::function<void(int playerId, float dist, float time)> cb) { m_onPlayerFinished = cb; }
+    void setOnPlayerCrashed(std::function<void(int playerId, float dist)> cb) { m_onPlayerCrashed = cb; }
+    void setOnReturnToLobby(std::function<void()> cb) { m_onReturnToLobby = cb; }
 
     const QMap<int, ConnectedClient>& getClients() const { return m_clients; }
     int getPlayerCount() const { return m_clients.size() + 1; /* +1 for host */ }
@@ -77,6 +84,9 @@ private:
     std::function<void(int)> m_onPlayerDisconnected;
     std::function<void(const RemotePlayerState&)> m_onTelemetryReceived;
     std::function<void(int, int)> m_onItemCollected;
+    std::function<void(int, float, float)> m_onPlayerFinished;
+    std::function<void(int, float)> m_onPlayerCrashed;
+    std::function<void()> m_onReturnToLobby;
 
     void processPacket(QTcpSocket* senderSocket, const QByteArray& packetData);
     void broadcastPacket(const QByteArray& packetData, QTcpSocket* excludeSocket = nullptr);

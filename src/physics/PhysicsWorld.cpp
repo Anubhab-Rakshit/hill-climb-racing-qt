@@ -97,6 +97,8 @@ void PhysicsWorld::reset(const std::string& biomeId,
     m_isMultiplayer = isMultiplayer;
     m_terrain.setBiome(biomeId);
     m_terrain.resetDeformation();
+    m_itemsCollectedP1.assign(m_terrain.getItems().size(), false);
+    m_itemsCollectedP2.assign(m_terrain.getItems().size(), false);
 
     // Player 1 Vehicle
     float startX1 = customStartX;
@@ -144,6 +146,7 @@ void PhysicsWorld::reset(const std::string& biomeId,
         m_vehicle2.setInfiniteFuel(m_infiniteFuel);
 
         m_distance2 = 0.0f;
+        m_lastClearedCheckpoint2 = 0;
         m_flips2 = 0;
         m_totalAirTime2 = 0.0f;
         m_airTimer2 = 0.0f;
@@ -371,13 +374,18 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
     float rwR = veh.rearWheelRadius();
     float fwR = veh.frontWheelRadius();
     auto& items = m_terrain.getItems();
+    auto& collected = isP1 ? m_itemsCollectedP1 : m_itemsCollectedP2;
+    if (collected.size() != items.size()) {
+        collected.assign(items.size(), false);
+    }
 
     // Swept bounding envelope incorporating vehicle wheelbase and trajectory step
     float minCarX = std::min({carPos.x, rwPos.x, fwPos.x, veh.prevChassisPos().x}) - 2.4f;
     float maxCarX = std::max({carPos.x, rwPos.x, fwPos.x, veh.prevChassisPos().x}) + 2.4f;
 
     for (size_t i = 0; i < items.size(); ++i) {
-        if (items[i].collected) continue;
+        if (!m_isMultiplayer && items[i].collected) continue;
+        if (collected[i]) continue;
         float ix = items[i].position.x;
         float iy = items[i].position.y;
         if (ix < minCarX || ix > maxCarX) continue;
@@ -406,7 +414,10 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
         bool hitBox = (ix >= minCarX && ix <= maxCarX && iy >= minY && iy <= maxY);
 
         if (hitChassis || hitRear || hitFront || hitBox) {
-            items[i].collected = true;
+            collected[i] = true;
+            if (!m_isMultiplayer) {
+                items[i].collected = true;
+            }
 
             if (items[i].type == ItemType::FUEL_CANISTER) {
                 veh.addFuel(100.0f);
@@ -415,7 +426,11 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
                     m_coinsCollected += items[i].value;
                 }
             }
-            if (m_onItem && isP1) {
+            if (m_isMultiplayer) {
+                if (m_onLocalItem) {
+                    m_onLocalItem(items[i].type, items[i].value, isP1);
+                }
+            } else if (m_onItem && isP1) {
                 m_onItem(items[i].type, items[i].value, static_cast<int>(i));
             }
         }
@@ -423,20 +438,13 @@ void PhysicsWorld::checkItemCollisionsForVehicle(Vehicle& veh, bool isP1) {
 }
 
 void PhysicsWorld::checkCheckpoints() {
-    const auto& checkpoints = m_terrain.getCheckpoints();
-    float carX = m_vehicle.chassisPos().x;
-
-    for (const auto& cp : checkpoints) {
-        if (carX >= cp.distance && m_lastClearedCheckpoint < cp.index) {
-            m_lastClearedCheckpoint = cp.index;
-            m_coinsCollected += cp.coinReward;
-            if (m_onCheckpoint) {
-                m_onCheckpoint(cp);
-            }
-        }
+    checkCheckpointsForVehicle(m_vehicle, m_lastClearedCheckpoint, true);
+    if (m_isMultiplayer) {
+        checkCheckpointsForVehicle(m_vehicle2, m_lastClearedCheckpoint2, false);
     }
 
     // Trophy Competition Finish Line
+    float carX = m_vehicle.chassisPos().x;
     if (carX >= m_finishDistance && !m_gameOver && m_finishDistance < 90000.0f) {
         m_gameOver = true;
         m_gameOverReason = "FINISH LINE!";
@@ -448,6 +456,23 @@ void PhysicsWorld::checkCheckpoints() {
         finishCp.isFinishLine = true;
         if (m_onCheckpoint) {
             m_onCheckpoint(finishCp);
+        }
+    }
+}
+
+void PhysicsWorld::checkCheckpointsForVehicle(Vehicle& veh, int& lastCp, bool isP1) {
+    const auto& checkpoints = m_terrain.getCheckpoints();
+    float carX = veh.chassisPos().x;
+
+    for (const auto& cp : checkpoints) {
+        if (carX >= cp.distance && lastCp < cp.index) {
+            lastCp = cp.index;
+            if (isP1) {
+                m_coinsCollected += cp.coinReward;
+                if (m_onCheckpoint) {
+                    m_onCheckpoint(cp);
+                }
+            }
         }
     }
 }

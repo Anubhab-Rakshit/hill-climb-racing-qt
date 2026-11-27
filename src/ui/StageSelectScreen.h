@@ -23,6 +23,7 @@ public:
 
     void setOnBack(std::function<void()> cb) { m_btnBack.setOnClick(cb); }
     void setOnSelectStage(std::function<void(const std::string& stageId)> cb) { m_onSelectStage = cb; }
+    void setMultiplayerMode(bool enabled) { m_multiplayerFlow = enabled; }
     void setButtonSound(std::function<void()> cb);
 
     void onMouseMove(int px, int py);
@@ -40,6 +41,7 @@ private:
     int m_height;
     float m_animTime;
     int m_page; // 0 = stages 0..2, 1 = stages 3..5, 2 = stages 6..8
+    bool m_multiplayerFlow = false;
 
     RetroButton m_btnBack;
     RetroButton m_btnPrevPage;

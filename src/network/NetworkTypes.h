@@ -22,7 +22,9 @@ enum class PacketType : uint8_t {
     PLAYER_FINISHED,
     RACE_RESULT,
     GRAND_PRIX_NEXT_ROUND,
-    DISCONNECT
+    DISCONNECT,
+    REMATCH,
+    RETURN_TO_LOBBY
 };
 
 struct PlayerLobbyInfo {

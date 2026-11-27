@@ -11,6 +11,7 @@ void InputController::resetTransientActions() {
     m_state.restart = false;
     m_state.enter = false;
     m_state.multiplayer = false;
+    m_state.onlineMultiplayer = false;
     m_state.mouseJustPressed = false;
     m_state.mouseJustReleased = false;
     m_state.mouseMoved = false;
@@ -64,6 +65,8 @@ void InputController::onKeyPress(QKeyEvent* event) {
         m_state.enter = true;
     } else if (k == Qt::Key_M) {
         m_state.multiplayer = true;
+    } else if (k == Qt::Key_N) {
+        m_state.onlineMultiplayer = true;
     }
 
     updateCombinedInputs();

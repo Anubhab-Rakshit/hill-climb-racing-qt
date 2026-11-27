@@ -158,7 +158,10 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 # 8. Achievements & Meta-Progression Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements
 
-# 9. Full Smoke Test & Procedural Reachability Scan
+# 9. Multiplayer Mode Separation Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-multiplayer-modes
+
+# 10. Full Smoke Test & Procedural Reachability Scan
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 

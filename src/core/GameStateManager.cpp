@@ -32,7 +32,10 @@ GameStateManager::GameStateManager()
     , m_camera2(m_width, 266)
     , m_fbP1(m_width, 266)
     , m_fbP2(m_width, 266)
+    , m_btnOnlineRematch(0, 0, 220, 44, "REMATCH", Theme::GREEN_GAS)
+    , m_btnOnlineLobby(0, 0, 220, 44, "RETURN TO LOBBY", 0xFF37474F)
 {
+    m_camera2.setCompactMode(true);
     setDimensions(m_width, m_height);
     setupUiCallbacks();
     setupNetworkCallbacks();
@@ -57,6 +60,8 @@ void GameStateManager::setDimensions(int width, int height) {
     m_stageSelect.setDimensions(width, height);
     m_hud.setDimensions(width, height);
     m_pauseOverlay.setDimensions(width, height);
+    m_btnOnlineRematch.setPosition(width / 2 - 232, height / 2 + 36);
+    m_btnOnlineLobby.setPosition(width / 2 + 12, height / 2 + 36);
     m_gameOverScreen.setDimensions(width, height);
     m_accountScreen.setDimensions(width, height);
     m_achievementsScreen.setDimensions(width, height);
@@ -79,6 +84,8 @@ void GameStateManager::setupUiCallbacks() {
     m_stageSelect.setButtonSound(playClick);
     m_hud.setButtonSound(playClick);
     m_pauseOverlay.setButtonSound(playClick);
+    m_btnOnlineRematch.setOnSound(playClick);
+    m_btnOnlineLobby.setOnSound(playClick);
     m_gameOverScreen.setButtonSound(playClick);
     m_accountScreen.setButtonSound(playClick);
     m_achievementsScreen.setButtonSound(playClick);
@@ -87,19 +94,29 @@ void GameStateManager::setupUiCallbacks() {
 
     // 1. Main Menu
     m_mainMenu.setOnStart([this]() {
+        m_isLocalMultiplayerFlow = false;
+        m_stageSelect.setMultiplayerMode(false);
         changeState(StateType::STAGE_SELECT);
     });
     m_mainMenu.setOnMultiplayer([this]() {
+        startMultiplayerRace();
+    });
+    m_mainMenu.setOnOnlineMultiplayer([this]() {
+        m_isLocalMultiplayerFlow = false;
         changeState(StateType::NETWORK_LOBBY);
     });
     m_mainMenu.setOnGrandPrix([this]() {
         startGrandPrixChallenge();
     });
     m_mainMenu.setOnGarage([this]() {
+        m_isLocalMultiplayerFlow = false;
+        m_garage.setMultiplayerMode(false);
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_mainMenu.setOnStages([this]() {
+        m_isLocalMultiplayerFlow = false;
+        m_stageSelect.setMultiplayerMode(false);
         changeState(StateType::STAGE_SELECT);
     });
     m_mainMenu.setOnAccount([this]() {
@@ -213,17 +230,26 @@ void GameStateManager::setupUiCallbacks() {
 
     // 5. Stage Select
     m_stageSelect.setOnBack([this]() {
+        m_isLocalMultiplayerFlow = false;
+        m_stageSelect.setMultiplayerMode(false);
         changeState(StateType::MAIN_MENU);
     });
     m_stageSelect.setOnSelectStage([this](const std::string& stageId) {
-        startRace(stageId);
+        if (m_isLocalMultiplayerFlow) {
+            startLocalMultiplayerRace(stageId);
+        } else {
+            startRace(stageId);
+        }
     });
 
     // 6. Garage Screen
     m_garage.setOnBack([this]() {
+        m_isLocalMultiplayerFlow = false;
+        m_garage.setMultiplayerMode(false);
         changeState(StateType::MAIN_MENU);
     });
     m_garage.setOnDrive([this]() {
+        m_stageSelect.setMultiplayerMode(m_isLocalMultiplayerFlow);
         changeState(StateType::STAGE_SELECT);
     });
     m_garage.setOnUpgradePurchased([this]() {
@@ -235,7 +261,7 @@ void GameStateManager::setupUiCallbacks() {
 
     // 7. HUD
     m_hud.setOnPauseClicked([this]() {
-        if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE) {
+        if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::ONLINE_RACE) {
             changeState(StateType::PAUSED);
         }
     });
@@ -243,7 +269,7 @@ void GameStateManager::setupUiCallbacks() {
     // 8. Pause Overlay
     m_pauseOverlay.setOnResume([this]() {
         if (m_isNetworkHost || m_isNetworkClient) {
-            changeState(StateType::MULTIPLAYER_RACE);
+            changeState(StateType::ONLINE_RACE);
         } else {
             changeState(StateType::GAMEPLAY);
         }
@@ -251,15 +277,21 @@ void GameStateManager::setupUiCallbacks() {
     m_pauseOverlay.setOnRestart([this]() {
         if (m_isNetworkHost || m_isNetworkClient) {
             startNetworkMultiplayer(m_isNetworkHost, m_selectedBiome);
+        } else if (m_isLocalMultiplayerFlow) {
+            startLocalMultiplayerRace(m_selectedBiome);
         } else {
             startRace(m_selectedBiome);
         }
     });
     m_pauseOverlay.setOnGarage([this]() {
+        m_garage.setMultiplayerMode(m_isLocalMultiplayerFlow);
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_pauseOverlay.setOnMenu([this]() {
+        m_isLocalMultiplayerFlow = false;
+        m_garage.setMultiplayerMode(false);
+        m_stageSelect.setMultiplayerMode(false);
         changeState(StateType::MAIN_MENU);
     });
 
@@ -267,16 +299,54 @@ void GameStateManager::setupUiCallbacks() {
     m_gameOverScreen.setOnRetry([this]() {
         if (m_isNetworkHost || m_isNetworkClient) {
             startNetworkMultiplayer(m_isNetworkHost, m_selectedBiome);
+        } else if (m_isLocalMultiplayerFlow) {
+            startLocalMultiplayerRace(m_selectedBiome);
         } else {
             startRace(m_selectedBiome);
         }
     });
     m_gameOverScreen.setOnGarage([this]() {
+        m_garage.setMultiplayerMode(m_isLocalMultiplayerFlow);
         m_garage.setViewedVehicle(m_profile.selectedVehicle());
         changeState(StateType::GARAGE);
     });
     m_gameOverScreen.setOnMenu([this]() {
+        m_isLocalMultiplayerFlow = false;
+        m_garage.setMultiplayerMode(false);
+        m_stageSelect.setMultiplayerMode(false);
         changeState(StateType::MAIN_MENU);
+    });
+
+    m_btnOnlineRematch.setOnClick([this]() {
+        if (m_isNetworkHost) {
+            if (m_isGrandPrix) {
+                m_gpRound = 1;
+                m_gpStandings.clear();
+                std::string myName = AccountManager::instance().activeAccount()->username;
+                m_gpStandings.push_back({myName, Theme::GOLD, 0, 0, 0.0f});
+                m_gpStandings.push_back({"PPO-Apex [AI]", 0xFF00E5FF, 0, 0, 0.0f});
+                m_gpStandings.push_back({"TD3-Turbo [AI]", 0xFFFF3D00, 0, 0, 0.0f});
+                m_gpStandings.push_back({"TRPO-Speed [AI]", 0xFF76FF03, 0, 0, 0.0f});
+            }
+            m_server.broadcastRematch();
+            startNetworkMultiplayer(true, m_selectedBiome);
+        } else if (m_isNetworkClient) {
+            m_client.sendReturnToLobby();
+            changeState(StateType::NETWORK_LOBBY);
+        }
+    });
+    m_btnOnlineLobby.setOnClick([this]() {
+        if (m_isNetworkHost) {
+            m_server.broadcastReturnToLobby();
+            m_server.stopServer();
+        } else if (m_isNetworkClient) {
+            m_client.sendReturnToLobby();
+        }
+        m_networkOpponents.clear();
+        m_isNetworkHost = false;
+        m_isNetworkClient = false;
+        m_onlineResultShown = false;
+        changeState(StateType::NETWORK_LOBBY);
     });
 
     // 10. Physics World Events
@@ -302,6 +372,29 @@ void GameStateManager::setupUiCallbacks() {
             m_server.sendItemCollected(itemIndex, 0);
         } else if (m_isNetworkClient) {
             m_client.sendItemCollected(itemIndex);
+        }
+    });
+
+    m_physics.setOnLocalItemCollected([this](Physics::ItemType type, int value, bool isP1) {
+        const auto& veh = isP1 ? m_physics.vehicle() : m_physics.vehicle2();
+        const auto& cam = isP1 ? m_camera : m_camera2;
+        if (isP1) {
+            m_profile.addCoins(value);
+            AccountManager::instance().addCoins(value);
+            m_achievements.addTo(AchievementStat::TOTAL_COINS, value);
+        }
+        Physics::Vec2 scr = cam.worldToScreen(veh.chassisPos());
+        if (type == Physics::ItemType::FUEL_CANISTER) {
+            m_audio.playFuelPickup();
+        } else {
+            m_audio.playCoinPickup();
+        }
+        std::string label = (isP1 ? "P1 +" : "P2 +") +
+                            (type == Physics::ItemType::FUEL_CANISTER ? std::string("FUEL")
+                                                                      : std::to_string(value));
+        uint32_t col = type == Physics::ItemType::FUEL_CANISTER ? UI::Theme::GREEN_GAS : UI::Theme::GOLD;
+        if (isP1) {
+            m_hud.addFloatingText(label, scr.x, scr.y - 30.0f, col);
         }
     });
 
@@ -400,6 +493,7 @@ void GameStateManager::setupNetworkCallbacks() {
             it->second.isAirborne = st.isAirborne;
             it->second.isCrashed = st.isCrashed;
             it->second.isFinished = st.isFinished;
+            it->second.finishTime = st.finishTime;
 
             float dx = it->second.targetX - it->second.posX;
             float dy = it->second.targetY - it->second.posY;
@@ -414,6 +508,7 @@ void GameStateManager::setupNetworkCallbacks() {
     // --- SERVER CALLBACKS ---
     m_server.setOnTelemetryReceived([this, updateOpponentTelemetry](const Network::RemotePlayerState& st) {
         updateOpponentTelemetry(st);
+        checkNetworkRaceFinish();
     });
 
     m_server.setOnPlayerDisconnected([this](int id) {
@@ -426,6 +521,31 @@ void GameStateManager::setupNetworkCallbacks() {
         if (itemIdx >= 0 && itemIdx < static_cast<int>(items.size())) {
             items[itemIdx].collected = true;
         }
+    });
+
+    m_server.setOnPlayerCrashed([this](int pId, float dist) {
+        auto it = m_networkOpponents.find(pId);
+        if (it != m_networkOpponents.end()) {
+            it->second.isCrashed = true;
+            it->second.distance = std::max(it->second.distance, dist);
+        }
+        checkNetworkRaceFinish();
+    });
+
+    m_server.setOnPlayerFinished([this](int pId, float dist, float time) {
+        auto it = m_networkOpponents.find(pId);
+        if (it != m_networkOpponents.end()) {
+            it->second.isFinished = true;
+            it->second.finishTime = time;
+            it->second.distance = std::max(it->second.distance, dist);
+        }
+        checkNetworkRaceFinish();
+    });
+
+    m_server.setOnReturnToLobby([this]() {
+        m_networkOpponents.clear();
+        m_onlineResultShown = false;
+        changeState(StateType::NETWORK_LOBBY);
     });
 
     // --- CLIENT CALLBACKS ---
@@ -455,6 +575,7 @@ void GameStateManager::setupNetworkCallbacks() {
 
     m_client.setOnRemoteTelemetry([this, updateOpponentTelemetry](const Network::RemotePlayerState& st) {
         updateOpponentTelemetry(st);
+        checkNetworkRaceFinish();
     });
 
     m_client.setOnItemCollected([this](int itemIdx, int pId) {
@@ -469,6 +590,37 @@ void GameStateManager::setupNetworkCallbacks() {
         m_gpRound = round;
         startNetworkMultiplayer(false, nextBiome);
     });
+
+    m_client.setOnRematch([this](const std::string& biomeId) {
+        m_isGrandPrix = false;
+        startNetworkMultiplayer(false, biomeId);
+    });
+
+    m_client.setOnReturnToLobby([this]() {
+        m_networkOpponents.clear();
+        m_onlineResultShown = false;
+        m_isNetworkClient = false;
+        changeState(StateType::NETWORK_LOBBY);
+    });
+
+    m_client.setOnRemotePlayerCrashed([this](int pId, float dist) {
+        auto it = m_networkOpponents.find(pId);
+        if (it != m_networkOpponents.end()) {
+            it->second.isCrashed = true;
+            it->second.distance = std::max(it->second.distance, dist);
+        }
+        checkNetworkRaceFinish();
+    });
+
+    m_client.setOnRemotePlayerFinished([this](int pId, float dist, float time) {
+        auto it = m_networkOpponents.find(pId);
+        if (it != m_networkOpponents.end()) {
+            it->second.isFinished = true;
+            it->second.finishTime = time;
+            it->second.distance = std::max(it->second.distance, dist);
+        }
+        checkNetworkRaceFinish();
+    });
 }
 
 void GameStateManager::changeState(StateType newState) {
@@ -480,7 +632,8 @@ void GameStateManager::changeState(StateType newState) {
         m_currentState == StateType::ACHIEVEMENTS || m_currentState == StateType::NETWORK_LOBBY ||
         m_currentState == StateType::GRAND_PRIX_CHALLENGE) {
         m_audio.setTargetMusic(Audio::MusicTrack::MENU);
-    } else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE) {
+    } else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE ||
+               m_currentState == StateType::ONLINE_RACE) {
         m_audio.setTargetMusic(Audio::MusicTrack::RACE);
     } else if (m_currentState == StateType::GAME_OVER) {
         m_audio.stopAllMusic();
@@ -491,8 +644,13 @@ void GameStateManager::startRace(const std::string& biomeId) {
     m_selectedBiome = biomeId;
     m_isNetworkHost = false;
     m_isNetworkClient = false;
+    m_isLocalMultiplayerFlow = false;
     m_networkOpponents.clear();
+    m_onlineResultShown = false;
+    m_garage.setMultiplayerMode(false);
+    m_stageSelect.setMultiplayerMode(false);
 
+    m_camera.setCompactMode(false);
     m_camera.setScreenSize(m_width, m_height);
     m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver(), false);
     m_camera.reset(m_physics.vehicle().chassisPos());
@@ -505,16 +663,53 @@ void GameStateManager::startRace(const std::string& biomeId) {
 }
 
 void GameStateManager::startMultiplayerRace() {
-    startNetworkMultiplayer(true, "countryside");
+    m_isLocalMultiplayerFlow = true;
+    m_isNetworkHost = false;
+    m_isNetworkClient = false;
+    m_networkOpponents.clear();
+    m_garage.setMultiplayerMode(true);
+    m_garage.setViewedVehicle(m_profile.selectedVehicle());
+    m_stageSelect.setMultiplayerMode(true);
+    changeState(StateType::GARAGE);
+}
+
+void GameStateManager::startLocalMultiplayerRace(const std::string& biomeId) {
+    m_selectedBiome = biomeId;
+    m_isLocalMultiplayerFlow = true;
+    m_isNetworkHost = false;
+    m_isNetworkClient = false;
+    m_networkOpponents.clear();
+
+    m_camera.setCompactMode(true);
+    m_camera.setScreenSize(m_width, 266);
+    m_camera2.setCompactMode(true);
+    m_camera2.setScreenSize(m_width, 266);
+    m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver(), true,
+                    m_garage.p2Vehicle(), m_garage.p2Driver());
+    m_camera.reset(m_physics.vehicle().chassisPos());
+    m_camera2.reset(m_physics.vehicle2().chassisPos());
+    m_particleSystem.clear();
+    m_gameTime = 0.0f;
+    m_smokeTimer = 0.0f;
+    m_smokeTimer2 = 0.0f;
+    m_gameOverScreen.clearUnlockedAchievements();
+    m_minimapRadar.setCourseLength(1750.0f);
+    syncAchievementProfileStats();
+    changeState(StateType::MULTIPLAYER_RACE);
 }
 
 void GameStateManager::startNetworkMultiplayer(bool isHost, const std::string& biomeId) {
     m_selectedBiome = biomeId;
     m_isNetworkHost = isHost;
     m_isNetworkClient = !isHost;
+    m_isLocalMultiplayerFlow = false;
     m_networkOpponents.clear();
+    m_onlineResultShown = false;
+    m_localOutcomeBroadcast = false;
+    m_localFinishTime = 0.0f;
+    m_garage.setMultiplayerMode(false);
+    m_stageSelect.setMultiplayerMode(false);
 
-    // Use vehicle chosen in lobby
     int vehIdx = m_lobbyScreen.getSelectedVehicle();
     if (vehIdx >= 0 && vehIdx < static_cast<int>(Physics::VehicleType::COUNT)) {
         m_profile.setSelectedVehicle(static_cast<Physics::VehicleType>(vehIdx));
@@ -528,7 +723,7 @@ void GameStateManager::startNetworkMultiplayer(bool isHost, const std::string& b
         }
     }
 
-    // Fullscreen single camera per player
+    m_camera.setCompactMode(false);
     m_camera.setScreenSize(m_width, m_height);
     m_physics.reset(biomeId, m_profile.selectedVehicle(), m_profile.selectedDriver(), false,
                     Physics::VehicleType::PICKUP_TRUCK, Physics::DriverType::SARAH, startX);
@@ -540,7 +735,7 @@ void GameStateManager::startNetworkMultiplayer(bool isHost, const std::string& b
     m_gameOverScreen.clearUnlockedAchievements();
     m_minimapRadar.setCourseLength(1750.0f);
     syncAchievementProfileStats();
-    changeState(StateType::MULTIPLAYER_RACE);
+    changeState(StateType::ONLINE_RACE);
 }
 
 void GameStateManager::startGrandPrixChallenge() {
@@ -649,6 +844,11 @@ void GameStateManager::handleInput(const InputController::State& input) {
 
     if (m_currentState == StateType::MAIN_MENU) {
         if (input.multiplayer) {
+            startMultiplayerRace();
+            return;
+        }
+        if (input.onlineMultiplayer) {
+            m_isLocalMultiplayerFlow = false;
             changeState(StateType::NETWORK_LOBBY);
             return;
         }
@@ -694,17 +894,13 @@ void GameStateManager::handleInput(const InputController::State& input) {
         if (input.mouseJustPressed) m_garage.onMouseDown(mx, my, m_profile);
         if (input.mouseJustReleased) m_garage.onMouseUp(mx, my, m_profile);
     }
-    else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE) {
+    else if (m_currentState == StateType::GAMEPLAY) {
         if (input.pause) {
             changeState(StateType::PAUSED);
             return;
         }
         if (input.restart) {
-            if (m_isNetworkHost || m_isNetworkClient) {
-                startNetworkMultiplayer(m_isNetworkHost, m_selectedBiome);
-            } else {
-                startRace(m_selectedBiome);
-            }
+            startRace(m_selectedBiome);
             return;
         }
 
@@ -716,11 +912,6 @@ void GameStateManager::handleInput(const InputController::State& input) {
         bool brakeActive = input.brake || (input.mouseDown && m_hud.isBrakePressed());
         bool reverseActive = input.reverse || (input.mouseDown && m_hud.isReversePressed());
 
-        // Evaluator Turbo Boost holding 'T'
-        if (m_isEvaluatorMode) {
-            // Evaluator turbo multiplier
-        }
-
         m_hud.setGasVirtualPressed(gasActive);
         m_hud.setBrakeVirtualPressed(brakeActive);
         m_hud.setReverseVirtualPressed(reverseActive);
@@ -729,9 +920,75 @@ void GameStateManager::handleInput(const InputController::State& input) {
                                        brakeActive ? 1.0f : 0.0f,
                                        reverseActive ? 1.0f : 0.0f);
     }
+    else if (m_currentState == StateType::MULTIPLAYER_RACE) {
+        if (input.pause) {
+            changeState(StateType::PAUSED);
+            return;
+        }
+        if (input.restart) {
+            startLocalMultiplayerRace(m_selectedBiome);
+            return;
+        }
+
+        const auto& p1 = input.p1;
+        const auto& p2 = input.p2;
+        m_physics.vehicle().applyInput(p1.gas ? 1.0f : 0.0f, p1.brake ? 1.0f : 0.0f,
+                                       p1.reverse ? 1.0f : 0.0f, p1.tiltLeft ? 1.0f : 0.0f,
+                                       p1.tiltRight ? 1.0f : 0.0f);
+        m_physics.vehicle2().applyInput(p2.gas ? 1.0f : 0.0f, p2.brake ? 1.0f : 0.0f,
+                                        p2.reverse ? 1.0f : 0.0f, p2.tiltLeft ? 1.0f : 0.0f,
+                                        p2.tiltRight ? 1.0f : 0.0f);
+    }
+    else if (m_currentState == StateType::ONLINE_RACE) {
+        if (m_onlineResultShown) {
+            if (input.mouseMoved) {
+                m_btnOnlineRematch.onMouseMove(mx, my);
+                m_btnOnlineLobby.onMouseMove(mx, my);
+            }
+            if (input.mouseJustPressed) {
+                m_btnOnlineRematch.onMouseDown(mx, my);
+                m_btnOnlineLobby.onMouseDown(mx, my);
+            }
+            if (input.mouseJustReleased) {
+                m_btnOnlineRematch.onMouseUp(mx, my);
+                m_btnOnlineLobby.onMouseUp(mx, my);
+            }
+            if (input.enter) m_btnOnlineRematch.triggerClick();
+            if (input.pause) m_btnOnlineLobby.triggerClick();
+            return;
+        }
+        if (input.pause) {
+            changeState(StateType::PAUSED);
+            return;
+        }
+        if (input.restart) {
+            startNetworkMultiplayer(m_isNetworkHost, m_selectedBiome);
+            return;
+        }
+
+        if (input.mouseMoved) m_hud.onMouseMove(mx, my);
+        if (input.mouseJustPressed) m_hud.onMouseDown(mx, my);
+        if (input.mouseJustReleased) m_hud.onMouseUp(mx, my);
+
+        bool gasActive = input.p1.gas || (input.mouseDown && m_hud.isGasPressed());
+        bool brakeActive = input.p1.brake || (input.mouseDown && m_hud.isBrakePressed());
+        bool reverseActive = input.p1.reverse || (input.mouseDown && m_hud.isReversePressed());
+
+        m_hud.setGasVirtualPressed(gasActive);
+        m_hud.setBrakeVirtualPressed(brakeActive);
+        m_hud.setReverseVirtualPressed(reverseActive);
+
+        m_physics.vehicle().applyInput(gasActive ? 1.0f : 0.0f,
+                                       brakeActive ? 1.0f : 0.0f,
+                                       reverseActive ? 1.0f : 0.0f,
+                                       input.p1.tiltLeft ? 1.0f : 0.0f,
+                                       input.p1.tiltRight ? 1.0f : 0.0f);
+    }
     else if (m_currentState == StateType::PAUSED) {
         if (input.pause || input.enter) {
             if (m_isNetworkHost || m_isNetworkClient) {
+                changeState(StateType::ONLINE_RACE);
+            } else if (m_isLocalMultiplayerFlow) {
                 changeState(StateType::MULTIPLAYER_RACE);
             } else {
                 changeState(StateType::GAMEPLAY);
@@ -746,6 +1003,8 @@ void GameStateManager::handleInput(const InputController::State& input) {
         if (input.restart || input.enter) {
             if (m_isNetworkHost || m_isNetworkClient) {
                 startNetworkMultiplayer(m_isNetworkHost, m_selectedBiome);
+            } else if (m_isLocalMultiplayerFlow) {
+                startLocalMultiplayerRace(m_selectedBiome);
             } else {
                 startRace(m_selectedBiome);
             }
@@ -767,7 +1026,8 @@ void GameStateManager::fixedUpdate(float dt) {
 
     bool isPaused = (m_currentState == StateType::PAUSED);
     if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::MULTIPLAYER_RACE ||
-        m_currentState == StateType::PAUSED || m_currentState == StateType::GAME_OVER) {
+        m_currentState == StateType::ONLINE_RACE || m_currentState == StateType::PAUSED ||
+        m_currentState == StateType::GAME_OVER) {
         m_terrainRasterizer.dayNightCycle().update(dt, isPaused);
     }
 
@@ -889,10 +1149,65 @@ void GameStateManager::fixedUpdate(float dt) {
         m_gameTime += dt;
         m_physics.step(dt, m_profile);
 
+        const auto& car1 = m_physics.vehicle();
+        const auto& car2 = m_physics.vehicle2();
+        m_camera.update(dt, car1.chassisPos(), car1.chassisVel().x);
+        m_camera2.update(dt, car2.chassisPos(), car2.chassisVel().x);
+
+        auto emitVehicleParticles = [this, dt](const Physics::Vehicle& car, float& smokeTimer) {
+            smokeTimer -= dt;
+            if (car.fuel() > 0.0f && smokeTimer <= 0.0f) {
+                smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
+                float cosA = std::cos(car.chassisAngle());
+                float sinA = std::sin(car.chassisAngle());
+                Physics::Vec2 pLocal(car.rearMountOffset().x * 0.95f, car.rearMountOffset().y * 0.4f);
+                Physics::Vec2 pWorld = car.chassisPos() + Physics::Vec2(pLocal.x * cosA - pLocal.y * sinA,
+                                                                       pLocal.x * sinA + pLocal.y * cosA);
+                m_particleSystem.emitSmoke(pWorld, car.chassisVel());
+            }
+            const std::string& biome = m_physics.terrain().getBiome();
+            if (car.isRearOnGround()) {
+                m_particleSystem.emitWheelSpray(car.rearWheelPos(), car.rearWheelRadius(),
+                                                car.rearContactTangent(), car.rearSlipSpeed(),
+                                                car.rearWheelAngularVel(), car.rearNormalForce(), biome);
+            }
+            if (car.isFrontOnGround()) {
+                m_particleSystem.emitWheelSpray(car.frontWheelPos(), car.frontWheelRadius(),
+                                                car.frontContactTangent(), car.frontSlipSpeed(),
+                                                car.frontWheelAngularVel(), car.frontNormalForce(), biome);
+            }
+        };
+
+        emitVehicleParticles(car1, m_smokeTimer);
+        emitVehicleParticles(car2, m_smokeTimer2);
+        m_particleSystem.update(dt);
+
+        m_hud.setSpeed(car1.getSpeedKmh());
+        m_hud.setRpm(car1.getEngineRpm());
+        m_hud.setFuel(car1.fuel());
+        m_hud.setDistance(m_physics.distanceReached());
+        m_hud.setCoins(m_profile.coins());
+        m_hud.setRecord(m_profile.getRecordDistance(m_selectedBiome));
+        m_hud.update(dt);
+
+        if (m_physics.winner() != 0) {
+            float dist = m_physics.winner() == 2 ? m_physics.distanceReached2() : m_physics.distanceReached();
+            m_gameOverScreen.setCrashReason(m_physics.mpStatusMessage());
+            m_gameOverScreen.setStats(dist, m_physics.coinsCollected(), m_physics.flipsCompleted(),
+                                      m_physics.totalAirTime(), dist > m_profile.getRecordDistance(m_selectedBiome));
+            m_camera.addTrauma(0.7f);
+            m_camera2.addTrauma(0.7f);
+            m_audio.playStuntCheer();
+            changeState(StateType::GAME_OVER);
+        }
+    }
+    else if (m_currentState == StateType::ONLINE_RACE) {
+        m_gameTime += dt;
+        m_physics.step(dt, m_profile);
+
         const auto& car = m_physics.vehicle();
         m_camera.update(dt, car.chassisPos(), car.chassisVel().x);
 
-        // Dead reckoning lerp for all remote opponents
         float lerpFactor = std::clamp(dt * 18.0f, 0.0f, 1.0f);
         for (auto& pair : m_networkOpponents) {
             auto& opp = pair.second;
@@ -905,18 +1220,17 @@ void GameStateManager::fixedUpdate(float dt) {
             opp.chassisAngle += dAngle * lerpFactor;
         }
 
-        // Exhaust smoke
         m_smokeTimer -= dt;
         if (car.fuel() > 0.0f && m_smokeTimer <= 0.0f) {
             m_smokeTimer = (car.getSpeedKmh() > 5.0f) ? 0.05f : 0.10f;
             float cosA = std::cos(car.chassisAngle());
             float sinA = std::sin(car.chassisAngle());
             Physics::Vec2 pLocal(car.rearMountOffset().x * 0.95f, car.rearMountOffset().y * 0.4f);
-            Physics::Vec2 pWorld = car.chassisPos() + Physics::Vec2(pLocal.x * cosA - pLocal.y * sinA, pLocal.x * sinA + pLocal.y * cosA);
+            Physics::Vec2 pWorld = car.chassisPos() + Physics::Vec2(pLocal.x * cosA - pLocal.y * sinA,
+                                                                   pLocal.x * sinA + pLocal.y * cosA);
             m_particleSystem.emitSmoke(pWorld, car.chassisVel());
         }
 
-        // Wheel spray
         const std::string& currentBiome = m_physics.terrain().getBiome();
         if (car.isRearOnGround()) {
             m_particleSystem.emitWheelSpray(car.rearWheelPos(), car.rearWheelRadius(),
@@ -937,7 +1251,13 @@ void GameStateManager::fixedUpdate(float dt) {
         m_hud.setRecord(m_profile.getRecordDistance(m_selectedBiome));
         m_hud.update(dt);
 
-        // Broadcast local telemetry at 30 Hz
+        float dist = m_physics.distanceReached();
+        bool crashed = m_physics.isGameOver();
+        bool finished = dist >= 1500.0f;
+        if (finished && m_localFinishTime <= 0.0f) {
+            m_localFinishTime = m_gameTime;
+        }
+
         m_netTelemetryTimer += dt;
         if (m_netTelemetryTimer >= 0.033f) {
             m_netTelemetryTimer = 0.0f;
@@ -962,10 +1282,11 @@ void GameStateManager::fixedUpdate(float dt) {
             myState.driverHeadAngle = car.driverHeadAngle();
             myState.speedKmh = car.getSpeedKmh();
             myState.fuel = car.fuel();
-            myState.distance = m_physics.distanceReached();
+            myState.distance = dist;
             myState.isAirborne = car.isAirborne();
-            myState.isCrashed = m_physics.isGameOver();
-            myState.isFinished = (myState.distance >= 1500.0f);
+            myState.isCrashed = crashed;
+            myState.isFinished = finished;
+            myState.finishTime = m_localFinishTime;
 
             if (m_isNetworkHost) {
                 m_server.updateHostTelemetry(myState);
@@ -976,21 +1297,8 @@ void GameStateManager::fixedUpdate(float dt) {
 
         m_particleSystem.update(dt);
 
-        if (m_physics.isGameOver()) {
-            float dist = m_physics.distanceReached();
-            int coinsEarned = m_physics.coinsCollected();
-            bool isNewRec = dist > m_profile.getRecordDistance(m_selectedBiome);
-
-            m_profile.recordDistance(m_selectedBiome, dist);
-            AccountManager::instance().recordDistance(m_selectedBiome, dist);
-            AccountManager::instance().addXP(static_cast<int>(dist));
-
-            m_achievements.recordMax(AchievementStat::BEST_RUN_DISTANCE, dist, false);
-            m_achievements.addTo(AchievementStat::TOTAL_DISTANCE, dist, false);
-            m_achievements.addTo(AchievementStat::TOTAL_FLIPS, m_physics.flipsCompleted(), false);
-            m_achievements.addTo(AchievementStat::TOTAL_AIR_TIME, m_physics.totalAirTime(), false);
-            m_achievements.evaluate();
-
+        if ((crashed || finished) && !m_localOutcomeBroadcast) {
+            broadcastLocalRaceOutcome(crashed, dist, m_localFinishTime);
             if (m_isGrandPrix) {
                 int pts = (dist >= 1500.0f) ? 10 : (dist > 1000.0f) ? 8 : (dist > 500.0f) ? 6 : 4;
                 m_gpStandings[0].points += pts;
@@ -1001,37 +1309,72 @@ void GameStateManager::fixedUpdate(float dt) {
                 m_challengeScreen.setStandings(m_gpStandings, m_gpRound, static_cast<int>(s_gpCircuit.size()),
                                                m_selectedBiome, nextTrk, isLast);
                 changeState(StateType::GRAND_PRIX_CHALLENGE);
-            } else {
-                m_gameOverScreen.setStats(dist, coinsEarned, m_physics.flipsCompleted(), m_physics.totalAirTime(), isNewRec);
-                m_camera.addTrauma(0.9f);
-                if (m_physics.gameOverReason() == "DRIVER DOWN!") {
-                    m_audio.playNeckCrunch();
-                } else {
-                    m_audio.playCrash();
-                }
-                changeState(StateType::GAME_OVER);
+                return;
             }
         }
+
+        checkNetworkRaceFinish();
     }
 
     m_audio.update(dt, m_physics.vehicle(), m_physics.terrain(), m_currentState);
 }
 
-void GameStateManager::checkNetworkRaceFinish() {
-    float dist = m_physics.distanceReached();
-    if (dist >= 1500.0f || m_physics.isGameOver()) {
-        if (m_isGrandPrix) {
-            int pts = (dist >= 1500.0f) ? 10 : (dist > 1000.0f) ? 8 : (dist > 500.0f) ? 6 : 4;
-            m_gpStandings[0].points += pts;
-            m_gpStandings[0].bestDistance = std::max(m_gpStandings[0].bestDistance, dist);
+void GameStateManager::broadcastLocalRaceOutcome(bool crashed, float distance, float time) {
+    if (m_localOutcomeBroadcast) return;
+    m_localOutcomeBroadcast = true;
 
-            bool isLast = (m_gpRound >= static_cast<int>(s_gpCircuit.size()));
-            std::string nextTrk = isLast ? "FINALE" : s_gpCircuit[m_gpRound];
-            m_challengeScreen.setStandings(m_gpStandings, m_gpRound, static_cast<int>(s_gpCircuit.size()),
-                                           m_selectedBiome, nextTrk, isLast);
-            changeState(StateType::GRAND_PRIX_CHALLENGE);
+    int localId = m_isNetworkHost ? 0 : m_client.getLocalPlayerId();
+    if (crashed) {
+        if (m_isNetworkHost) {
+            m_server.broadcastPlayerCrashed(localId, distance);
+        } else if (m_isNetworkClient) {
+            m_client.sendPlayerCrashed(distance);
+        }
+    } else {
+        if (m_isNetworkHost) {
+            m_server.broadcastPlayerFinished(localId, distance, time);
+        } else if (m_isNetworkClient) {
+            m_client.sendPlayerFinished(distance, time);
         }
     }
+}
+
+void GameStateManager::checkNetworkRaceFinish() {
+    if (m_currentState != StateType::ONLINE_RACE || m_isGrandPrix || m_onlineResultShown) return;
+
+    float dist = m_physics.distanceReached();
+    bool localDone = m_physics.isGameOver() || dist >= 1500.0f;
+    if (!localDone) return;
+
+    for (const auto& pair : m_networkOpponents) {
+        const auto& opp = pair.second;
+        if (!(opp.isCrashed || opp.isFinished || opp.distance >= 1500.0f)) return;
+    }
+
+    float bestOppDist = 0.0f;
+    std::string bestOppName = "RIVAL";
+    for (const auto& pair : m_networkOpponents) {
+        const auto& opp = pair.second;
+        if (opp.distance > bestOppDist) {
+            bestOppDist = opp.distance;
+            bestOppName = opp.name;
+        }
+    }
+
+    if (dist > bestOppDist + 1.0f) {
+        m_onlineResultTitle = "VICTORY";
+    } else if (bestOppDist > dist + 1.0f) {
+        m_onlineResultTitle = "DEFEAT";
+    } else {
+        m_onlineResultTitle = "DRAW";
+    }
+
+    std::string localStatus = m_physics.isGameOver() ? "CRASHED" : "FINISHED";
+    m_onlineResultDetail = "YOU " + std::to_string(static_cast<int>(dist)) + "m (" + localStatus + ")  |  " +
+                           bestOppName + " " + std::to_string(static_cast<int>(bestOppDist)) + "m";
+    m_onlineResultShown = true;
+    m_btnOnlineRematch.setText(m_isNetworkHost ? "REMATCH" : "ASK HOST");
+    m_btnOnlineRematch.setEnabled(m_isNetworkHost);
 }
 
 void GameStateManager::renderOverheadTag(Graphics::Framebuffer& fb, const Graphics::Camera& cam,
@@ -1124,7 +1467,107 @@ void GameStateManager::renderCompactHud(Graphics::Framebuffer& fb, const Physics
 }
 
 void GameStateManager::renderMultiplayer(Graphics::Framebuffer& fb, float alpha) {
-    renderNetworkRace(fb, alpha);
+    if (m_isLocalMultiplayerFlow) {
+        renderLocalMultiplayerRace(fb, alpha);
+    } else {
+        renderNetworkRace(fb, alpha);
+    }
+}
+
+void GameStateManager::renderLocalMultiplayerRace(Graphics::Framebuffer& fb, float alpha) {
+    m_camera.setRenderAlpha(alpha);
+    m_camera2.setRenderAlpha(alpha);
+
+    m_terrainRasterizer.render(m_fbP1, m_camera, m_physics.terrain(), m_gameTime, &m_physics.itemsCollectedP1());
+    m_particleSystem.render(m_fbP1, m_camera);
+    Graphics::SpriteRenderer::renderVehicle(m_fbP1, m_camera, m_physics.vehicle2(), alpha, 0.55f);
+    Graphics::SpriteRenderer::renderVehicle(m_fbP1, m_camera, m_physics.vehicle(), alpha, 1.0f);
+
+    Physics::Vec2 p2Scr = m_camera.worldToScreen(m_physics.vehicle2().chassisPos());
+    float relDistP2 = m_physics.vehicle2().chassisPos().x - m_physics.vehicle().chassisPos().x;
+    if (p2Scr.x >= 20 && p2Scr.x <= m_fbP1.width() - 20 && p2Scr.y >= 15 && p2Scr.y <= m_fbP1.height() - 15) {
+        Graphics::RasterFont::drawStringCentered(m_fbP1, static_cast<int>(p2Scr.x),
+                                                 static_cast<int>(p2Scr.y - 34), "[P2]", 0xFF00E5FF, 1);
+    } else {
+        int indY = m_fbP1.height() / 2;
+        std::string indStr = relDistP2 >= 0.0f
+                                 ? "P2 +" + std::to_string(static_cast<int>(relDistP2)) + "m >"
+                                 : "< P2 " + std::to_string(relDistP2) + "m";
+        int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+        int ix = relDistP2 >= 0.0f ? m_fbP1.width() - tw - 18 : 10;
+        UIComponents::drawArcadePanel(m_fbP1, ix, indY - 10, tw + 14, 20, 0xDD090F1A,
+                                      Theme::CARD_BORDER, 0xFF00E5FF, 0, false, true);
+        Graphics::RasterFont::drawString(m_fbP1, ix + 7, indY - 5, indStr, 0xFF00E5FF, 1);
+    }
+    std::string vehName1 = m_physics.vehicle().config().name;
+    renderCompactHud(m_fbP1, m_physics.vehicle(), m_physics.distanceReached(),
+                     "P1 - " + vehName1, 0xFFFF3D00, "P1: [W/D] GAS  [S/A] BRK/REV");
+
+    m_terrainRasterizer.render(m_fbP2, m_camera2, m_physics.terrain(), m_gameTime, &m_physics.itemsCollectedP2());
+    m_particleSystem.render(m_fbP2, m_camera2);
+    Graphics::SpriteRenderer::renderVehicle(m_fbP2, m_camera2, m_physics.vehicle(), alpha, 0.55f);
+    Graphics::SpriteRenderer::renderVehicle(m_fbP2, m_camera2, m_physics.vehicle2(), alpha, 1.0f);
+
+    Physics::Vec2 p1Scr = m_camera2.worldToScreen(m_physics.vehicle().chassisPos());
+    float relDistP1 = m_physics.vehicle().chassisPos().x - m_physics.vehicle2().chassisPos().x;
+    if (p1Scr.x >= 20 && p1Scr.x <= m_fbP2.width() - 20 && p1Scr.y >= 15 && p1Scr.y <= m_fbP2.height() - 15) {
+        Graphics::RasterFont::drawStringCentered(m_fbP2, static_cast<int>(p1Scr.x),
+                                                 static_cast<int>(p1Scr.y - 34), "[P1]", 0xFFFF3D00, 1);
+    } else {
+        int indY = m_fbP2.height() / 2;
+        std::string indStr = relDistP1 >= 0.0f
+                                 ? "P1 +" + std::to_string(static_cast<int>(relDistP1)) + "m >"
+                                 : "< P1 " + std::to_string(relDistP1) + "m";
+        int tw = Graphics::RasterFont::getTextWidth(indStr, 1);
+        int ix = relDistP1 >= 0.0f ? m_fbP2.width() - tw - 18 : 10;
+        UIComponents::drawArcadePanel(m_fbP2, ix, indY - 10, tw + 14, 20, 0xDD090F1A,
+                                      Theme::CARD_BORDER, 0xFFFF3D00, 0, false, true);
+        Graphics::RasterFont::drawString(m_fbP2, ix + 7, indY - 5, indStr, 0xFFFF3D00, 1);
+    }
+    std::string vehName2 = m_physics.vehicle2().config().name;
+    renderCompactHud(m_fbP2, m_physics.vehicle2(), m_physics.distanceReached2(),
+                     "P2 - " + vehName2, 0xFF00E5FF, "P2: [UP/DN] GAS  [LT/RT] BRK/REV");
+
+    fb.blit(0, 0, m_fbP1);
+    fb.blit(0, 274, m_fbP2);
+
+    int cx = m_width / 2;
+    fb.fillRect(0, 266, m_width, 8, 0xFF0A0F18);
+    fb.drawLine(0, 266, m_width, 266, 0xFFFF3D00);
+    fb.drawLine(0, 273, m_width, 273, 0xFF00E5FF);
+    fb.fillCircle(cx, 270, 14, 0xFF0E1826);
+    fb.drawCircle(cx, 270, 14, Theme::GOLD);
+    Graphics::RasterFont::drawStringCentered(fb, cx, 266, "VS", Theme::GOLD, 1);
+
+    const std::string& status = m_physics.mpStatusMessage();
+    if (!status.empty()) {
+        int sw = Graphics::RasterFont::getTextWidth(status, 1) + 20;
+        int sx = cx - sw / 2;
+        UIComponents::drawArcadePanel(fb, sx, 248, sw, 18, 0xF00A111D, Theme::CARD_BORDER,
+                                      Theme::GOLD, 0, false, true);
+        Graphics::RasterFont::drawStringCentered(fb, cx, 252, status, Theme::GOLD, 1);
+    }
+}
+
+void GameStateManager::renderOnlineResultOverlay(Graphics::Framebuffer& fb) {
+    fb.fillRect(0, 0, m_width, m_height, 0xB4060A12);
+
+    int panelW = std::min(660, m_width - 60);
+    int panelH = 210;
+    int px = (m_width - panelW) / 2;
+    int py = m_height / 2 - 150;
+    UIComponents::drawArcadePanel(fb, px, py, panelW, panelH, 0xF0090F1A,
+                                  Theme::CARD_BORDER, Theme::GOLD, 3);
+
+    Graphics::RasterFont::drawStringCentered(fb, m_width / 2, py + 24, "* RACE RESULT *", Theme::GOLD, 1);
+    Graphics::RasterFont::drawStringCentered(fb, m_width / 2, py + 56, m_onlineResultTitle,
+                                             m_onlineResultTitle == "VICTORY" ? Theme::GREEN_GAS
+                                                                              : Theme::TEXT_WHITE, 3);
+    Graphics::RasterFont::drawStringCentered(fb, m_width / 2, py + 112, m_onlineResultDetail,
+                                             Theme::TEXT_WHITE, 1);
+
+    m_btnOnlineRematch.render(fb, 2);
+    m_btnOnlineLobby.render(fb, 2);
 }
 
 void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
@@ -1143,44 +1586,42 @@ void GameStateManager::render(Graphics::Framebuffer& fb, float alpha) {
     } else if (m_currentState == StateType::STAGE_SELECT) {
         m_stageSelect.render(fb, m_profile);
     } else if (m_currentState == StateType::MULTIPLAYER_RACE) {
+        renderLocalMultiplayerRace(fb, alpha);
+    } else if (m_currentState == StateType::ONLINE_RACE) {
         renderNetworkRace(fb, alpha);
+        if (m_onlineResultShown) {
+            renderOnlineResultOverlay(fb);
+        }
     } else if (m_currentState == StateType::GAMEPLAY || m_currentState == StateType::PAUSED || m_currentState == StateType::GAME_OVER) {
-        m_camera.setRenderAlpha(alpha);
+        if (m_isLocalMultiplayerFlow && (m_currentState == StateType::PAUSED || m_currentState == StateType::GAME_OVER)) {
+            renderLocalMultiplayerRace(fb, alpha);
+        } else {
+            m_camera.setRenderAlpha(alpha);
 
-        // 1. World Terrain & Parallax
-        m_terrainRasterizer.render(fb, m_camera, m_physics.terrain(), m_gameTime);
+            m_terrainRasterizer.render(fb, m_camera, m_physics.terrain(), m_gameTime);
+            m_particleSystem.render(fb, m_camera);
+            Graphics::SpriteRenderer::renderVehicle(fb, m_camera, m_physics.vehicle(), alpha);
 
-        // 2. Particles
-        m_particleSystem.render(fb, m_camera);
+            std::vector<UI::RadarRacer> racers;
+            std::string myName = AccountManager::instance().activeAccount()->username;
+            racers.push_back({myName, m_physics.distanceReached(), Theme::GOLD, true, m_physics.isGameOver()});
 
-        // 3. Vehicle
-        Graphics::SpriteRenderer::renderVehicle(fb, m_camera, m_physics.vehicle(), alpha);
+            if (m_isGrandPrix) {
+                for (size_t i = 1; i < m_gpStandings.size(); ++i) {
+                    float aiDist = std::min(m_gpStandings[i].bestDistance, m_physics.distanceReached() + (static_cast<float>(i) * 45.0f - 70.0f));
+                    racers.push_back({m_gpStandings[i].name, aiDist, m_gpStandings[i].color, false, false});
+                }
+            }
+            m_minimapRadar.render(fb, racers);
+            m_hud.render(fb);
 
-        // 4. Contracted Minimap / Radar Tracker
-        std::vector<UI::RadarRacer> racers;
-        std::string myName = AccountManager::instance().activeAccount()->username;
-        racers.push_back({myName, m_physics.distanceReached(), Theme::GOLD, true, m_physics.isGameOver()});
-
-        if (m_isGrandPrix) {
-            // Draw benchmark competitor pins on minimap
-            for (size_t i = 1; i < m_gpStandings.size(); ++i) {
-                float aiDist = std::min(m_gpStandings[i].bestDistance, m_physics.distanceReached() + (static_cast<float>(i) * 45.0f - 70.0f));
-                racers.push_back({m_gpStandings[i].name, aiDist, m_gpStandings[i].color, false, false});
+            if (m_isEvaluatorMode) {
+                const auto& cfg = Physics::VehicleRegistry::getConfig(m_profile.selectedVehicle());
+                const auto& bSpec = Physics::BiomeRegistry::getBiome(m_selectedBiome);
+                m_evaluatorOverlay.render(fb, cfg.name, bSpec.name);
             }
         }
-        m_minimapRadar.render(fb, racers);
 
-        // 5. Telemetry HUD
-        m_hud.render(fb);
-
-        // 6. Evaluator Mode Toolbar
-        if (m_isEvaluatorMode) {
-            const auto& cfg = Physics::VehicleRegistry::getConfig(m_profile.selectedVehicle());
-            const auto& bSpec = Physics::BiomeRegistry::getBiome(m_selectedBiome);
-            m_evaluatorOverlay.render(fb, cfg.name, bSpec.name);
-        }
-
-        // 7. Overlays
         if (m_currentState == StateType::PAUSED) {
             m_pauseOverlay.render(fb);
         } else if (m_currentState == StateType::GAME_OVER) {

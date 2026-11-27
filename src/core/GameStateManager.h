@@ -40,6 +40,7 @@ public:
     StateType currentState() const { return m_currentState; }
     void startRace(const std::string& biomeId);
     void startMultiplayerRace();
+    void startLocalMultiplayerRace(const std::string& biomeId);
     void startNetworkMultiplayer(bool isHost, const std::string& biomeId);
     void startGrandPrixChallenge();
     void advanceGrandPrixRound();
@@ -99,6 +100,12 @@ private:
     Network::GameClient m_client;
     bool m_isNetworkHost = false;
     bool m_isNetworkClient = false;
+    bool m_isLocalMultiplayerFlow = false;
+    bool m_onlineResultShown = false;
+    bool m_localOutcomeBroadcast = false;
+    float m_localFinishTime = 0.0f;
+    std::string m_onlineResultTitle;
+    std::string m_onlineResultDetail;
     std::map<int, Network::RemotePlayerState> m_networkOpponents;
 
     // Grand Prix Circuit
@@ -115,6 +122,8 @@ private:
     UI::StageSelectScreen m_stageSelect;
     UI::HUD m_hud;
     UI::PauseOverlay m_pauseOverlay;
+    UI::RetroButton m_btnOnlineRematch;
+    UI::RetroButton m_btnOnlineLobby;
     UI::GameOverScreen m_gameOverScreen;
     UI::AccountScreen m_accountScreen;
     UI::AchievementsScreen m_achievementsScreen;
@@ -131,11 +140,14 @@ private:
     void setupNetworkCallbacks();
     void renderMultiplayer(Graphics::Framebuffer& fb, float alpha);
     void renderNetworkRace(Graphics::Framebuffer& fb, float alpha);
+    void renderLocalMultiplayerRace(Graphics::Framebuffer& fb, float alpha);
+    void renderOnlineResultOverlay(Graphics::Framebuffer& fb);
     void renderCompactHud(Graphics::Framebuffer& fb, const Physics::Vehicle& veh, float dist,
                           const std::string& pLabel, uint32_t tagCol, const std::string& ctrlHint);
     void renderOverheadTag(Graphics::Framebuffer& fb, const Graphics::Camera& cam, const Physics::Vec2& worldPos,
                            const std::string& name, uint32_t color, float distDiff);
     void checkNetworkRaceFinish();
+    void broadcastLocalRaceOutcome(bool crashed, float distance, float time);
 };
 
 } // namespace Core

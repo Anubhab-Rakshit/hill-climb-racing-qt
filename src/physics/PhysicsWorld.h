@@ -5,6 +5,7 @@
 #include "ProfileManager.h"
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace Physics {
 
@@ -60,6 +61,9 @@ public:
     const std::string& mpStatusMessage() const { return m_mpStatusMessage; }
 
     int currentCheckpoint() const { return m_lastClearedCheckpoint; }
+    int currentCheckpoint2() const { return m_lastClearedCheckpoint2; }
+    const std::vector<bool>& itemsCollectedP1() const { return m_itemsCollectedP1; }
+    const std::vector<bool>& itemsCollectedP2() const { return m_itemsCollectedP2; }
 
     // Runtime Developer Mode Tuning Parameters
     void setCustomGravity(float g);
@@ -88,6 +92,7 @@ public:
     // Event callbacks for UI
     void setOnStunt(std::function<void(const std::string& title, int coins)> cb) { m_onStunt = cb; }
     void setOnItemCollected(std::function<void(ItemType type, int value, int itemIndex)> cb) { m_onItem = cb; }
+    void setOnLocalItemCollected(std::function<void(ItemType type, int value, bool isP1)> cb) { m_onLocalItem = cb; }
     void setOnCheckpoint(std::function<void(const CheckpointInfo& cp)> cb) { m_onCheckpoint = cb; }
 
 private:
@@ -123,10 +128,14 @@ private:
     std::string m_mpStatusMessage;
 
     int m_lastClearedCheckpoint;
+    int m_lastClearedCheckpoint2 = 0;
     float m_deformAccum = 0.0f;
+    std::vector<bool> m_itemsCollectedP1;
+    std::vector<bool> m_itemsCollectedP2;
 
     std::function<void(const std::string&, int)> m_onStunt;
     std::function<void(ItemType, int, int)> m_onItem;
+    std::function<void(ItemType, int, bool)> m_onLocalItem;
     std::function<void(const CheckpointInfo&)> m_onCheckpoint;
 
     // Live Tuning Variables (Dev Mode)
@@ -144,6 +153,7 @@ private:
     void checkItemCollisions();
     void checkItemCollisionsForVehicle(Vehicle& veh, bool isP1);
     void checkCheckpoints();
+    void checkCheckpointsForVehicle(Vehicle& veh, int& lastCp, bool isP1);
     void updateStunts(float dt);
     void updateStuntsForVehicle(Vehicle& veh, float dt, float& airTimer, float& wheelieTimer,
                                 float& totalAirTime, float& cumulativeRotation, int& flips,

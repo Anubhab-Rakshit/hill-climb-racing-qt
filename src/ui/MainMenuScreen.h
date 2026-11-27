@@ -20,6 +20,7 @@ public:
 
     void setOnStart(std::function<void()> cb) { m_btnStart.setOnClick(cb); }
     void setOnMultiplayer(std::function<void()> cb) { m_btnMultiplayer.setOnClick(cb); }
+    void setOnOnlineMultiplayer(std::function<void()> cb) { m_btnOnline.setOnClick(cb); }
     void setOnGrandPrix(std::function<void()> cb) { m_btnGrandPrix.setOnClick(cb); }
     void setOnGarage(std::function<void()> cb) { m_btnGarage.setOnClick(cb); }
     void setOnStages(std::function<void()> cb) { m_btnStages.setOnClick(cb); }
@@ -30,6 +31,7 @@ public:
     void setButtonSound(std::function<void()> cb) {
         m_btnStart.setOnSound(cb);
         m_btnMultiplayer.setOnSound(cb);
+        m_btnOnline.setOnSound(cb);
         m_btnGrandPrix.setOnSound(cb);
         m_btnGarage.setOnSound(cb);
         m_btnStages.setOnSound(cb);
@@ -54,6 +56,7 @@ private:
 
     RetroButton m_btnStart;
     RetroButton m_btnMultiplayer;
+    RetroButton m_btnOnline;
     RetroButton m_btnGrandPrix;
     RetroButton m_btnGarage;
     RetroButton m_btnStages;

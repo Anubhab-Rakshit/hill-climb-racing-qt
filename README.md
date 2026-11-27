@@ -120,7 +120,7 @@ Launch with legacy analytical physics engine:
 
 ## 🧪 Automated Testing & Verification
 
-The project includes **9 comprehensive, deterministic CLI test suites**. Note that tests use built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
+The project includes **10 comprehensive, deterministic CLI test suites**. Note that tests use built-in test runners (not Qt's QTest framework) and support headless offscreen execution via `QT_QPA_PLATFORM=offscreen`.
 
 | Test Command | Scope & Invariants Verified |
 | :--- | :--- |
@@ -132,6 +132,7 @@ The project includes **9 comprehensive, deterministic CLI test suites**. Note th
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain` | Validates all 9 track recipes, signature features and surface zones, 5000m reachability, material registry/friction ordering, boundary blending, and Box2D/legacy braking order across ice, mud, sand, grass, and rock. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio` | Validates volume hierarchy, BGM state crossfading, dynamic RPM pitch modulation, wheel rolling SFX, impact scaling, and multi-channel clipping limiter. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements` | Validates 12 achievement definitions, per-account unlock persistence, lifetime stat thresholds, one-time coin/XP rewards, duplicate unlock protection, and profile-count synchronization for vehicles, upgrades, and Grand Prix trophies. |
+| `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-multiplayer-modes` | Validates local split-screen vs online race separation: P2 garage flow, dual-vehicle simulation, compact camera framing, full-screen network camera, and online race state. |
 | `QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test` | End-to-end procedural terrain scan (fuel reachability across all biomes), stage progression unlocks, stationary idle check, checkpoint crossing, and visual screenshot generation. |
 
 Run all tests together:
@@ -144,6 +145,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-multiplayer-modes
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 

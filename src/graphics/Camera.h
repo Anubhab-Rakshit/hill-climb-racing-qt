@@ -13,6 +13,7 @@ public:
     Camera(int screenWidth = 960, int screenHeight = 540);
 
     void setScreenSize(int w, int h) { m_screenW = w; m_screenH = h; }
+    void setCompactMode(bool enabled) { m_compactMode = enabled; }
     void reset(const Physics::Vec2& pos);
 
     void update(float dt, const Physics::Vec2& targetPos, float targetSpeedX);
@@ -22,6 +23,7 @@ public:
     float x() const;
     float y() const;
     float zoom() const;
+    float centerYFrac() const { return m_compactMode ? 0.58f : 0.55f; }
 
     Physics::Vec2 worldToScreen(const Physics::Vec2& world) const;
     Physics::Vec2 screenToWorld(const Physics::Vec2& screen) const;
@@ -37,6 +39,7 @@ private:
     float m_prevZoom;
     float m_trauma;
     float m_renderAlpha;
+    bool m_compactMode = false;
 };
 
 } // namespace Graphics

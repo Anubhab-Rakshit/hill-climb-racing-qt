@@ -286,7 +286,7 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
     int cx = m_width / 2;
     int headW = 300;
     UIComponents::drawArcadePanel(fb, cx - headW / 2, 12, headW, 36, 0xEE0B121C, 0xFF37474F, Theme::GOLD, 2, true, true);
-    Graphics::RasterFont::drawStringCentered(fb, cx, 22, "SELECT STAGE TRACK", Theme::GOLD, 2);
+    Graphics::RasterFont::drawStringCentered(fb, cx, 22, m_multiplayerFlow ? "SELECT 2P STAGE" : "SELECT STAGE TRACK", Theme::GOLD, 2);
 
     // Master Currency Pill
     int coinBoxW = 155;
@@ -393,12 +393,12 @@ void StageSelectScreen::render(Graphics::Framebuffer& fb, const Core::ProfileMan
         Graphics::RasterFont::drawStringCentered(fb, x + cardW / 2, recY, recStr, Theme::GOLD, 2);
 
         // Unlock status & Action Button
-        bool unlocked = profile.isStageUnlocked(stage.id);
+        bool unlocked = m_multiplayerFlow || profile.isStageUnlocked(stage.id);
         auto& btn = m_btnStageAction[idx];
         int btnY = y + cardH - btnH - 10;
 
         if (unlocked) {
-            btn.setText("PLAY");
+            btn.setText(m_multiplayerFlow ? "2P RACE" : "PLAY");
             btn.setBaseColor(Theme::GREEN_GAS);
             btn.setEnabled(true);
         } else {

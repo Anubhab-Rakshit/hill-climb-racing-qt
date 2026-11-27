@@ -15,6 +15,7 @@ Camera::Camera(int screenWidth, int screenHeight)
     , m_prevZoom(44.0f)
     , m_trauma(0.0f)
     , m_renderAlpha(1.0f)
+    , m_compactMode(false)
 {
 }
 
@@ -23,8 +24,8 @@ void Camera::reset(const Physics::Vec2& pos) {
     m_prevPos = pos;
     m_shakeOffset = {0.0f, 0.0f};
     m_prevShakeOffset = {0.0f, 0.0f};
-    m_zoom = 44.0f;
-    m_prevZoom = 44.0f;
+    m_zoom = m_compactMode ? 33.0f : 44.0f;
+    m_prevZoom = m_zoom;
     m_trauma = 0.0f;
     m_renderAlpha = 1.0f;
 }
@@ -40,8 +41,8 @@ void Camera::update(float dt, const Physics::Vec2& targetPos, float targetSpeedX
     m_prevShakeOffset = m_shakeOffset;
 
     // 1. Dynamic Look-ahead based on calibrated forward speed
-    float lookAheadX = std::clamp(targetSpeedX * 0.58f, 0.0f, 7.0f);
-    Physics::Vec2 desiredPos = {targetPos.x + lookAheadX, targetPos.y + 0.9f};
+    float lookAheadX = std::clamp(targetSpeedX * (m_compactMode ? 0.40f : 0.58f), 0.0f, m_compactMode ? 5.0f : 7.0f);
+    Physics::Vec2 desiredPos = {targetPos.x + lookAheadX, targetPos.y + (m_compactMode ? 0.35f : 0.9f)};
 
     // Smooth position lerp
     float lerpSpeed = 7.0f;
@@ -49,7 +50,9 @@ void Camera::update(float dt, const Physics::Vec2& targetPos, float targetSpeedX
     m_pos.y += (desiredPos.y - m_pos.y) * (1.0f - std::exp(-lerpSpeed * dt));
 
     // 2. Speed-dependent Zoom Out (calibrated for 60% physical velocity)
-    float targetZoom = 46.0f - std::clamp(std::abs(targetSpeedX) * 0.65f, 0.0f, 12.0f);
+    float baseZoom = m_compactMode ? 33.0f : 46.0f;
+    float maxZoomOut = m_compactMode ? 6.0f : 12.0f;
+    float targetZoom = baseZoom - std::clamp(std::abs(targetSpeedX) * (m_compactMode ? 0.40f : 0.65f), 0.0f, maxZoomOut);
     m_zoom += (targetZoom - m_zoom) * (1.0f - std::exp(-4.0f * dt));
 
     // 3. Traumatic Shake
@@ -84,14 +87,14 @@ float Camera::zoom() const {
 Physics::Vec2 Camera::worldToScreen(const Physics::Vec2& world) const {
     float curZoom = zoom();
     float sx = m_screenW * 0.5f + (world.x - x()) * curZoom;
-    float sy = m_screenH * 0.55f - (world.y - y()) * curZoom;
+    float sy = m_screenH * centerYFrac() - (world.y - y()) * curZoom;
     return {sx, sy};
 }
 
 Physics::Vec2 Camera::screenToWorld(const Physics::Vec2& screen) const {
     float curZoom = zoom();
     float wx = x() + (screen.x - m_screenW * 0.5f) / curZoom;
-    float wy = y() - (screen.y - m_screenH * 0.55f) / curZoom;
+    float wy = y() - (screen.y - m_screenH * centerYFrac()) / curZoom;
     return {wx, wy};
 }
 

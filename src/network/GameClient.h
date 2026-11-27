@@ -33,6 +33,9 @@ public:
     void sendReady(bool isReady, int vehicleType);
     void sendTelemetry(const RemotePlayerState& state);
     void sendItemCollected(int itemIndex);
+    void sendPlayerCrashed(float distance);
+    void sendPlayerFinished(float distance, float time);
+    void sendReturnToLobby();
 
     // Callbacks for UI & Game Engine
     void setOnConnected(std::function<void()> cb) { m_onConnected = cb; }
@@ -47,6 +50,12 @@ public:
     void setOnRemoteTelemetry(std::function<void(const RemotePlayerState& state)> cb) { m_onRemoteTelemetry = cb; }
     void setOnItemCollected(std::function<void(int itemIdx, int playerId)> cb) { m_onItemCollected = cb; }
     void setOnGrandPrixNext(std::function<void(const std::string& nextBiome, int round)> cb) { m_onGrandPrixNext = cb; }
+    void setOnRematch(std::function<void(const std::string& biomeId)> cb) { m_onRematch = cb; }
+    void setOnReturnToLobby(std::function<void()> cb) { m_onReturnToLobby = cb; }
+    void setOnRemotePlayerCrashed(std::function<void(int playerId, float distance)> cb) { m_onRemotePlayerCrashed = cb; }
+    void setOnRemotePlayerFinished(std::function<void(int playerId, float distance, float time)> cb) {
+        m_onRemotePlayerFinished = cb;
+    }
 
     const std::map<int, RemotePlayerState>& getRemotePlayers() const { return m_remotePlayers; }
 
@@ -78,6 +87,10 @@ private:
     std::function<void(const RemotePlayerState&)> m_onRemoteTelemetry;
     std::function<void(int, int)> m_onItemCollected;
     std::function<void(const std::string&, int)> m_onGrandPrixNext;
+    std::function<void(const std::string&)> m_onRematch;
+    std::function<void()> m_onReturnToLobby;
+    std::function<void(int, float)> m_onRemotePlayerCrashed;
+    std::function<void(int, float, float)> m_onRemotePlayerFinished;
 
     void processPacket(const QByteArray& packetData);
     void sendPacket(const QByteArray& packetData);

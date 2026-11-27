@@ -39,6 +39,7 @@ GarageScreen::GarageScreen()
     , m_activeTab(0)
     , m_btnBack(20, 14, 110, 36, "< MENU", 0xFF37474F)
     , m_btnDrive(780, 14, 160, 36, "DRIVE >", Theme::GREEN_GAS)
+    , m_btnToggleRacer(160, 14, 130, 36, "RACER 1", 0xFF7C4DFF)
     , m_btnPrevVeh(0, 0, 36, 32, "<", 0xFF2A394A)
     , m_btnNextVeh(0, 0, 36, 32, ">", 0xFF2A394A)
     , m_btnUnlockVeh(0, 0, 136, 32, "UNLOCK", Theme::GOLD)
@@ -49,6 +50,7 @@ GarageScreen::GarageScreen()
 {
     m_btnBack.setKeyHint("ESC");
     m_btnDrive.setKeyHint("ENTER");
+    m_btnToggleRacer.setKeyHint("R");
     for (int i = 0; i < Core::ProfileManager::UPGRADE_COUNT; ++i) {
         m_btnUpgrades[i] = RetroButton(0, 0, 186, 38, "UPGRADE", Theme::GOLD);
     }
@@ -58,6 +60,7 @@ GarageScreen::GarageScreen()
 void GarageScreen::setButtonSound(std::function<void()> cb) {
     m_btnBack.setOnSound(cb);
     m_btnDrive.setOnSound(cb);
+    m_btnToggleRacer.setOnSound(cb);
     m_btnPrevVeh.setOnSound(cb);
     m_btnNextVeh.setOnSound(cb);
     m_btnUnlockVeh.setOnSound(cb);
@@ -76,6 +79,8 @@ void GarageScreen::setDimensions(int width, int height) {
 
     m_btnBack.setPosition(20, 14);
     m_btnDrive.setPosition(m_width - 170, 14);
+    m_btnToggleRacer.setPosition(m_width / 2 - 320, 14);
+    m_btnToggleRacer.setSize(130, 36);
 
     int cx = m_width / 2;
 
@@ -123,6 +128,7 @@ void GarageScreen::setDimensions(int width, int height) {
 void GarageScreen::onMouseMove(int px, int py) {
     m_btnBack.onMouseMove(px, py);
     m_btnDrive.onMouseMove(px, py);
+    m_btnToggleRacer.onMouseMove(px, py);
     m_btnPrevVeh.onMouseMove(px, py);
     m_btnNextVeh.onMouseMove(px, py);
     m_btnUnlockVeh.onMouseMove(px, py);
@@ -140,6 +146,7 @@ void GarageScreen::onMouseMove(int px, int py) {
 bool GarageScreen::onMouseDown(int px, int py, Core::ProfileManager& profile) {
     if (m_btnBack.onMouseDown(px, py)) return true;
     if (m_btnDrive.onMouseDown(px, py)) return true;
+    if (m_multiplayerFlow && m_btnToggleRacer.onMouseDown(px, py)) return true;
 
     // Check click on vehicle preview to trigger suspension bounce
     int cx = m_width / 2;
@@ -151,7 +158,7 @@ bool GarageScreen::onMouseDown(int px, int py, Core::ProfileManager& profile) {
 
     if (m_btnPrevVeh.onMouseDown(px, py)) return true;
     if (m_btnNextVeh.onMouseDown(px, py)) return true;
-    if (!profile.isVehicleUnlocked(m_viewedVehicle) && m_btnUnlockVeh.onMouseDown(px, py)) return true;
+    if (!m_multiplayerFlow && !profile.isVehicleUnlocked(m_viewedVehicle) && m_btnUnlockVeh.onMouseDown(px, py)) return true;
 
     if (m_btnPrevDriver.onMouseDown(px, py)) return true;
     if (m_btnNextDriver.onMouseDown(px, py)) return true;
@@ -171,31 +178,47 @@ void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
     m_btnBack.onMouseUp(px, py);
     m_btnDrive.onMouseUp(px, py);
 
+    if (m_multiplayerFlow && m_btnToggleRacer.isPressed() && m_btnToggleRacer.contains(px, py)) {
+        m_activeRacer = (m_activeRacer == 0) ? 1 : 0;
+        m_carBounceVel = -90.0f;
+    }
+    m_btnToggleRacer.onMouseUp(px, py);
+
     // Vehicle Carousel
     if (m_btnPrevVeh.isPressed() && m_btnPrevVeh.contains(px, py)) {
-        int cur = static_cast<int>(m_viewedVehicle);
         int total = static_cast<int>(Physics::VehicleType::COUNT);
-        m_viewedVehicle = static_cast<Physics::VehicleType>((cur + total - 1) % total);
-        if (profile.isVehicleUnlocked(m_viewedVehicle)) {
-            profile.setSelectedVehicle(m_viewedVehicle);
+        if (m_multiplayerFlow && m_activeRacer == 1) {
+            int cur = static_cast<int>(m_p2Vehicle);
+            m_p2Vehicle = static_cast<Physics::VehicleType>((cur + total - 1) % total);
+        } else {
+            int cur = static_cast<int>(m_viewedVehicle);
+            m_viewedVehicle = static_cast<Physics::VehicleType>((cur + total - 1) % total);
+            if (profile.isVehicleUnlocked(m_viewedVehicle)) {
+                profile.setSelectedVehicle(m_viewedVehicle);
+            }
         }
         m_carBounceVel = -130.0f;
     }
     m_btnPrevVeh.onMouseUp(px, py);
 
     if (m_btnNextVeh.isPressed() && m_btnNextVeh.contains(px, py)) {
-        int cur = static_cast<int>(m_viewedVehicle);
         int total = static_cast<int>(Physics::VehicleType::COUNT);
-        m_viewedVehicle = static_cast<Physics::VehicleType>((cur + 1) % total);
-        if (profile.isVehicleUnlocked(m_viewedVehicle)) {
-            profile.setSelectedVehicle(m_viewedVehicle);
+        if (m_multiplayerFlow && m_activeRacer == 1) {
+            int cur = static_cast<int>(m_p2Vehicle);
+            m_p2Vehicle = static_cast<Physics::VehicleType>((cur + 1) % total);
+        } else {
+            int cur = static_cast<int>(m_viewedVehicle);
+            m_viewedVehicle = static_cast<Physics::VehicleType>((cur + 1) % total);
+            if (profile.isVehicleUnlocked(m_viewedVehicle)) {
+                profile.setSelectedVehicle(m_viewedVehicle);
+            }
         }
         m_carBounceVel = -130.0f;
     }
     m_btnNextVeh.onMouseUp(px, py);
 
     // Unlock Vehicle Button
-    if (!profile.isVehicleUnlocked(m_viewedVehicle) && m_btnUnlockVeh.isPressed() && m_btnUnlockVeh.contains(px, py)) {
+    if (!m_multiplayerFlow && !profile.isVehicleUnlocked(m_viewedVehicle) && m_btnUnlockVeh.isPressed() && m_btnUnlockVeh.contains(px, py)) {
         if (profile.unlockVehicleWithCoins(m_viewedVehicle)) {
             m_carBounceVel = -220.0f;
             m_flashCardIdx = 99;
@@ -207,17 +230,27 @@ void GarageScreen::onMouseUp(int px, int py, Core::ProfileManager& profile) {
 
     // Driver Carousel
     if (m_btnPrevDriver.isPressed() && m_btnPrevDriver.contains(px, py)) {
-        int cur = static_cast<int>(profile.selectedDriver());
         int total = static_cast<int>(Physics::DriverType::COUNT);
-        profile.setSelectedDriver(static_cast<Physics::DriverType>((cur + total - 1) % total));
+        if (m_multiplayerFlow && m_activeRacer == 1) {
+            int cur = static_cast<int>(m_p2Driver);
+            m_p2Driver = static_cast<Physics::DriverType>((cur + total - 1) % total);
+        } else {
+            int cur = static_cast<int>(profile.selectedDriver());
+            profile.setSelectedDriver(static_cast<Physics::DriverType>((cur + total - 1) % total));
+        }
         m_carBounceVel = -70.0f;
     }
     m_btnPrevDriver.onMouseUp(px, py);
 
     if (m_btnNextDriver.isPressed() && m_btnNextDriver.contains(px, py)) {
-        int cur = static_cast<int>(profile.selectedDriver());
         int total = static_cast<int>(Physics::DriverType::COUNT);
-        profile.setSelectedDriver(static_cast<Physics::DriverType>((cur + 1) % total));
+        if (m_multiplayerFlow && m_activeRacer == 1) {
+            int cur = static_cast<int>(m_p2Driver);
+            m_p2Driver = static_cast<Physics::DriverType>((cur + 1) % total);
+        } else {
+            int cur = static_cast<int>(profile.selectedDriver());
+            profile.setSelectedDriver(static_cast<Physics::DriverType>((cur + 1) % total));
+        }
         m_carBounceVel = -70.0f;
     }
     m_btnNextDriver.onMouseUp(px, py);
@@ -345,6 +378,10 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     // 2. Header Plaque
     m_btnBack.render(fb, 2);
     m_btnDrive.render(fb, 2);
+    if (m_multiplayerFlow) {
+        m_btnToggleRacer.setText(m_activeRacer == 0 ? "RACER 1" : "RACER 2");
+        m_btnToggleRacer.render(fb, 2);
+    }
 
     int cx = m_width / 2;
     int headW = (m_width >= 1200) ? 350 : 280;
@@ -437,6 +474,16 @@ void GarageScreen::render(Graphics::Framebuffer& fb, Core::ProfileManager& profi
     }
     std::string driverTitle = "DRIVER: " + driverCfg.name;
     Graphics::RasterFont::drawString(fb, dBoxX + 32, dBoxY + 7, driverTitle, driverCfg.themeColor, 1);
+
+    if (m_multiplayerFlow) {
+        const auto& p2Veh = Physics::VehicleRegistry::getConfig(m_p2Vehicle);
+        const auto& p2Drv = Physics::VehicleRegistry::getDriver(m_p2Driver);
+        int p2BoxW = 320;
+        int p2BoxX = cx - p2BoxW / 2;
+        UIComponents::drawArcadePanel(fb, p2BoxX, 118, p2BoxW, 20, 0xEE141028, 0xFF7C4DFF, 0, 0, true, true);
+        std::string p2Text = "P2: " + p2Veh.name + " / " + p2Drv.name;
+        Graphics::RasterFont::drawStringCentered(fb, cx, 122, p2Text, 0xFFCE93D8, 1);
+    }
 
     // 5. Vehicle Interactive Preview on Hydraulic Lift
     drawVehiclePreview(fb, cx, 164, profile);

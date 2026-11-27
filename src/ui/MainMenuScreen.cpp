@@ -17,8 +17,9 @@ MainMenuScreen::MainMenuScreen()
     , m_height(Theme::VIRTUAL_HEIGHT)
     , m_animTime(0.0f)
     , m_btnStart(540, 95, 340, 40, "START SOLO RACE", Theme::GREEN_GAS)
-    , m_btnMultiplayer(540, 140, 340, 40, "REMOTE MULTIPLAYER", 0xFFFF5722)
-    , m_btnGrandPrix(540, 185, 340, 40, "GRAND PRIX CHALLENGE", Theme::GOLD)
+    , m_btnMultiplayer(540, 140, 340, 40, "LOCAL 2P RACE", 0xFFFF5722)
+    , m_btnOnline(540, 185, 340, 40, "ONLINE MULTIPLAYER", 0xFF00BCD4)
+    , m_btnGrandPrix(540, 230, 340, 40, "GRAND PRIX CHALLENGE", Theme::GOLD)
     , m_btnGarage(540, 230, 340, 38, "GARAGE & TUNING", 0xFFFFB300)
     , m_btnStages(540, 273, 340, 38, "STAGE SELECT", Theme::CYAN_UPGRADE)
     , m_btnAccount(540, 316, 340, 38, "RACER PROFILE & LEVEL", 0xFF7C4DFF)
@@ -28,6 +29,7 @@ MainMenuScreen::MainMenuScreen()
 {
     m_btnStart.setKeyHint("ENTER");
     m_btnMultiplayer.setKeyHint("M");
+    m_btnOnline.setKeyHint("N");
     m_btnGrandPrix.setKeyHint("C");
     m_btnGarage.setKeyHint("G");
     m_btnStages.setKeyHint("S");
@@ -44,11 +46,9 @@ void MainMenuScreen::setDimensions(int width, int height) {
 
     int btnW = (width >= 1200) ? 350 : 320;
     int btnX = width - btnW - (width >= 1200 ? 75 : 60);
-    int startY = (height >= 700) ? 108 : 94;
-    int btnH = (height >= 700) ? 40 : 38;
-    int btnHSmall = (height >= 700) ? 38 : 36;
-    int gap = (height >= 700) ? 46 : 42;
-    int gapSmall = (height >= 700) ? 44 : 40;
+    int startY = (height >= 700) ? 100 : 78;
+    int btnH = (height >= 700) ? 40 : 36;
+    int gap = (height >= 700) ? 42 : 40;
 
     m_btnStart.setPosition(btnX, startY);
     m_btnStart.setSize(btnW, btnH);
@@ -56,31 +56,35 @@ void MainMenuScreen::setDimensions(int width, int height) {
     m_btnMultiplayer.setPosition(btnX, startY + gap);
     m_btnMultiplayer.setSize(btnW, btnH);
 
-    m_btnGrandPrix.setPosition(btnX, startY + gap * 2);
+    m_btnOnline.setPosition(btnX, startY + gap * 2);
+    m_btnOnline.setSize(btnW, btnH);
+
+    m_btnGrandPrix.setPosition(btnX, startY + gap * 3);
     m_btnGrandPrix.setSize(btnW, btnH);
 
-    m_btnGarage.setPosition(btnX, startY + gap * 3);
-    m_btnGarage.setSize(btnW, btnHSmall);
+    m_btnGarage.setPosition(btnX, startY + gap * 4);
+    m_btnGarage.setSize(btnW, btnH);
 
-    m_btnStages.setPosition(btnX, startY + gap * 3 + gapSmall);
-    m_btnStages.setSize(btnW, btnHSmall);
+    m_btnStages.setPosition(btnX, startY + gap * 5);
+    m_btnStages.setSize(btnW, btnH);
 
-    m_btnAccount.setPosition(btnX, startY + gap * 3 + gapSmall * 2);
-    m_btnAccount.setSize(btnW, btnHSmall);
+    m_btnAccount.setPosition(btnX, startY + gap * 6);
+    m_btnAccount.setSize(btnW, btnH);
 
-    m_btnAchievements.setPosition(btnX, startY + gap * 3 + gapSmall * 4);
-    m_btnAchievements.setSize(btnW, btnHSmall);
+    m_btnAchievements.setPosition(btnX, startY + gap * 7);
+    m_btnAchievements.setSize(btnW, btnH);
 
-    m_btnEvaluator.setPosition(btnX, startY + gap * 3 + gapSmall * 5);
-    m_btnEvaluator.setSize(btnW, btnHSmall);
+    m_btnEvaluator.setPosition(btnX, startY + gap * 8);
+    m_btnEvaluator.setSize(btnW, btnH);
 
-    m_btnQuit.setPosition(btnX, startY + gap * 3 + gapSmall * 6);
-    m_btnQuit.setSize(btnW, (height >= 700) ? 34 : 32);
+    m_btnQuit.setPosition(btnX, startY + gap * 9);
+    m_btnQuit.setSize(btnW, (height >= 700) ? 38 : 34);
 }
 
 void MainMenuScreen::onMouseMove(int px, int py) {
     m_btnStart.onMouseMove(px, py);
     m_btnMultiplayer.onMouseMove(px, py);
+    m_btnOnline.onMouseMove(px, py);
     m_btnGrandPrix.onMouseMove(px, py);
     m_btnGarage.onMouseMove(px, py);
     m_btnStages.onMouseMove(px, py);
@@ -93,6 +97,7 @@ void MainMenuScreen::onMouseMove(int px, int py) {
 bool MainMenuScreen::onMouseDown(int px, int py) {
     if (m_btnStart.onMouseDown(px, py)) return true;
     if (m_btnMultiplayer.onMouseDown(px, py)) return true;
+    if (m_btnOnline.onMouseDown(px, py)) return true;
     if (m_btnGrandPrix.onMouseDown(px, py)) return true;
     if (m_btnGarage.onMouseDown(px, py)) return true;
     if (m_btnStages.onMouseDown(px, py)) return true;
@@ -106,6 +111,7 @@ bool MainMenuScreen::onMouseDown(int px, int py) {
 void MainMenuScreen::onMouseUp(int px, int py) {
     m_btnStart.onMouseUp(px, py);
     m_btnMultiplayer.onMouseUp(px, py);
+    m_btnOnline.onMouseUp(px, py);
     m_btnGrandPrix.onMouseUp(px, py);
     m_btnGarage.onMouseUp(px, py);
     m_btnStages.onMouseUp(px, py);
@@ -303,20 +309,24 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
 
     bool isBn = Core::LocalizationManager::instance().isBengali();
     m_btnStart.setText(isBn ? "KHELA SHURU" : "SOLO RACE");
-    m_btnMultiplayer.setText(isBn ? "2P LORAI (ONLINE)" : "ONLINE MULTIPLAYER");
+    m_btnMultiplayer.setText(isBn ? "STHANIYA 2P LORAI" : "LOCAL 2P RACE");
+    m_btnOnline.setText(isBn ? "ANLINE LORAI" : "ONLINE MULTIPLAYER");
     m_btnGrandPrix.setText(isBn ? "SERADER CHALLENGE" : "GRAND PRIX CHALLENGE");
     m_btnGarage.setText(isBn ? "GARIR KARKHANA" : "GARAGE & TUNING");
     m_btnStages.setText(isBn ? "POHTH BACHHO" : "STAGE SELECT");
     m_btnAccount.setText(isBn ? "PILOT PROFILE" : "RACER PROFILE & LEVEL");
+    m_btnAchievements.setText(isBn ? "SOPHOLTA" : "ACHIEVEMENTS");
     m_btnEvaluator.setText(isBn ? "PROFESSOR BABUR PASS" : "VIP EVALUATOR MODE");
     m_btnQuit.setText(isBn ? "BERIYE JAWA" : "QUIT GAME");
 
     m_btnStart.render(fb, 2);
     m_btnMultiplayer.render(fb, 2);
+    m_btnOnline.render(fb, 2);
     m_btnGrandPrix.render(fb, 2);
     m_btnGarage.render(fb, 2);
     m_btnStages.render(fb, 2);
     m_btnAccount.render(fb, 2);
+    m_btnAchievements.render(fb, 2);
     m_btnEvaluator.render(fb, 2);
     m_btnQuit.render(fb, 2);
 
@@ -414,7 +424,7 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     fb.fillRect(0, footY, m_width, footH, 0xEE090E18);
     fb.drawLine(0, footY, m_width, footY, 0xFF1E2B3E);
 
-    int totalFooterW = 695;
+    int totalFooterW = 790;
     int startKx = (m_width - totalFooterW) / 2;
     int ky = footY + 6;
 
@@ -422,13 +432,18 @@ void MainMenuScreen::render(Graphics::Framebuffer& fb, const Core::ProfileManage
     UIComponents::drawKeycap(fb, startKx, ky, "ENTER");
     Graphics::RasterFont::drawString(fb, startKx + 46, ky + 4, "SOLO", Theme::GREEN_GAS, 1);
 
-    // M: 2P RACE
+    // M: LOCAL 2P RACE
     int mKx = startKx + 95;
     UIComponents::drawKeycap(fb, mKx, ky, "M");
-    Graphics::RasterFont::drawString(fb, mKx + 22, ky + 4, "2P RACE", 0xFFFF9100, 1);
+    Graphics::RasterFont::drawString(fb, mKx + 22, ky + 4, "2P", 0xFFFF9100, 1);
+
+    // N: ONLINE MULTIPLAYER
+    int nKx = mKx + 70;
+    UIComponents::drawKeycap(fb, nKx, ky, "N");
+    Graphics::RasterFont::drawString(fb, nKx + 22, ky + 4, "ONLINE", Theme::CYAN_UPGRADE, 1);
 
     // P1: WASD
-    int p1Kx = mKx + 95;
+    int p1Kx = nKx + 95;
     Graphics::RasterFont::drawString(fb, p1Kx, ky + 4, "P1:", Theme::TEXT_MUTED, 1);
     UIComponents::drawKeycap(fb, p1Kx + 26, ky, "W");
     UIComponents::drawKeycap(fb, p1Kx + 46, ky, "A");

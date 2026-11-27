@@ -155,6 +155,18 @@ void GameClient::processPacket(const QByteArray& packetData) {
             m_onRaceStart(biome);
         }
     }
+    else if (type == PacketType::REMATCH) {
+        std::string biome = obj["biomeId"].toString().toStdString();
+        m_currentBiomeId = biome;
+        if (m_onRematch) {
+            m_onRematch(biome);
+        }
+    }
+    else if (type == PacketType::RETURN_TO_LOBBY) {
+        if (m_onReturnToLobby) {
+            m_onReturnToLobby();
+        }
+    }
     else if (type == PacketType::PLAYER_TELEMETRY) {
         int id = obj["playerId"].toInt();
         if (id == m_localPlayerId) return; // Ignore own echoes
@@ -185,6 +197,7 @@ void GameClient::processPacket(const QByteArray& packetData) {
         st.isAirborne = obj["air"].toBool();
         st.isCrashed = obj["crash"].toBool();
         st.isFinished = obj["fin"].toBool();
+        st.finishTime = static_cast<float>(obj["finTime"].toDouble());
 
         // If newly seen player, initialize current position immediately
         if (m_remotePlayers.find(id) == m_remotePlayers.end()) {
@@ -208,6 +221,21 @@ void GameClient::processPacket(const QByteArray& packetData) {
         int pId = obj["playerId"].toInt();
         if (m_onItemCollected) {
             m_onItemCollected(itemIdx, pId);
+        }
+    }
+    else if (type == PacketType::PLAYER_CRASHED) {
+        int pId = obj["playerId"].toInt();
+        float dist = static_cast<float>(obj["dist"].toDouble());
+        if (m_onRemotePlayerCrashed) {
+            m_onRemotePlayerCrashed(pId, dist);
+        }
+    }
+    else if (type == PacketType::PLAYER_FINISHED) {
+        int pId = obj["playerId"].toInt();
+        float dist = static_cast<float>(obj["dist"].toDouble());
+        float time = static_cast<float>(obj["time"].toDouble());
+        if (m_onRemotePlayerFinished) {
+            m_onRemotePlayerFinished(pId, dist, time);
         }
     }
     else if (type == PacketType::GRAND_PRIX_NEXT_ROUND) {
@@ -264,6 +292,7 @@ void GameClient::sendTelemetry(const RemotePlayerState& state) {
     obj["air"] = state.isAirborne;
     obj["crash"] = state.isCrashed;
     obj["fin"] = state.isFinished;
+    obj["finTime"] = state.finishTime;
 
     sendPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
@@ -274,6 +303,39 @@ void GameClient::sendItemCollected(int itemIndex) {
     QJsonObject obj;
     obj["type"] = static_cast<int>(PacketType::ITEM_COLLECTED);
     obj["itemIdx"] = itemIndex;
+    obj["playerId"] = m_localPlayerId;
+
+    sendPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+void GameClient::sendPlayerCrashed(float distance) {
+    if (!isConnected()) return;
+
+    QJsonObject obj;
+    obj["type"] = static_cast<int>(PacketType::PLAYER_CRASHED);
+    obj["playerId"] = m_localPlayerId;
+    obj["dist"] = distance;
+
+    sendPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+void GameClient::sendPlayerFinished(float distance, float time) {
+    if (!isConnected()) return;
+
+    QJsonObject obj;
+    obj["type"] = static_cast<int>(PacketType::PLAYER_FINISHED);
+    obj["playerId"] = m_localPlayerId;
+    obj["dist"] = distance;
+    obj["time"] = time;
+
+    sendPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+void GameClient::sendReturnToLobby() {
+    if (!isConnected()) return;
+
+    QJsonObject obj;
+    obj["type"] = static_cast<int>(PacketType::RETURN_TO_LOBBY);
     obj["playerId"] = m_localPlayerId;
 
     sendPacket(QJsonDocument(obj).toJson(QJsonDocument::Compact));

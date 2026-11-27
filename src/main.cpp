@@ -31,6 +31,37 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (argc > 1 && (std::string(argv[1]) == "--test-multiplayer-modes" ||
+                     std::string(argv[1]) == "--multiplayer-modes-test")) {
+        bool ok = true;
+        auto check = [&ok](bool condition, const std::string& label) {
+            std::cout << (condition ? "[PASS] " : "[FAIL] ") << label << std::endl;
+            if (!condition) ok = false;
+        };
+
+        auto& sm = engine.stateManager();
+        sm.startMultiplayerRace();
+        check(sm.currentState() == Core::StateType::GARAGE, "local multiplayer enters garage");
+        check(sm.garageScreen().multiplayerMode(), "garage exposes P2 selection");
+
+        sm.startLocalMultiplayerRace("desert");
+        check(sm.currentState() == Core::StateType::MULTIPLAYER_RACE, "local race uses split-screen state");
+        check(sm.physics().isMultiplayer(), "local race simulates two vehicles");
+        check(sm.camera().centerYFrac() > 0.57f, "local race uses compact camera framing");
+
+        sm.fixedUpdate(1.0f / 60.0f);
+        check(sm.physics().vehicle2().fuel() > 0.0f, "P2 vehicle is live in local split-screen");
+
+        sm.startNetworkMultiplayer(true, "countryside");
+        check(sm.currentState() == Core::StateType::ONLINE_RACE, "network race uses online state");
+        check(!sm.physics().isMultiplayer(), "network race keeps single local vehicle");
+        check(sm.camera().centerYFrac() < 0.57f, "network race uses full-screen camera framing");
+
+        std::cout << (ok ? "[PASS] multiplayer mode separation verified"
+                         : "[FAIL] multiplayer mode separation failed") << std::endl;
+        return ok ? 0 : 1;
+    }
+
     if (argc > 1 && (std::string(argv[1]) == "--test-achievements" ||
                      std::string(argv[1]) == "--achievements-test")) {
         Core::AccountManager& accounts = Core::AccountManager::instance();

@@ -35,6 +35,13 @@ public:
     Physics::VehicleType viewedVehicle() const { return m_viewedVehicle; }
     void setViewedVehicle(Physics::VehicleType type) { m_viewedVehicle = type; }
 
+    void setMultiplayerMode(bool enabled) { m_multiplayerFlow = enabled; }
+    bool multiplayerMode() const { return m_multiplayerFlow; }
+    Physics::VehicleType p2Vehicle() const { return m_p2Vehicle; }
+    Physics::DriverType p2Driver() const { return m_p2Driver; }
+    void setP2Vehicle(Physics::VehicleType type) { m_p2Vehicle = type; }
+    void setP2Driver(Physics::DriverType type) { m_p2Driver = type; }
+
 private:
     int m_width;
     int m_height;
@@ -46,12 +53,17 @@ private:
 
     Physics::VehicleType m_viewedVehicle;
     int m_activeTab; // 0 = Powertrain & Traction, 1 = Handling & Chassis
+    bool m_multiplayerFlow = false;
+    int m_activeRacer = 0;
+    Physics::VehicleType m_p2Vehicle = Physics::VehicleType::OFFROADER;
+    Physics::DriverType m_p2Driver = Physics::DriverType::BILL;
     std::function<void()> m_onUpgradePurchased;
     std::function<void()> m_onVehicleUnlocked;
 
     // Navigation & Actions
     RetroButton m_btnBack;
     RetroButton m_btnDrive;
+    RetroButton m_btnToggleRacer;
 
     // Vehicle Carousel
     RetroButton m_btnPrevVeh;

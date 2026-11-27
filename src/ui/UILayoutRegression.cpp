@@ -60,26 +60,25 @@ struct ResolutionLayout {
         return {0, 0, width, height};
     }
 
-    // Main Menu Buttons (9 buttons)
+    // Main Menu Buttons (10 buttons)
     std::vector<Rect> getMainMenuButtons() const {
         int btnW = (width >= 1200) ? 350 : 320;
         int btnX = width - btnW - (width >= 1200 ? 75 : 60);
-        int startY = (height >= 700) ? 108 : 94;
-        int btnH = (height >= 700) ? 40 : 38;
-        int btnHSmall = (height >= 700) ? 38 : 36;
-        int gap = (height >= 700) ? 46 : 42;
-        int gapSmall = (height >= 700) ? 44 : 40;
+        int startY = (height >= 700) ? 100 : 78;
+        int btnH = (height >= 700) ? 40 : 36;
+        int gap = (height >= 700) ? 42 : 40;
 
         std::vector<Rect> btns;
         btns.push_back({btnX, startY, btnW, btnH});                                // Start
-        btns.push_back({btnX, startY + gap, btnW, btnH});                          // Multiplayer
-        btns.push_back({btnX, startY + gap * 2, btnW, btnH});                      // Grand Prix
-        btns.push_back({btnX, startY + gap * 3, btnW, btnHSmall});                 // Garage
-        btns.push_back({btnX, startY + gap * 3 + gapSmall, btnW, btnHSmall});      // Stages
-        btns.push_back({btnX, startY + gap * 3 + gapSmall * 2, btnW, btnHSmall});  // Account
-        btns.push_back({btnX, startY + gap * 3 + gapSmall * 4, btnW, btnHSmall});  // Achievements
-        btns.push_back({btnX, startY + gap * 3 + gapSmall * 5, btnW, btnHSmall});  // Evaluator
-        btns.push_back({btnX, startY + gap * 3 + gapSmall * 6, btnW, (height >= 700) ? 34 : 32}); // Quit
+        btns.push_back({btnX, startY + gap, btnW, btnH});                          // Local 2P
+        btns.push_back({btnX, startY + gap * 2, btnW, btnH});                      // Online
+        btns.push_back({btnX, startY + gap * 3, btnW, btnH});                      // Grand Prix
+        btns.push_back({btnX, startY + gap * 4, btnW, btnH});                      // Garage
+        btns.push_back({btnX, startY + gap * 5, btnW, btnH});                      // Stages
+        btns.push_back({btnX, startY + gap * 6, btnW, btnH});                      // Account
+        btns.push_back({btnX, startY + gap * 7, btnW, btnH});                      // Achievements
+        btns.push_back({btnX, startY + gap * 8, btnW, btnH});                      // Evaluator
+        btns.push_back({btnX, startY + gap * 9, btnW, (height >= 700) ? 38 : 34}); // Quit
         return btns;
     }
 
@@ -378,7 +377,7 @@ int UILayoutRegression::run() {
             }
         }
         std::cout << "  " << w << "x" << h << " Menu Buttons Non-Overlap: "
-                  << (!resOverlap ? "PASS (0 overlaps among 9 buttons)" : "FAIL") << std::endl;
+                  << (!resOverlap ? "PASS (0 overlaps among 10 buttons)" : "FAIL") << std::endl;
         if (resOverlap) check2Pass = false;
     }
     if (!check2Pass) allPassed = false;

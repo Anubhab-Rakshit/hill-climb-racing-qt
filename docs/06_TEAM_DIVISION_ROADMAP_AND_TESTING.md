@@ -88,7 +88,7 @@ graph LR
 #### 🧪 Member 5 (or Distributed): QA, Testing & Visual Polish Lead
 - **Scope**: Implements built-in automated CLI test suites, HUD telemetry gauges, responsive screen scaling, and project presentation.
 - **Primary Deliverables**:
-  - 9 comprehensive CLI verification suites (`--test-ui-layout`, `--test-box2d`, `--test-box2d-vehicles`, `--test-box2d-world`, `--test-physics`, `--test-terrain`, `--test-audio`, `--test-achievements`, `--smoke-test`).
+  - 10 comprehensive CLI verification suites (`--test-ui-layout`, `--test-box2d`, `--test-box2d-vehicles`, `--test-box2d-world`, `--test-physics`, `--test-terrain`, `--test-audio`, `--test-achievements`, `--test-multiplayer-modes`, `--smoke-test`).
   - Responsive screen layouts for $960 \times 540$ and $1280 \times 720$ with zero element occlusion.
   - Analog needle gauges for RPM and Speedometer; segmented flashing fuel bar with low-fuel alert.
   - Automated physics regression verification (suspension stability, non-penetration audit).
@@ -176,7 +176,10 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 # 8. Achievements & Meta-Progression Suite
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements
 
-# 9. End-to-End Procedural Reachability & Smoke Test
+# 9. Multiplayer Mode Separation Suite
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-multiplayer-modes
+
+# 10. End-to-End Procedural Reachability & Smoke Test
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 ```
 
@@ -189,7 +192,8 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 6. **Terrain & Materials (`--test-terrain`)**: Validates 9 track recipes, signature features, surface-zone coverage, flat starts, 5000m climbability/reachability, material registry and friction ordering, boundary blending, and Box2D/legacy braking-deceleration order across ice, mud, sand, grass, and rock.
 7. **Dynamic Audio Audit (`--test-audio`)**: Validates volume hierarchy, BGM crossfading, dynamic engine RPM pitch modulation (1000 to 8500 RPM), tire rolling audio, crash intensity scaling, environmental wind loop, and multi-channel anti-clipping limiter.
 8. **Achievements & Meta-Progression (`--test-achievements`)**: Validates 12 achievement definitions, per-account unlock persistence, lifetime stat thresholds, one-time coin/XP rewards, duplicate unlock protection, and profile-count synchronization for vehicles, upgrades, and Grand Prix trophies.
-9. **Procedural Reachability (`--smoke-test`)**: Validates procedural climbability (< 38° slopes) and fuel reachability (< 165m intervals) across all 6 biomes, verifies stage progression unlock chaining, stationary idle stability, and exports visual screen verification captures to `scratch/`.
+9. **Multiplayer Mode Separation (`--test-multiplayer-modes`)**: Validates the local split-screen garage-to-race flow, dual-vehicle simulation, compact camera framing, online race state, single local vehicle simulation, and full-screen network camera framing.
+10. **Procedural Reachability (`--smoke-test`)**: Validates procedural climbability (< 38° slopes) and fuel reachability (< 165m intervals) across all 6 biomes, verifies stage progression unlock chaining, stationary idle stability, and exports visual screen verification captures to `scratch/`.
 
 ---
 

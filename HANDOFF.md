@@ -32,7 +32,7 @@ All gameplay and UI pixels are written into a 32-bit ARGB `Framebuffer` and blit
   - `A` tilt left (air)
   - `D` tilt right (air)
   - Arrow keys for Player 2
-  - `Esc`/`P` pause, `R` restart, `Enter`/`Space` select, `M` multiplayer
+  - `Esc`/`P` pause, `R` restart, `Enter`/`Space` select, `M` local split-screen, `N` online multiplayer
 - Box2D motor direction was fixed so `W` drives +X and `S` drives -X.
 - `A/D` no longer trigger gas/brake.
 - Combined `S` brake/reverse is covered by a dedicated Box2D regression test.
@@ -79,6 +79,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-physics
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-terrain
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-audio
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-achievements
+QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-multiplayer-modes
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --smoke-test
 QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 ```
@@ -99,6 +100,7 @@ QT_QPA_PLATFORM=offscreen ./build/HillClimbRacingQt --test-ui-layout
 - `--test-terrain`: passing all 9 recipes, material ordering, blending, and Box2D/legacy braking order.
 - `--test-audio`: passing.
 - `--test-achievements`: passing all 12 definitions, one-time rewards, persistence, and profile-count sync.
+- `--test-multiplayer-modes`: passing local split-screen vs online race separation and camera framing checks.
 - `--smoke-test`: passing on Box2D.
 - `--smoke-test --legacy-physics`: passing on the legacy solver.
 - `--test-ui-layout`: passing automated layout regression and screenshot capture at 960x540 and 1280x720.
